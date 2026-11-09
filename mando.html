@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#171614" />
+    <title>Mando arcade · Micro GP</title>
+  </head>
+  <body>
+    <main class="panel" data-link="connecting" aria-label="Mando arcade Micro GP">
+      <span class="screw screw--tl" aria-hidden="true"></span>
+      <span class="screw screw--tr" aria-hidden="true"></span>
+      <span class="screw screw--bl" aria-hidden="true"></span>
+      <span class="screw screw--br" aria-hidden="true"></span>
+
+      <header class="nameplate">
+        <div class="mark">
+          <h1>MICRO <span>GP</span></h1>
+          <p class="eyebrow">Taller 07</p>
+        </div>
+        <p class="connection" role="status">
+          <span class="pilot" aria-hidden="true"></span>
+          <span id="link-status">Conectando</span>
+        </p>
+        <div class="driver">
+          <div class="dorsal">
+            <span class="eyebrow">Dorsal</span>
+            <strong id="car-number">—</strong>
+          </div>
+          <p id="car-name">Sin auto</p>
+        </div>
+      </header>
+
+      <div class="deck">
+        <div class="control">
+          <div class="steering" id="steering" tabindex="-1" role="slider" aria-label="Giro"
+            aria-orientation="horizontal" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"
+            aria-valuetext="Centro" aria-disabled="true">
+            <span class="steering-socket" aria-hidden="true">
+              <span class="steering-boot"></span>
+            </span>
+            <span class="steering-arm" aria-hidden="true">
+              <span class="steering-shaft"></span>
+              <span class="steering-knob"></span>
+            </span>
+          </div>
+        </div>
+        <div class="control">
+          <button id="brake" class="pedal pedal--brake" type="button" aria-pressed="false" disabled>
+            <span class="pedal-cap">FRENO</span>
+          </button>
+        </div>
+        <div class="control">
+          <button id="gas" class="pedal pedal--gas" type="button" aria-pressed="false" disabled>
+            <span class="pedal-cap">GAS</span>
+          </button>
+        </div>
+      </div>
+
+      <footer class="panel-footer">
+        Mirá la pista compartida
+      </footer>
+    </main>
+    <script type="module" src="/src/controller/main.ts"></script>
+  </body>
+</html>

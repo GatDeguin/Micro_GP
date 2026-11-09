@@ -1,0 +1,112 @@
+.view-tools {
+  position: fixed;
+  z-index: 2;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  color: #f1e4cf;
+  font: 500 0.875rem/1.35 system-ui, sans-serif;
+}
+
+.view-tools-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.38rem 0.75rem;
+  border: 1px solid #88705a;
+  border-radius: 0.45rem;
+  background: #251f1bee;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.view-tools-trigger:is(:hover, [aria-expanded="true"]) {
+  background: #3b3026;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .view-tools:not(:hover, :focus-within) .view-tools-trigger[aria-expanded="false"] {
+    opacity: 0;
+  }
+}
+
+.view-tools-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  box-sizing: border-box;
+  width: min(17rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 4.6rem);
+  padding: 0.65rem;
+  overflow: auto;
+  border: 1px solid #88705a;
+  border-radius: 0.55rem;
+  background: #26211e;
+  box-shadow: 0 0.4rem 1.5rem #17110bcc;
+}
+
+.view-tools-panel[hidden] {
+  display: none;
+}
+
+.view-tools-views {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.view-tools-views legend {
+  padding: 0.25rem 0.3rem 0.35rem;
+  color: #cdb79c;
+  font-size: 0.75rem;
+}
+
+.view-tools-panel label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0 0.45rem;
+  border-radius: 0.32rem;
+  cursor: pointer;
+}
+
+.view-tools-panel label:is(:hover, :has(input:checked)) {
+  background: #49392e;
+}
+
+.view-tools-panel input {
+  inline-size: 1rem;
+  block-size: 1rem;
+  margin: 0;
+  accent-color: #e4bb82;
+}
+
+.view-tools-trigger:focus-visible,
+.view-tools-panel label:has(input:focus-visible) {
+  outline: 2px solid #f6d5a9;
+  outline-offset: 1px;
+}
+
+.view-tools-panel kbd {
+  padding: 0.05rem 0.3rem;
+  border: 1px solid #766151;
+  border-radius: 0.22rem;
+  color: #e5cbae;
+  font: 0.7rem/1.4 ui-monospace, monospace;
+}
+
+.view-tools-split {
+  margin-top: 0.4rem;
+  border-top: 1px solid #6b5546;
+}
+
+.view-tools-status {
+  min-height: 2.25em;
+  margin: 0.15rem 0.45rem 0.1rem;
+  color: #d2bfa8;
+  font-size: 0.75rem;
+}

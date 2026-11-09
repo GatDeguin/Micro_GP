@@ -1,0 +1,341 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { NEUTRAL, type DriveInput, type Driver } from '../src/shared/protocol.ts';
+import type { TRACK as Track } from '../src/shared/track.ts';
+import type { LapProgress } from '../src/sim/progress.ts';
+import type { Race } from '../src/sim/race.ts';
+
+const TICK = 1 / 60;
+
+function step(race: Race, seconds: number, drivers: readonly Driver[] = []) {
+  for (let i = 0; i < Math.round(seconds / TICK); i++) race.step(TICK, drivers);
+}
+
+function runUntil(race: Race, seconds: number, drivers: readonly Driver[], condition: () => boolean) {
+  for (let i = 0; i < Math.round(seconds / TICK); i++) {
+    if (condition()) return i * TICK;
+    race.step(TICK, drivers);
+  }
+  assert.ok(condition(), 'simulation did not reach the expected state');
+  return seconds;
+}
+
+function drive(input: DriveInput): Driver[] {
+  return [{ owned: true, input }];
+}
+
+function follow(track: typeof Track, progress: LapProgress, from: number, to: number, forward = true) {
+  let last = track.sampleAt(from);
+  const steps = Math.ceil(Math.abs(to - from) / 0.16);
+  for (let i = 1; i <= steps; i++) {
+    const next = track.sampleAt(from + (to - from) * i / steps);
+    progress.advance(last, next, forward);
+    last = next;
+  }
+}
+
+test('the closed course has a compound right entry and stays within the grade limit', async () => {
+  const { TRACK, ROAD_HALF, WALL_HALF } = await import('../src/shared/track.ts');
+  const start = TRACK.sampleAt(0);
+  assert.deepEqual([start.x, start.y, start.z, start.dx, start.dz], [-3.75, 0, 8.6875, 1, 0]);
+  assert.equal(ROAD_HALF * 2, 78 / 16);
+  assert.ok(Math.abs(TRACK.length - 119.26) < 0.05);
+  assert.deepEqual(TRACK.sampleAt(TRACK.length), start);
+
+  const bendIn = TRACK.locate(15.98, 6.70);
+  const bendOut = TRACK.locate(20.69, 4.79);
+  const apex = TRACK.locate(24.77, 0.81);
+  assert.ok(Math.abs(bendIn.offset) < 0.01 && Math.abs(bendOut.offset) < 0.01);
+  assert.ok(bendIn.s < bendOut.s && bendOut.s < apex.s);
+  assert.ok(bendIn.dz < -0.5 && bendOut.dz > -0.34 && apex.dz < -0.9);
+
+  let steepestClimb = 0;
+  let steepestDescent = 0;
+  const segmentLengths = TRACK.samples.map((point, i) => {
+    const next = TRACK.samples[(i + 1) % TRACK.samples.length];
+    const run = Math.hypot(next.x - point.x, next.z - point.z);
+    const rise = next.y - point.y;
+    for (const offset of [-WALL_HALF, WALL_HALF]) {
+      const edgeX = next.x - point.x - (next.dz - point.dz) * offset;
+      const edgeZ = next.z - point.z + (next.dx - point.dx) * offset;
+      const edgeRun = Math.hypot(edgeX, edgeZ);
+      assert.ok(edgeX * (next.x - point.x) + edgeZ * (next.z - point.z) > 0);
+      const grade = rise / edgeRun;
+      assert.ok(Math.abs(grade) <= 0.127);
+      steepestClimb = Math.max(steepestClimb, grade);
+      steepestDescent = Math.max(steepestDescent, -grade);
+    }
+    return run;
+  });
+  assert.ok(Math.min(...segmentLengths) / Math.max(...segmentLengths) > 0.99);
+  assert.ok(steepestClimb > 0.10 && steepestDescent > 0.10);
+  assert.equal(Math.max(...TRACK.samples.map(point => point.y)), 2.15);
+
+  const lane = TRACK.locate(-3.75, 9.8875);
+  assert.ok(Math.min(lane.s, TRACK.length - lane.s) < 0.001);
+  assert.ok(Math.abs(lane.offset - 1.2) < 0.001);
+});
+
+test('the start arms the lap and a finish requires forward travel through each gate', async () => {
+  const { TRACK } = await import('../src/shared/track.ts');
+  const { LapProgress } = await import('../src/sim/progress.ts');
+  const progress = new LapProgress(-1.6);
+  follow(TRACK, progress, -1.6, 0.4);
+  assert.equal(progress.lap, 0);
+
+  follow(TRACK, progress, 0.4, TRACK.length - 0.4);
+  follow(TRACK, progress, TRACK.length - 0.4, TRACK.length + 0.4, false);
+  assert.equal(progress.lap, 0, 'reverse gear cannot award a lap');
+  follow(TRACK, progress, TRACK.length + 0.4, TRACK.length - 0.4);
+  assert.equal(progress.lap, 0, 'crossing the line the wrong way cannot award a lap');
+  follow(TRACK, progress, TRACK.length - 0.4, TRACK.length + 0.4);
+  assert.equal(progress.lap, 1);
+});
+
+test('a jump past Curvón cannot award its checkpoint or the lap', async () => {
+  const { TRACK } = await import('../src/shared/track.ts');
+  const { LapProgress } = await import('../src/sim/progress.ts');
+  const progress = new LapProgress(-1.6);
+  follow(TRACK, progress, -1.6, 90);
+  const beforeJump = progress.distance;
+  progress.advance(TRACK.sampleAt(90), TRACK.sampleAt(96), true);
+  assert.equal(progress.distance, beforeJump);
+  follow(TRACK, progress, 96, TRACK.length + 0.4);
+  assert.equal(progress.lap, 0);
+  assert.ok(progress.distance < 93, 'ranking remains below the missed gate');
+});
+
+test('four bots drive the whole race and the result resets to a new grid', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const opening = race.snapshot();
+  assert.equal(opening.phase, 'demo');
+  assert.equal(opening.cars.length, 4);
+  step(race, 0.3);
+  assert.notEqual(race.snapshot().cars[0].x, opening.cars[0].x);
+
+  const human = drive(NEUTRAL);
+  const lights = new Set<number>();
+  runUntil(race, 3, human, () => {
+    const state = race.snapshot();
+    if (state.phase === 'grid') lights.add(state.lights);
+    return state.phase === 'race';
+  });
+  assert.deepEqual([...lights], [0, 1, 2, 3]);
+  assert.equal(race.snapshot().lights, 0);
+
+  const bots = [{ owned: true, input: null }];
+  const openingLap = runUntil(race, 27, bots, () => race.snapshot().cars.every(car => car.lap >= 1));
+  const firstFinish = openingLap + runUntil(race, 74 - openingLap, bots, () => race.snapshot().flag);
+  assert.ok(firstFinish >= 53);
+  const resultsDelay = runUntil(race, 15.1, bots, () => race.snapshot().phase === 'results');
+  assert.ok(resultsDelay < 15);
+  const result = race.snapshot();
+  assert.deepEqual(result.cars.map(car => car.lap), [3, 3, 3, 3]);
+  assert.equal(new Set(result.order).size, 4);
+  assert.equal(result.cars[0].owned, true);
+
+  step(race, 5.95, bots);
+  assert.equal(race.snapshot().phase, 'results');
+  step(race, 0.06, bots);
+  assert.equal(race.snapshot().phase, 'grid');
+  assert.equal(race.snapshot().heat, result.heat + 1);
+  step(race, 0.1);
+  assert.equal(race.snapshot().phase, 'demo');
+});
+
+test('after the first finish the race closes with unfinished cars ranked by valid progress', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const human = drive(NEUTRAL);
+  runUntil(race, 77, human, () => race.snapshot().flag);
+  step(race, 14.95, human);
+  assert.equal(race.snapshot().phase, 'race');
+  step(race, 0.07, human);
+  const result = race.snapshot();
+  assert.equal(result.phase, 'results');
+  assert.equal(result.order.at(-1), 0);
+  assert.equal(result.cars[0].lap, 0);
+});
+
+test('an active joystick turns the car right while GAS propels it forward', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const neutral = new Race();
+  const turning = new Race();
+  step(neutral, 3, drive(NEUTRAL));
+  step(turning, 3, drive(NEUTRAL));
+  const startingX = turning.snapshot().cars[0].x;
+  step(neutral, 0.75, drive({ ...NEUTRAL, gas: true }));
+  step(turning, 0.75, drive({ ...NEUTRAL, gas: true, x: 0.45 }));
+  const straightCar = neutral.snapshot().cars[0];
+  const turningCar = turning.snapshot().cars[0];
+  assert.ok(turningCar.x > startingX + 0.7);
+  assert.ok(turningCar.z > straightCar.z + 0.08);
+  assert.ok(turningCar.yaw < straightCar.yaw - 0.15);
+});
+
+test('small steering inputs from the calibrated controller still reach the wheels', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  step(race, 3.3, drive({ ...NEUTRAL, gas: true, x: 0.06 }));
+  assert.equal(race.snapshot().cars[0].steer, 0.06);
+});
+
+test('the starting grid fits the larger bodies with clearance in both directions', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const { TRACK } = await import('../src/shared/track.ts');
+  const race = new Race();
+  step(race, TICK, drive(NEUTRAL));
+  const [a, b, c, d] = race.snapshot().cars;
+  assert.equal(race.snapshot().phase, 'grid');
+  assert.ok(a.x - c.x > 3.52 && b.x - d.x > 3.52, 'the nose and tail need room');
+  assert.ok(Math.abs(a.z - b.z) > 1.66 && Math.abs(c.z - d.z) > 1.66, 'the wheels need room');
+  assert.ok(b.x + 1.82 < TRACK.sampleAt(0).x, 'the lead bumper remains behind the finish');
+});
+
+test('heading determines whether the ends of two cars touch', async () => {
+  const { CAR_DIMENSIONS } = await import('../src/shared/car-dimensions.ts');
+  const { capsule, contactBetween } = await import('../src/sim/contact.ts');
+  const nose = capsule({ x: 0, z: 0, yaw: 0, dimensions: CAR_DIMENSIONS[1] });
+  const target = { x: 0, z: 3.38, yaw: 0, dimensions: CAR_DIMENSIONS[2] };
+  const aligned = contactBetween(nose, capsule(target));
+  assert.ok(aligned && aligned.nz > 0.99, 'longitudinal contact occurs at the bumpers');
+  assert.equal(contactBetween(nose, capsule({ ...target, yaw: Math.PI / 2 })), null);
+});
+
+test('two full-size cars can accelerate side by side', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = drive(NEUTRAL)[0];
+  const moving = drive({ ...NEUTRAL, gas: true })[0];
+  step(race, 3, [stopped, stopped, stopped, stopped]);
+  step(race, 1.2, [moving, moving, stopped, stopped]);
+  const [a, b] = race.snapshot().cars;
+  assert.ok(Math.abs(a.z - b.z) > 1.66);
+  assert.ok(Math.abs(a.x - b.x) < 0.01 && a.speed > 4 && b.speed > 4);
+});
+
+test('GAS gives a strong launch and builds speed without a jump', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = { owned: true, input: NEUTRAL };
+  const accelerating = { owned: true, input: { ...NEUTRAL, gas: true } };
+  const drivers = [accelerating, stopped, stopped, stopped];
+  step(race, 3, [stopped, stopped, stopped, stopped]);
+  step(race, TICK, drivers);
+  assert.ok(race.snapshot().cars[0].speed > 0 && race.snapshot().cars[0].speed < 0.18);
+  step(race, 29 * TICK, drivers);
+  assert.ok(race.snapshot().cars[0].speed > 3.4);
+  step(race, 1.05, drivers);
+  assert.ok(race.snapshot().cars[0].speed > 7.8);
+});
+
+test('a sharp steering input at full pace scrubs speed and turns progressively', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = { owned: true, input: NEUTRAL };
+  const accelerating = { owned: true, input: { ...NEUTRAL, gas: true } };
+  step(race, 3, [stopped, stopped, stopped, stopped]);
+  step(race, 1.8, [accelerating, stopped, stopped, stopped]);
+  const before = race.snapshot().cars[0];
+  step(race, 0.20, [{ owned: true, input: { ...accelerating.input, x: 1 } }, stopped, stopped, stopped]);
+  const after = race.snapshot().cars[0];
+  assert.ok(after.z > before.z);
+  assert.ok(before.yaw - after.yaw > 0.18 && before.yaw - after.yaw < 0.37);
+  assert.ok(after.speed < before.speed - 0.25 && after.speed > 6);
+});
+
+test('the run-off slows a car even when it has not struck the wall', async () => {
+  const { TRACK } = await import('../src/shared/track.ts');
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  // Leave enough of the straight to stay on the run-off before the right entry.
+  step(race, 240 * TICK, drive({ ...NEUTRAL, gas: true }));
+  const initialSpeed = race.snapshot().cars[0].speed;
+
+  for (let i = 0; i < 120; i++) {
+    const car = race.snapshot().cars[0];
+    const location = TRACK.locate(car.x, car.z);
+    assert.ok(Math.abs(location.offset) < 2.65, 'the tires must stay clear of the barrier');
+    const look = TRACK.sampleAt(location.s + 4.1);
+    const desiredYaw = Math.atan2(look.x - look.dz * 2.47 - car.x, look.z + look.dx * 2.47 - car.z);
+    const x = Math.max(-1, Math.min(1, 3.2 * (car.yaw - desiredYaw)));
+    race.step(TICK, drive({ x, gas: true, brake: false }));
+  }
+
+  const car = race.snapshot().cars[0];
+  const location = TRACK.locate(car.x, car.z);
+  assert.ok(location.offset > 2.36 && location.offset < 2.65);
+  assert.ok(car.speed > 2 && car.speed < initialSpeed - 0.9);
+});
+
+test('FRENO overrides GAS and reverse needs a fresh press after stopping', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const gas = drive({ ...NEUTRAL, gas: true });
+  const both = drive({ ...NEUTRAL, gas: true, brake: true });
+  step(race, 3.75, gas);
+  const initialSpeed = race.snapshot().cars[0].speed;
+  assert.ok(initialSpeed > 1);
+  step(race, 0.15, both);
+  assert.ok(race.snapshot().cars[0].speed < initialSpeed - 0.5);
+  step(race, 1.5, both);
+  assert.equal(race.snapshot().cars[0].speed, 0);
+  step(race, 0.05, drive(NEUTRAL));
+  step(race, 0.45, both);
+  assert.ok(race.snapshot().cars[0].speed < -0.5);
+  step(race, 0.05, drive(NEUTRAL));
+  assert.equal(race.snapshot().cars[0].speed, 0);
+});
+
+test('a mid-race join takes the moving bot in place', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const human = drive(NEUTRAL);
+  step(race, 8, human);
+  const before = race.snapshot().cars[1];
+  assert.ok(before.speed > 2);
+  race.step(TICK, [...human, ...drive(NEUTRAL)]);
+  const after = race.snapshot().cars[1];
+  assert.equal(after.owned, true);
+  assert.equal(after.lap, before.lap);
+  assert.ok(Math.hypot(after.x - before.x, after.z - before.z) < 0.16);
+  assert.ok(after.speed < before.speed);
+});
+
+test('a car driven into the wall can keep moving without a reset or a free lap', async () => {
+  const { TRACK, WALL_HALF } = await import('../src/shared/track.ts');
+  const { CAR_DIMENSIONS } = await import('../src/shared/car-dimensions.ts');
+  const { capsule } = await import('../src/sim/contact.ts');
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const gas = drive({ ...NEUTRAL, gas: true });
+  runUntil(race, 11, gas, () => {
+    const car = race.snapshot().cars[0];
+    const { ax, az, bx, bz, radius } = capsule({ ...car, dimensions: CAR_DIMENSIONS[0] });
+    const edge = Math.max(Math.abs(TRACK.locate(ax, az).offset), Math.abs(TRACK.locate(bx, bz).offset)) + radius;
+    assert.ok(edge <= WALL_HALF + 0.02, 'the front and rear must stay inside the barrier');
+    return race.snapshot().phase === 'race' && Math.abs(car.yaw - Math.PI / 2) > 0.08;
+  });
+  const impact = race.snapshot().cars[0];
+  step(race, 0.85, gas);
+  const after = race.snapshot().cars[0];
+  assert.ok(Math.hypot(after.x - impact.x, after.z - impact.z) > 1, 'the car should roll away from impact');
+  assert.ok(after.speed > 1);
+  assert.equal(after.blink, false);
+  assert.equal(after.lap, 0);
+});
+
+test('a rear-end impact rolls the stopped car forward and leaves room for both cars', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = { owned: true, input: NEUTRAL };
+  const chasing = { owned: true, input: { ...NEUTRAL, gas: true } };
+  step(race, 3, [stopped, stopped, chasing, stopped]);
+  const initial = race.snapshot().cars[0].x;
+  step(race, 0.75, [stopped, stopped, chasing, stopped]);
+  const [ahead, , behind] = race.snapshot().cars;
+  assert.ok(ahead.speed > 0.55, 'impact should transfer momentum to the stopped car');
+  assert.ok(ahead.x > initial + 0.12);
+  assert.ok(ahead.x - behind.x >= 3.24, 'the visual bumpers must stay separated');
+});

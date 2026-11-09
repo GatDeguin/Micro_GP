@@ -1,0 +1,25 @@
+{
+  "name": "micro-gp-taller-07",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "node server/index.ts --dev",
+    "build": "tsc --noEmit && vite build",
+    "start": "node server/index.ts",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "qrcode-generator": "1.4.4",
+    "three": "0.180.0",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/three": "0.180.0",
+    "@types/ws": "8.18.1",
+    "typescript": "5.9.3",
+    "vite": "8.2.0"
+  }
+}

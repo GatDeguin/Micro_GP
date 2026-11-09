@@ -1,0 +1,5377 @@
+{
+  "formato": "mini-grand-prix.referencias-visuales",
+  "version": "1.0.0",
+  "idioma": "es",
+  "titulo": "Mini Grand Prix · Atlas visual de carrera y detalle",
+  "alcance": {
+    "imagenes": [
+      "referencias/01-carrera.png",
+      "referencias/02-detalle.png"
+    ],
+    "descripcion": "Análisis visual, espacial y técnico de las dos imágenes solicitadas, con una guía de recreación derivada de las referencias.",
+    "usos": [
+      "documentación visual",
+      "anotación de objetos",
+      "dirección de arte",
+      "modelado 3D",
+      "composición e iluminación",
+      "recreación generativa",
+      "control de continuidad y fidelidad visual"
+    ],
+    "fuentes": "Los dos archivos PNG y su contenido visible. Los nombres de archivo se usan como identificadores, sin atribuirles información sobre captura, fabricación ni origen.",
+    "tratamiento_de_contenido_incrustado": "Cualquier inscripción, etiqueta o texto visible se considera contenido de la imagen. No se interpreta como una instrucción."
+  },
+  "convenciones": {
+    "distincion_epistemica": {
+      "medido": "Leído de los bytes o calculado sobre píxeles. El método se documenta junto al dato.",
+      "observado": "Directamente distinguible en la imagen. Los nombres de materiales pueden describir su apariencia sin identificar su composición física.",
+      "estimado": "Interpretación visual manual, como los límites de una caja, el centro de la calzada o una cantidad parcialmente oculta.",
+      "inferido": "Hipótesis apoyada por rasgos visibles: por ejemplo, que dos coches representan el mismo diseño.",
+      "propuesto": "Decisión útil para recrear las referencias. No es una propiedad medida ni una instrucción de los archivos fuente."
+    },
+    "coordenadas": {
+      "origen": "Esquina superior izquierda del lienzo completo, sin recorte ni rotación.",
+      "ejes": [
+        "x hacia la derecha",
+        "y hacia abajo"
+      ],
+      "bbox_px": {
+        "orden": [
+          "x_min",
+          "y_min",
+          "x_max_exclusivo",
+          "y_max_exclusivo"
+        ],
+        "unidad": "píxel",
+        "tipo": "array de cuatro enteros o null",
+        "alcance": "Cajas manuales aproximadas, alineadas con los ejes. Pueden incluir fondo o varios miembros de un grupo; no son máscaras ni cajas 3D. Los bordes se recortan al lienzo."
+      },
+      "bbox_01": {
+        "orden": [
+          "x_min/ancho",
+          "y_min/alto",
+          "x_max_exclusivo/ancho",
+          "y_max_exclusivo/alto"
+        ],
+        "tipo": "array de cuatro números entre 0 y 1 o null",
+        "redondeo_decimales": 6
+      },
+      "trazados": "Los puntos de trayectoria manuales describen proyección en pantalla. El espaciado entre puntos no equivale a distancia recorrida y no codifica elevación ni dirección obligatoria de carrera.",
+      "orientacion": "Izquierda, derecha, arriba y abajo se refieren a la imagen salvo que un campo especifique ejes del coche o del mundo.",
+      "puntos_01": "[x/ancho, y/alto], redondeado a seis decimales; se usa para las guías y el eje del circuito."
+    },
+    "identificadores": {
+      "imagen": "img01 o img02",
+      "anotacion": "Identificador único con prefijo de su imagen.",
+      "grupos": "Una anotación puede representar un conjunto, una parte o un área. Las cajas pueden solaparse. El número de anotaciones no equivale al número de objetos físicos.",
+      "categoria": "Taxonomía común para filtrar inventarios de ambas imágenes. El campo tipo conserva la clasificación más específica usada en cada descripción."
+    },
+    "valores_ausentes": "null indica que el valor no se especifica o no puede determinarse. Una lista de elementos visibles no descarta otros elementos fuera de plano u ocultos."
+  },
+  "sintesis_del_conjunto": {
+    "descripcion": "Un pequeño circuito de asfalto oscuro sobre una base de contrachapado claro, rodeado por el mobiliario de un taller de escala aparente mucho mayor. Los pianos rojos y crema y la franja verde dibujan el recorrido. Un plano elevado enseña el óvalo irregular y sus cuatro coches; un plano bajo concentra la atención en un compacto turquesa y un coche rojo detrás.",
+    "motivos_recurrentes": [
+      "Taller cálido con madera ámbar, herramientas metálicas grandes y cajonera roja gastada.",
+      "Carrera en miniatura sugerida por la escala relativa de coches, vallas, pernos, pista y herramientas.",
+      "Coches de líneas clásicas con bandas claras, neumáticos negros y reflejos puntuales.",
+      "Franjas de escape verdes, pianos rojo y crema, calzada oscura, valla metálica y piezas atornilladas.",
+      "Contraste de colores: turquesa frío contra luz ámbar y rojo; amarillos y violetas como acentos en el plano general."
+    ],
+    "funcion_de_cada_vista": {
+      "img01": [
+        "identificar la silueta y topología del circuito",
+        "ubicar los cuatro coches y la meta",
+        "leer la maqueta como objeto sobre el banco",
+        "ver el tablero vacío separado de la pista"
+      ],
+      "img02": [
+        "leer el frente y lateral del coche turquesa",
+        "observar diferencias de silueta con el coche rojo",
+        "inspeccionar desgaste, rejilla, fijaciones, textura del pavimento y neumáticos",
+        "entender el cambio de escala visual a ras de pista"
+      ]
+    },
+    "accesibilidad": {
+      "descripcion_conjunta": "Dos vistas de una pista de carreras en miniatura en un taller iluminado con luz cálida. Desde arriba se ven el circuito completo y cuatro coches de colores. Desde el suelo, un coche turquesa ocupa el primer plano con uno rojo detrás; el piano curvo, la valla y las pilas de neumáticos enmarcan ambos.",
+      "identificacion_no_dependiente_del_color": [
+        "El coche compacto de faros redondos y parrilla rectangular es el protagonista del plano bajo.",
+        "El coche que le sigue tiene dos faros auxiliares redondos grandes y un alerón trasero visible.",
+        "La meta se reconoce por la franja de casillas alternadas que cruza el asfalto.",
+        "El área para gráfica en la esquina inferior derecha del plano general es una placa rectangular con cuatro tornillos."
+      ]
+    },
+    "comparacion_cuantitativa": {
+      "estado": "medido",
+      "luminancia_relativa_media": {
+        "img01": 0.202262,
+        "img02": 0.105717
+      },
+      "lectura": "La toma general tiene un valor medio de luminancia de píxel mayor. La toma baja contiene más área oscura en la composición. El cálculo supone sRGB y describe el lienzo; no cuantifica exposición de cámara ni potencia luminosa."
+    }
+  },
+  "imagenes": [
+    {
+      "id": "img01",
+      "titulo": "Vista general de la carrera en el banco de taller",
+      "descripcion_corta": "Circuito de carreras en miniatura sobre una base de madera, con cuatro autos de colores, un tramo elevado, vallas y ocho focos encendidos.",
+      "descripcion_extensa": "Un encuadre horizontal y elevado reúne casi toda una maqueta de circuito sobre un banco de taller gastado. Una calzada gris parda forma un bucle alrededor de una gran isla de madera clara. La recta de primer plano contiene marcas de parrilla y una línea ajedrezada, con un hatchback turquesa a la izquierda y un coche rojo con alerón a la derecha. Un coupé amarillo ocupa la gran curva derecha y otro violeta se sitúa en el tramo ondulado elevado del fondo. Los pianos rojos y crema, los márgenes verdes y las vallas de malla recortan el contorno del recorrido. Los soportes vistos de madera y sus zapatas resaltan bajo la calzada posterior. Ocho focos pequeños proyectan un brillo cálido sobre el tablero. Detrás se distinguen recipientes de herramientas, una llave ajustable grande y una cajonera roja. Una placa crema vacía con marco oscuro y cuatro fijaciones descansa en el banco en la esquina inferior derecha.",
+      "archivo": {
+        "nombre": "01-carrera.png",
+        "formato": "PNG",
+        "mime": "image/png",
+        "bytes": 2893398,
+        "sha256": "8200acc36cf631915a5bc80cdc08d368bd83d6d36c48b10852b7dd96cb045e56",
+        "ancho_px": 1672,
+        "alto_px": 941,
+        "orientacion": "horizontal",
+        "aspecto_ancho_alto": 1.776833156,
+        "ihdr": {
+          "bits_por_canal": 8,
+          "tipo_de_color_codigo": 2,
+          "tipo_de_color": "RGB de color verdadero",
+          "canales_codificados": 3,
+          "alfa_codificado": false,
+          "compresion_codigo": 0,
+          "compresion": "zlib/DEFLATE",
+          "metodo_de_filtrado_codigo": 0,
+          "entrelazado_codigo": 0,
+          "entrelazado": false,
+          "filas_por_filtro": [
+            0,
+            40,
+            0,
+            107,
+            794
+          ]
+        },
+        "chunks_en_orden": [
+          {
+            "tipo": "IHDR",
+            "offset_bytes": 8,
+            "longitud_datos_bytes": 13,
+            "crc32_hex": "3DE4705E",
+            "crc32_coincide": true
+          },
+          {
+            "tipo": "caBX",
+            "offset_bytes": 33,
+            "longitud_datos_bytes": 23654,
+            "crc32_hex": "B2611599",
+            "crc32_coincide": true
+          },
+          {
+            "tipo": "IDAT",
+            "offset_bytes": 23699,
+            "longitud_datos_bytes": 2869675,
+            "crc32_hex": "BC48FCE7",
+            "crc32_coincide": true
+          },
+          {
+            "tipo": "IEND",
+            "offset_bytes": 2893386,
+            "longitud_datos_bytes": 0,
+            "crc32_hex": "AE426082",
+            "crc32_coincide": true
+          }
+        ],
+        "metadata_png_convencional": {
+          "chunks_textuales": [],
+          "exif_presente": false,
+          "perfil_color_icc_presente": false,
+          "sRGB_explicito": false,
+          "resolucion_fisica_pHYs_presente": false
+        },
+        "credenciales_c2pa": {
+          "estado_procedencia": "Declaraciones incrustadas en el archivo",
+          "contenedor": "PNG caBX con cajas JUMBF",
+          "etiqueta_manifiesto": "urn:c2pa:129cbe69-32e4-4789-86e4-e3f276174202",
+          "version_especificacion_declarada": "2.2.0",
+          "id_instancia_declarado": "xmp:iid:dcaa11b4-0e82-4918-8cca-2402b3db5159",
+          "titulo_interno_declarado": "image.png",
+          "generador_de_credenciales_declarado": "OpenAI Media Service API",
+          "version_biblioteca_declarada": "0.79.2",
+          "acciones_declaradas": [
+            {
+              "accion": "c2pa.created",
+              "fecha_utc_declarada": "2026-11-09T17:48:01.032146527Z",
+              "agente_de_software": {
+                "nombre": "ChatGPT",
+                "version": "gpt-image"
+              },
+              "tipo_fuente_digital_iptc": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+            },
+            {
+              "accion": "c2pa.converted",
+              "fecha_utc_declarada": "2026-11-09T17:48:01.032147903Z",
+              "agente_de_software": null,
+              "tipo_fuente_digital_iptc": null
+            },
+            {
+              "accion": "c2pa.watermarked.unbound",
+              "fecha_utc_declarada": "2026-11-09T17:48:01.031761107Z",
+              "agente_de_software": null,
+              "tipo_fuente_digital_iptc": null
+            }
+          ],
+          "todas_las_acciones_incluidas_declarado": false,
+          "enlace_por_hash": {
+            "asercion": "c2pa.hash.data",
+            "algoritmo": "sha256",
+            "exclusiones_bytes": [
+              {
+                "inicio": 33,
+                "longitud": 23666
+              }
+            ],
+            "hash_declarado_hex": "568126a588a10fed832d7dda9ec109ef4e8dff69040efd3fa903ad021f707f2d",
+            "hash_recalculado_hex": "568126a588a10fed832d7dda9ec109ef4e8dff69040efd3fa903ad021f707f2d",
+            "coincide": true,
+            "metodo": "SHA-256 de los intervalos de bytes del PNG fuera de las exclusiones declaradas, concatenados en orden de archivo"
+          },
+          "caja_de_firma_presente": true,
+          "autenticidad_criptografica": "Firma y cadena de confianza sin comprobar",
+          "alcance": "Los identificadores, las fechas, el software y el tipo de fuente son declaraciones internas del manifiesto. La coincidencia del hash comprueba el enlace de datos cubierto por la aserción."
+        },
+        "ruta_relativa_al_proyecto": "referencias/01-carrera.png",
+        "ruta_relativa_a_este_json": "01-carrera.png",
+        "relacion_de_aspecto_exacta": "1672:941"
+      },
+      "escena": {
+        "categoria_visual": "Diorama de automovilismo de aspecto artesanal en interior de taller",
+        "elementos_ancla": [
+          "Cuatro carrocerías saturadas de colores distintos",
+          "Óvalo irregular con tramo posterior ondulado y complejo de curvas a la derecha",
+          "Calzada oscura alrededor de isla de veta miel",
+          "Vallas de alambre y focos encendidos",
+          "Banco usado, herramienta de gran tamaño y cajonera roja"
+        ],
+        "evidencia_escala": [
+          "La llave ajustable del fondo supera con amplitud el largo aparente de cada vehículo.",
+          "Los postes cortos repetidos y los bordes de tablero expuestos se leen como componentes de maqueta.",
+          "La base entera cabe sobre el plano del banco."
+        ],
+        "lectura_narrativa": "La parrilla, la decoración de los autos y su distribución sugieren una carrera en miniatura. Una imagen fija solo establece poses y posiciones en el instante representado.",
+        "personas_visibles": 0,
+        "coches_visibles": 4,
+        "luminarias_visibles": 8
+      },
+      "camara": {
+        "tipo_de_plano": "Plano general amplio de conjunto",
+        "punto_de_vista": "Tres cuartos elevado desde el lado de la recta frontal. Se ven las caras superiores, el canto frontal de la base y los laterales de las carrocerías.",
+        "direccion_visual": "Hacia el fondo del banco, con la recta frontal de izquierda a derecha casi horizontal.",
+        "proyeccion_aparente": "Perspectiva oblicua. La dimensión frente-fondo se acorta en imagen y las formas del fondo parecen comprimidas respecto al primer plano.",
+        "rotacion_aparente": "Leve o no apreciable. La arista frontal larga del tablero y la recta sirven de anclas horizontales.",
+        "profundidad_de_campo_aparente": "La maqueta está bien definida desde el vallado frontal hasta el tramo alto. El taller del fondo tiene suavidad relativa sin perder legibilidad.",
+        "indicios_de_movimiento": "No se aprecia barrido direccional ni desenfoque de ruedas suficiente para estimar desplazamiento.",
+        "focal_equivalente_mm": null,
+        "altura_camara_m": null,
+        "inclinacion_grados": null,
+        "exposicion": null
+      },
+      "composicion": {
+        "formato": "Panorámico horizontal",
+        "centro_de_peso": "Masa visual de la maqueta, con la línea de meta cerca del centro horizontal y por debajo del centro vertical.",
+        "planos_de_profundidad": [
+          {
+            "plano": "extremo cercano",
+            "elementos": [
+              "Canto y cara arañada del banco",
+              "Placa crema de esquina",
+              "Franja delantera de madera y focos frontales"
+            ]
+          },
+          {
+            "plano": "cercano",
+            "elementos": [
+              "Vallado frontal",
+              "Recta, línea ajedrezada, parrilla y autos turquesa y rojo",
+              "Curvas laterales con pianos rojo crema"
+            ]
+          },
+          {
+            "plano": "medio",
+            "elementos": [
+              "Isla de madera",
+              "Dos focos interiores",
+              "Coupé amarillo a la derecha"
+            ]
+          },
+          {
+            "plano": "posterior",
+            "elementos": [
+              "Tramo alto, apoyos, valla y coupé violeta",
+              "Cuatro focos periféricos"
+            ]
+          },
+          {
+            "plano": "fondo",
+            "elementos": [
+              "Banco trasero",
+              "Panel perforado, bote, frasco, bandeja amarilla, llave y cajonera roja"
+            ]
+          }
+        ],
+        "estructura_del_encuadre": "El bucle oscuro bordea una forma central clara. Las bandas de pianos duplican buena parte del contorno y guían la mirada. La recta y el canto frontal estabilizan la sinuosidad de los tramos superiores.",
+        "acentos_cromaticos": "Turquesa abajo a la izquierda, rojo abajo a la derecha del centro, amarillo en el arco derecho y violeta en la ondulación superior.",
+        "contraste_principal": "Asfalto oscuro contra la madera clara, con una secuencia repetida de rojos y cremas en la transición.",
+        "espacio_negativo": "Gran isla central cálida con poca ocupación, más un cuadrado crema vacío en la esquina inferior derecha.",
+        "recortes": [
+          "El banco y el panel perforado tocan bordes del encuadre.",
+          "Los mangos de herramientas y la cajonera están cortados por el borde superior. La cajonera también toca el derecho.",
+          "La base se aproxima o llega al recorte en el extremo izquierdo y el lateral derecho, mientras el largo canto delantero queda legible."
+        ],
+        "ritmo": "Postes repetidos, trama de malla, bloques bicolores de los pianos, cuadrados de meta y cuadrículas de emisores."
+      },
+      "iluminacion": {
+        "lectura_general": "Luz interior cálida, de ámbar a naranja, con relleno suficiente para conservar detalle en las superficies oscuras.",
+        "fuentes_visibles": [
+          "Ocho cabezales de foco encendidos, con emisores de centro blanco y envolvente cálida."
+        ],
+        "contribucion_aparente": "Brillos locales en la banda de madera delantera, en torno a la valla y en el asfalto de la curva izquierda. La iluminación general del taller se percibe más amplia que los ocho puntos visibles.",
+        "altas_luces": [
+          "Centros de los emisores",
+          "Reflejos de pinturas y marcos de ventanilla",
+          "Mordaza y aristas de la llave",
+          "Tiradores de los cajones"
+        ],
+        "sombras": [
+          "Sombras de contacto bajo los autos y las luminarias",
+          "Sombra oscura continua y recortada por los soportes debajo de la rama elevada",
+          "Valla y postes con sombras delgadas en zonas puntuales"
+        ],
+        "rebotes_visuales": [
+          "Veta y cantos de madera viran a miel o naranja en zonas iluminadas",
+          "La malla recibe reflejos cobrizos",
+          "Negros de ruedas y juntas se mantienen más fríos u oscuros que las superficies vecinas"
+        ],
+        "temperatura_de_color_kelvin": null,
+        "fuentes_fuera_de_cuadro": "No determinables. La dirección y el número de luces fuera de encuadre no pueden deducirse con fiabilidad."
+      },
+      "inventario": [
+        {
+          "id": "img01_auto_turquesa",
+          "categoria": "vehiculo",
+          "tipo": "vehiculo",
+          "etiqueta": "Hatchback turquesa de rally",
+          "bbox_px": [
+            277,
+            591,
+            414,
+            677
+          ],
+          "bbox_01": [
+            0.16567,
+            0.628055,
+            0.247608,
+            0.719447
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Carrocería compacta y cuadrada con techo casi horizontal y portón trasero casi vertical.",
+            "Dos bandas longitudinales claras, paralelas y estrechamente separadas en esta toma, visibles en techo y capó.",
+            "Cristales de tono muy oscuro, división entre paños laterales, neumáticos negros y llantas metálicas de centro oscuro.",
+            "Ensanches de guardabarros y parachoques con detalles brillantes a escala. Pequeños faros claros o ámbar en el frente."
+          ],
+          "posicion": "Recta de primer plano, a la izquierda de la parrilla y del ajedrezado.",
+          "frente_en_imagen": "Derecha con componente hacia abajo.",
+          "punto_frontal_px": [
+            402,
+            654
+          ],
+          "punto_posterior_px": [
+            286,
+            628
+          ],
+          "acabado_aparente": "Pintura turquesa satinada a brillante con reflejos claros en techo y capó.",
+          "sombra": "Concentrada debajo de la carrocería y algo extendida hacia la derecha."
+        },
+        {
+          "id": "img01_auto_rojo",
+          "categoria": "vehiculo",
+          "tipo": "vehiculo",
+          "etiqueta": "Coche rojo de rally",
+          "bbox_px": [
+            928,
+            570,
+            1085,
+            660
+          ],
+          "bbox_01": [
+            0.555024,
+            0.605739,
+            0.648923,
+            0.701382
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Silueta compacta de morro bajo, cabina oscura y parte posterior corta con alerón alto.",
+            "Franjas blancas longitudinales sobre techo y capó. Pequeñas luces redondas adicionales parecen ocupar el frente.",
+            "Neumáticos negros, centros de llanta oscuros con aros claros y pasos de rueda ensanchados.",
+            "Brillos en parabrisas, borde de ventanas, molduras y frente."
+          ],
+          "posicion": "Recta de primer plano, a la derecha de la línea ajedrezada.",
+          "frente_en_imagen": "Derecha con componente hacia abajo.",
+          "punto_frontal_px": [
+            1075,
+            637
+          ],
+          "punto_posterior_px": [
+            938,
+            600
+          ],
+          "acabado_aparente": "Rojo intenso a rojo naranja con reflejos especulares cálidos."
+        },
+        {
+          "id": "img01_auto_amarillo",
+          "categoria": "vehiculo",
+          "tipo": "vehiculo",
+          "etiqueta": "Coupé deportivo amarillo",
+          "bbox_px": [
+            1415,
+            386,
+            1527,
+            467
+          ],
+          "bbox_01": [
+            0.846292,
+            0.410202,
+            0.913278,
+            0.496281
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Morro redondeado y bajo, dos faros delanteros circulares con interior oscuro y ventanillas oscuras.",
+            "Dos franjas claras longitudinales recorren la zona central del capó y del techo. Brillos fuertes sobre los guardabarros.",
+            "Ruedas negras y aros metálicos claros. Cola redondeada y compacta."
+          ],
+          "posicion": "Gran curva derecha, entre el remate de la entrada interior y el piano exterior.",
+          "frente_en_imagen": "Izquierda con componente hacia abajo.",
+          "punto_frontal_px": [
+            1427,
+            445
+          ],
+          "punto_posterior_px": [
+            1514,
+            408
+          ],
+          "acabado_aparente": "Amarillo vivo con claros marfil y sombras oclusivas oscuras."
+        },
+        {
+          "id": "img01_auto_violeta",
+          "categoria": "vehiculo",
+          "tipo": "vehiculo",
+          "etiqueta": "Coupé deportivo violeta",
+          "bbox_px": [
+            837,
+            141,
+            965,
+            224
+          ],
+          "bbox_01": [
+            0.500598,
+            0.149841,
+            0.577153,
+            0.238045
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Carrocería baja y curvada, con alerón trasero violeta y cristales de tono oscuro.",
+            "Dos líneas claras longitudinales destacan en el capó.",
+            "Llantas claras con centro oscuro y contorno de neumático negro.",
+            "Faros delanteros de silueta redonda u ovalada en un morro curvo."
+          ],
+          "posicion": "Tramo posterior elevado, cerca de la cresta proyectada.",
+          "frente_en_imagen": "Izquierda con componente hacia abajo.",
+          "punto_frontal_px": [
+            848,
+            209
+          ],
+          "punto_posterior_px": [
+            955,
+            160
+          ],
+          "acabado_aparente": "Violeta a magenta brillante con reflejos rosados en aristas."
+        },
+        {
+          "id": "img01_tablero",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "estructura",
+          "etiqueta": "Base de madera laminada de la maqueta",
+          "bbox_px": [
+            0,
+            115,
+            1672,
+            825
+          ],
+          "bbox_01": [
+            0,
+            0.12221,
+            1,
+            0.876727
+          ],
+          "visibilidad": "parcial_por_recorte_y_oclusiones",
+          "observaciones": [
+            "Tablero de gran formato con silueta irregular, esquinas amplias redondeadas y un entrante junto al extremo delantero derecho.",
+            "La cara superior presenta vetas sinuosas miel, tostadas y naranjas. El canto frontal expone múltiples láminas horizontales alternadas y un redondeo en las aristas.",
+            "La carretera, los apoyos y las vallas ocupan su cara superior. La franja frontal de madera desnuda sigue el vallado y alberga los dos focos cercanos.",
+            "Se ven varios tornillos circulares embutidos en la cara superior, por ejemplo junto al borde frontal izquierdo, al frontal derecho y a la curva exterior derecha."
+          ],
+          "material_aparente": "Contrachapado o laminado de madera",
+          "zona_desnuda_central_px": [
+            332,
+            341,
+            1180,
+            549
+          ]
+        },
+        {
+          "id": "img01_calzada",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "superficie",
+          "etiqueta": "Calzada gris pardo de circuito cerrado",
+          "bbox_px": [
+            36,
+            141,
+            1612,
+            708
+          ],
+          "bbox_01": [
+            0.021531,
+            0.149841,
+            0.964115,
+            0.752391
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Cinta ancha oscura en bucle alrededor de una isla de madera.",
+            "Grano fino de aspecto asfáltico, con rayas y marcas curvas más oscuras y reflejos ámbar localizados.",
+            "Carece de divisor longitudinal visible. En la recta principal hay cajones de parrilla y una línea de cuadros blanco y negro."
+          ],
+          "material_aparente": "Textura de asfalto mate con leves brillos rasantes."
+        },
+        {
+          "id": "img01_pianos_exteriores",
+          "categoria": "senalizacion",
+          "tipo": "senalizacion",
+          "etiqueta": "Pianos del borde exterior",
+          "bbox_px": [
+            34,
+            140,
+            1611,
+            716
+          ],
+          "bbox_01": [
+            0.020335,
+            0.148778,
+            0.963517,
+            0.760893
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Bandas rectangulares alternadas en rojo y crema, conformadas a los cambios de dirección del circuito.",
+            "Perfil angosto a ras del asfalto con transición a la franja verde o madera. En la recta baja, la lectura de algunas secciones queda interrumpida por la valla y los focos."
+          ],
+          "segmentos_visuales": [
+            "Izquierda ascendente hacia la parte alta.",
+            "Borde alto ondulante frente al taller.",
+            "Curva externa derecha.",
+            "Retorno al borde bajo de la recta."
+          ]
+        },
+        {
+          "id": "img01_pianos_interiores",
+          "categoria": "senalizacion",
+          "tipo": "senalizacion",
+          "etiqueta": "Pianos del borde interior",
+          "bbox_px": [
+            230,
+            203,
+            1410,
+            590
+          ],
+          "bbox_01": [
+            0.13756,
+            0.215728,
+            0.843301,
+            0.626993
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Bloques alternados en rojo y crema, con tonos marfil cálidos bajo la iluminación.",
+            "Siguen la curva izquierda, el borde elevado que mira al patio y la punta de la S interior derecha.",
+            "En la recta, buena parte de la delimitación interior se lee como línea clara fina sin bloques alternados discernibles."
+          ]
+        },
+        {
+          "id": "img01_franjas_verdes",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "superficie",
+          "etiqueta": "Franjas verdes de margen",
+          "bbox_px": [
+            19,
+            134,
+            1643,
+            739
+          ],
+          "bbox_01": [
+            0.011364,
+            0.142402,
+            0.982656,
+            0.785335
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Márgenes verdes de anchura variable por fuera de los pianos y al pie de las vallas.",
+            "Verdes relativamente planos con manchas más claras y oscuras, sin césped de hojas individualmente reconocibles.",
+            "La isla derecha muestra un ensanchamiento verde curvo alrededor de la valla."
+          ]
+        },
+        {
+          "id": "img01_isla_interior",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "superficie",
+          "etiqueta": "Isla central de madera a la vista",
+          "bbox_px": [
+            264,
+            240,
+            1211,
+            577
+          ],
+          "bbox_01": [
+            0.157895,
+            0.255048,
+            0.724282,
+            0.613177
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Gran claro visual central de madera miel con vetas onduladas.",
+            "La limita la valla inferior por el frente, la calzada elevada por el fondo y las dos curvas laterales.",
+            "Dos focos están anclados a su suelo de madera. Las sombras del tramo elevado recorren su parte posterior."
+          ],
+          "funcion_compositiva": "Área de textura cálida y baja densidad de objetos que separa visualmente las dos ramas del bucle."
+        },
+        {
+          "id": "img01_elevacion",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "estructura",
+          "etiqueta": "Tablero elevado posterior con rampas y apoyos",
+          "bbox_px": [
+            269,
+            199,
+            1285,
+            364
+          ],
+          "bbox_01": [
+            0.160885,
+            0.211477,
+            0.768541,
+            0.386823
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "El canto de madera de la pista es visible desde el interior del circuito.",
+            "Travesaños verticales color miel y diagonales forman pórticos visibles bajo el tablero. Las bases tienen tono gris pardo y forma de bloque rectangular.",
+            "Se distingue un vacío en sombra entre el suelo de la isla y el tablero.",
+            "La estructura asciende y desciende con el perfil sinuoso. El punto alto proyectado hacia el fondo derecho cae antes de la bajada a la S."
+          ],
+          "cantidad_minima_bases_claras": 6,
+          "centros_de_pies_px": [
+            [
+              457,
+              340
+            ],
+            [
+              564,
+              345
+            ],
+            [
+              712,
+              354
+            ],
+            [
+              869,
+              322
+            ],
+            [
+              1006,
+              274
+            ],
+            [
+              1118,
+              284
+            ]
+          ],
+          "cobertura": "Rama trasera vista desde el patio. La extensión y altura métricas no son determinables."
+        },
+        {
+          "id": "img01_valla_exterior",
+          "categoria": "barrera",
+          "tipo": "barrera",
+          "etiqueta": "Valla exterior de malla metálica",
+          "bbox_px": [
+            14,
+            107,
+            1652,
+            757
+          ],
+          "bbox_01": [
+            0.008373,
+            0.113709,
+            0.988038,
+            0.804463
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Paneles de malla fina cuadrada con postes finos gris pardo y largueros superior e inferior.",
+            "Postes sobre pequeñas bases rectangulares y repetición de paños cortos para aproximar la curvatura.",
+            "La malla deja ver pianos, verde y madera a través de ella.",
+            "Pátina y reflejos cobre o ámbar visibles en los alambres iluminados."
+          ],
+          "puntos_de_referencia_px": [
+            [
+              50,
+              647
+            ],
+            [
+              67,
+              300
+            ],
+            [
+              163,
+              177
+            ],
+            [
+              402,
+              125
+            ],
+            [
+              690,
+              178
+            ],
+            [
+              995,
+              109
+            ],
+            [
+              1250,
+              214
+            ],
+            [
+              1530,
+              284
+            ],
+            [
+              1645,
+              452
+            ],
+            [
+              1494,
+              589
+            ],
+            [
+              1260,
+              722
+            ],
+            [
+              580,
+              728
+            ],
+            [
+              146,
+              712
+            ]
+          ]
+        },
+        {
+          "id": "img01_valla_interior",
+          "categoria": "barrera",
+          "tipo": "barrera",
+          "etiqueta": "Vallas del borde interior",
+          "bbox_px": [
+            260,
+            198,
+            1318,
+            584
+          ],
+          "bbox_01": [
+            0.155502,
+            0.210414,
+            0.788278,
+            0.620616
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Malla y postes metálicos en el borde delantero de la isla y sobre tramos del tablero elevado.",
+            "La sección frontal casi horizontal separa asfalto oscuro y madera clara.",
+            "A la derecha, la sección se curva alrededor del margen verde. Hay un paño muy corto casi de canto cerca de la bajada de la calzada."
+          ],
+          "puntos_de_referencia_px": [
+            [
+              266,
+              440
+            ],
+            [
+              310,
+              503
+            ],
+            [
+              525,
+              556
+            ],
+            [
+              836,
+              555
+            ],
+            [
+              1100,
+              557
+            ],
+            [
+              1190,
+              542
+            ],
+            [
+              1153,
+              446
+            ],
+            [
+              1206,
+              373
+            ],
+            [
+              1305,
+              334
+            ],
+            [
+              1230,
+              329
+            ],
+            [
+              1008,
+              212
+            ],
+            [
+              715,
+              288
+            ],
+            [
+              455,
+              261
+            ],
+            [
+              303,
+              352
+            ]
+          ]
+        },
+        {
+          "id": "img01_meta",
+          "categoria": "senalizacion",
+          "tipo": "senalizacion",
+          "etiqueta": "Línea ajedrezada de salida o meta",
+          "bbox_px": [
+            816,
+            583,
+            853,
+            705
+          ],
+          "bbox_01": [
+            0.488038,
+            0.619554,
+            0.510167,
+            0.749203
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Cruza la recta en dirección perpendicular aproximada al sentido local de su eje.",
+            "Dos columnas alternadas de cuadrados crema y negros, con ligera distorsión por perspectiva.",
+            "Constituye la única marca ajedrezada visible y separa visualmente el coche turquesa del rojo."
+          ],
+          "extremos_en_imagen_px": [
+            [
+              833,
+              585
+            ],
+            [
+              836,
+              701
+            ]
+          ],
+          "interpretacion": "Salida o meta aparente por la convención del patrón y su vecindad con la parrilla."
+        },
+        {
+          "id": "img01_parrilla",
+          "categoria": "senalizacion",
+          "tipo": "senalizacion",
+          "etiqueta": "Marcas de parrilla en dos filas",
+          "bbox_px": [
+            430,
+            599,
+            809,
+            675
+          ],
+          "bbox_01": [
+            0.257177,
+            0.636557,
+            0.483852,
+            0.717322
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Trazos marfil de tres lados, de aspecto angular y extremo abierto hacia la izquierda.",
+            "Cuatro marcas en la fila superior y tres en la inferior visible. Las dos filas se ven escalonadas.",
+            "Todas quedan a la izquierda de la línea ajedrezada."
+          ],
+          "cantidad_visible": 7,
+          "filas": [
+            {
+              "nombre": "superior",
+              "centros_px": [
+                [
+                  443,
+                  614
+                ],
+                [
+                  563,
+                  614
+                ],
+                [
+                  680,
+                  613
+                ],
+                [
+                  797,
+                  614
+                ]
+              ]
+            },
+            {
+              "nombre": "inferior",
+              "centros_px": [
+                [
+                  493,
+                  661
+                ],
+                [
+                  617,
+                  660
+                ],
+                [
+                  740,
+                  659
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "img01_foco_exterior_izq",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco exterior izquierdo",
+          "bbox_px": [
+            91,
+            131,
+            145,
+            271
+          ],
+          "bbox_01": [
+            0.054426,
+            0.139214,
+            0.086722,
+            0.287991
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            117,
+            156
+          ],
+          "centro_de_la_base_px": [
+            126,
+            260
+          ],
+          "posicion": "Borde izquierdo exterior, sobre la primera curva amplia.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_fondo_izq",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco posterior izquierdo",
+          "bbox_px": [
+            523,
+            64,
+            568,
+            165
+          ],
+          "bbox_01": [
+            0.312799,
+            0.068013,
+            0.339713,
+            0.175345
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            545,
+            81
+          ],
+          "centro_de_la_base_px": [
+            549,
+            157
+          ],
+          "posicion": "Borde posterior, entre el recipiente amarillo y el sector ondulante.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_fondo_der",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco posterior derecho",
+          "bbox_px": [
+            1233,
+            84,
+            1285,
+            207
+          ],
+          "bbox_01": [
+            0.73744,
+            0.089267,
+            0.768541,
+            0.219979
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            1258,
+            107
+          ],
+          "centro_de_la_base_px": [
+            1254,
+            193
+          ],
+          "posicion": "Borde posterior a la derecha de la cresta, delante de la cajonera roja.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_exterior_der",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco exterior derecho",
+          "bbox_px": [
+            1555,
+            204,
+            1612,
+            337
+          ],
+          "bbox_01": [
+            0.930024,
+            0.216791,
+            0.964115,
+            0.35813
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            1583,
+            231
+          ],
+          "centro_de_la_base_px": [
+            1575,
+            325
+          ],
+          "posicion": "Curva externa derecha, por fuera de la valla.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_interior_izq",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco interior izquierdo",
+          "bbox_px": [
+            301,
+            363,
+            362,
+            514
+          ],
+          "bbox_01": [
+            0.180024,
+            0.38576,
+            0.216507,
+            0.546227
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            330,
+            391
+          ],
+          "centro_de_la_base_px": [
+            339,
+            495
+          ],
+          "posicion": "Sobre madera desnuda dentro de la curva izquierda.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_interior_der",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco interior derecho",
+          "bbox_px": [
+            1106,
+            370,
+            1170,
+            527
+          ],
+          "bbox_01": [
+            0.661483,
+            0.393199,
+            0.699761,
+            0.560043
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            1138,
+            400
+          ],
+          "centro_de_la_base_px": [
+            1131,
+            510
+          ],
+          "posicion": "Sobre madera desnuda, junto a la valla curva derecha del patio.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_frontal_izq",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco delantero izquierdo",
+          "bbox_px": [
+            549,
+            687,
+            600,
+            780
+          ],
+          "bbox_01": [
+            0.328349,
+            0.730074,
+            0.358852,
+            0.828905
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            573,
+            704
+          ],
+          "centro_de_la_base_px": [
+            573,
+            766
+          ],
+          "posicion": "Banda de madera delante de la valla, a la izquierda de la línea ajedrezada.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_foco_frontal_der",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Foco delantero derecho",
+          "bbox_px": [
+            1050,
+            688,
+            1099,
+            781
+          ],
+          "bbox_01": [
+            0.62799,
+            0.731137,
+            0.657297,
+            0.829968
+          ],
+          "visibilidad": "visible",
+          "observaciones": [
+            "Cabezal rectangular oscuro de seis emisores claros en disposición aparente de tres columnas por dos filas.",
+            "Poste delgado vertical sobre base cuadrangular. Núcleos blanquecinos y halos cálidos."
+          ],
+          "centro_del_cabezal_px": [
+            1074,
+            704
+          ],
+          "centro_de_la_base_px": [
+            1073,
+            767
+          ],
+          "posicion": "Banda de madera delante de la valla, en el tercio derecho de la recta.",
+          "estado_visible": "encendido"
+        },
+        {
+          "id": "img01_tornillos_tablero",
+          "categoria": "herrajes",
+          "tipo": "herrajes",
+          "etiqueta": "Fijaciones circulares del tablero",
+          "bbox_px": [
+            80,
+            587,
+            1618,
+            773
+          ],
+          "bbox_01": [
+            0.047847,
+            0.623804,
+            0.967703,
+            0.821467
+          ],
+          "visibilidad": "visible_como_conjunto",
+          "observaciones": [
+            "Cabezas pequeñas, oscuras o metálicas, embutidas en la madera exterior.",
+            "Tres ubicaciones de lectura clara se aprecian al frente izquierdo, frente derecho y lateral derecho."
+          ],
+          "centros_de_ejemplo_px": [
+            [
+              90,
+              749
+            ],
+            [
+              1316,
+              764
+            ],
+            [
+              1608,
+              592
+            ]
+          ]
+        },
+        {
+          "id": "img01_banco",
+          "categoria": "entorno",
+          "tipo": "entorno",
+          "etiqueta": "Banco de taller gastado",
+          "bbox_px": [
+            0,
+            17,
+            1672,
+            941
+          ],
+          "bbox_01": [
+            0,
+            0.018066,
+            1,
+            1
+          ],
+          "visibilidad": "parcial_por_recorte_y_oclusiones",
+          "observaciones": [
+            "Mesa oscura de madera, visible detrás, alrededor y delante de la maqueta.",
+            "Arañazos, manchas, veta irregular y puntos de pintura desgastada en la franja inferior.",
+            "El canto vertical frontal cruza la parte baja del encuadre.",
+            "Los reflejos cálidos de los focos destacan zonas de la superficie."
+          ],
+          "material_aparente": "Madera de taller marcada por el uso."
+        },
+        {
+          "id": "img01_panel_perforado",
+          "categoria": "entorno",
+          "tipo": "entorno",
+          "etiqueta": "Panel perforado de herramientas",
+          "bbox_px": [
+            0,
+            0,
+            500,
+            130
+          ],
+          "bbox_01": [
+            0,
+            0,
+            0.299043,
+            0.138151
+          ],
+          "visibilidad": "parcial_por_recorte_y_oclusiones",
+          "observaciones": [
+            "Fondo ocre amaderado con perforaciones redondas repetidas.",
+            "Se concentra detrás de los recipientes en el sector superior izquierdo."
+          ]
+        },
+        {
+          "id": "img01_recipiente_herramientas",
+          "categoria": "utileria",
+          "tipo": "utileria",
+          "etiqueta": "Bote metálico de herramientas",
+          "bbox_px": [
+            103,
+            0,
+            255,
+            161
+          ],
+          "bbox_01": [
+            0.061603,
+            0,
+            0.152512,
+            0.171095
+          ],
+          "visibilidad": "parcial_por_recorte",
+          "observaciones": [
+            "Recipiente cilíndrico de metal mate y bruñido, con borde superior redondeado.",
+            "Contiene varios mangos y vástagos oblicuos de color oscuro y madera. Los extremos de varios objetos se pierden por el borde superior."
+          ]
+        },
+        {
+          "id": "img01_frasco_herrajes",
+          "categoria": "utileria",
+          "tipo": "utileria",
+          "etiqueta": "Frasco de vidrio con pequeñas piezas metálicas",
+          "bbox_px": [
+            254,
+            25,
+            341,
+            140
+          ],
+          "bbox_01": [
+            0.151914,
+            0.026567,
+            0.203947,
+            0.148778
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Frasco transparente con boca circular de borde grueso y cuerpo ligeramente facetado.",
+            "Se observan pequeñas formas alargadas y brillantes dentro, compatibles con tornillos u otros herrajes.",
+            "Está a la derecha del bote y a la izquierda del organizador amarillo."
+          ]
+        },
+        {
+          "id": "img01_organizador",
+          "categoria": "utileria",
+          "tipo": "utileria",
+          "etiqueta": "Bandeja amarilla de taller",
+          "bbox_px": [
+            329,
+            31,
+            487,
+            126
+          ],
+          "bbox_01": [
+            0.19677,
+            0.032944,
+            0.291268,
+            0.1339
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Cajetín rectangular abierto, de color amarillo mostaza y con nervaduras verticales en el frente.",
+            "Contiene varias piezas y una forma metálica alta en arco o U."
+          ]
+        },
+        {
+          "id": "img01_llave_ajustable",
+          "categoria": "utileria",
+          "tipo": "herramienta",
+          "etiqueta": "Llave ajustable grande",
+          "bbox_px": [
+            616,
+            6,
+            1011,
+            108
+          ],
+          "bbox_01": [
+            0.368421,
+            0.006376,
+            0.604665,
+            0.114772
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Herramienta plateada apoyada en diagonal casi horizontal sobre el banco detrás de la pista.",
+            "Mordaza abierta a la izquierda y mecanismo de ajuste helicoidal en el cabezal.",
+            "Mango largo con zona central rebajada y perforación ovalada en el extremo derecho.",
+            "Reflejos cálidos en los bordes del acero. Las posibles marcas del mango carecen de lectura fiable."
+          ],
+          "eje_aproximado_px": [
+            [
+              652,
+              69
+            ],
+            [
+              979,
+              27
+            ]
+          ]
+        },
+        {
+          "id": "img01_fondo_tras_llave",
+          "categoria": "entorno",
+          "tipo": "entorno",
+          "etiqueta": "Soporte oscuro detrás de la llave",
+          "bbox_px": [
+            486,
+            0,
+            1070,
+            100
+          ],
+          "bbox_01": [
+            0.29067,
+            0,
+            0.639952,
+            0.10627
+          ],
+          "visibilidad": "parcial_por_recorte_y_oclusiones",
+          "observaciones": [
+            "Superficies de tono pardo oscuro y gris detrás del banco y de la herramienta. Varios elementos verticales delimitan el fondo."
+          ],
+          "identificacion": "indeterminada"
+        },
+        {
+          "id": "img01_cajonera",
+          "categoria": "utileria",
+          "tipo": "utileria",
+          "etiqueta": "Cajonera metálica roja",
+          "bbox_px": [
+            1062,
+            0,
+            1672,
+            244
+          ],
+          "bbox_01": [
+            0.635167,
+            0,
+            1,
+            0.259299
+          ],
+          "visibilidad": "parcial_por_recorte",
+          "observaciones": [
+            "Mueble rojo de taller al fondo derecho con varios frentes de cajón horizontales.",
+            "Tiradores o perfiles largos metálicos plateados, bordes oscuros y marcas de desgaste sobre la pintura.",
+            "Su borde derecho y parte superior quedan fuera de cuadro."
+          ]
+        },
+        {
+          "id": "img01_placa_vacia",
+          "categoria": "placa",
+          "tipo": "placa",
+          "etiqueta": "Placa cuadrangular vacía de borde metálico",
+          "bbox_px": [
+            1457,
+            694,
+            1657,
+            890
+          ],
+          "bbox_01": [
+            0.871411,
+            0.737513,
+            0.991029,
+            0.945802
+          ],
+          "visibilidad": "casi_completa",
+          "observaciones": [
+            "Inserto crema liso con esquinas achaflanadas o redondeadas dentro de un marco oscuro grueso.",
+            "Cuatro cabezas metálicas redondas ocupan las esquinas del marco.",
+            "Contorno exterior casi cuadrado con esquinas redondeadas y sombra de contacto sobre el banco.",
+            "El interior está visualmente vacío."
+          ],
+          "centros_fijaciones_px": [
+            [
+              1476,
+              710
+            ],
+            [
+              1639,
+              710
+            ],
+            [
+              1476,
+              867
+            ],
+            [
+              1639,
+              867
+            ]
+          ],
+          "ubicacion": "Ángulo inferior derecho, fuera del perímetro de la base.",
+          "funcion": "Indeterminada. Funciona como superficie vacía dentro de la composición."
+        }
+      ],
+      "pista": {
+        "topologia_aparente": "Un lazo continuo sin cruce visible. La rama trasera elevada tiene un vano abierto sobre la isla. El vano no muestra una segunda calzada que pase por debajo.",
+        "configuracion": "Una recta frontal extensa, gran curva izquierda, rama posterior ondulada con cresta, bajada trasera derecha y complejo derecho con retorno a la recta.",
+        "superficie": "Gris antracita a pardo, grano sutil, rastros oscuros curvilíneos y reflejos dependientes de zona. No se distingue ranura longitudinal continua de guiado ni división formal en carriles.",
+        "bordes": "Pianos alternos rojo y crema donde se distinguen, línea clara fina en partes de la recta, franjas verdes y vallado de malla. La anchura aparente depende de la perspectiva y de la curvatura local.",
+        "mediciones_2d": [
+          {
+            "magnitud": "ancho_de_calzada_en_la_meta",
+            "valor_aprox_px": 117,
+            "referencias_px": [
+              [
+                834,
+                585
+              ],
+              [
+                835,
+                702
+              ]
+            ],
+            "interpretacion": "Distancia en el plano de imagen entre bordes locales. No equivale a anchura física."
+          }
+        ],
+        "traza_2d_aproximada": {
+          "convencion": "Eje visual de la superficie de rodadura estimado a mano a partir de sus bordes. Los puntos enlazan sectores de un solo bucle en el orden indicado. Su orden se eligió para codificar el contorno y no establece un sentido de carrera. La perspectiva y el desnivel se conservan tal como se proyectan.",
+          "cerrado": true,
+          "sectores": [
+            {
+              "id": "img01_sector_recta",
+              "nombre": "Recta delantera",
+              "observaciones": "Pasa por la parrilla y la meta. Eje casi horizontal y franja ancha en primer plano.",
+              "puntos_px": [
+                [
+                  322,
+                  651
+                ],
+                [
+                  421,
+                  648
+                ],
+                [
+                  536,
+                  645
+                ],
+                [
+                  655,
+                  644
+                ],
+                [
+                  764,
+                  644
+                ],
+                [
+                  835,
+                  643
+                ],
+                [
+                  948,
+                  644
+                ],
+                [
+                  1059,
+                  644
+                ],
+                [
+                  1153,
+                  644
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.192584,
+                  0.691817
+                ],
+                [
+                  0.251794,
+                  0.688629
+                ],
+                [
+                  0.320574,
+                  0.685441
+                ],
+                [
+                  0.391746,
+                  0.684378
+                ],
+                [
+                  0.456938,
+                  0.684378
+                ],
+                [
+                  0.499402,
+                  0.683316
+                ],
+                [
+                  0.566986,
+                  0.684378
+                ],
+                [
+                  0.633373,
+                  0.684378
+                ],
+                [
+                  0.689593,
+                  0.684378
+                ]
+              ]
+            },
+            {
+              "id": "img01_sector_s_derecha_inferior",
+              "nombre": "Curva de enlace derecha inferior",
+              "observaciones": "La calzada se arquea hacia la derecha. La forma de S se aprecia especialmente en su borde interior y en la retirada del tablero exterior.",
+              "puntos_px": [
+                [
+                  1153,
+                  644
+                ],
+                [
+                  1228,
+                  640
+                ],
+                [
+                  1285,
+                  622
+                ],
+                [
+                  1332,
+                  593
+                ],
+                [
+                  1364,
+                  553
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.689593,
+                  0.684378
+                ],
+                [
+                  0.73445,
+                  0.680128
+                ],
+                [
+                  0.768541,
+                  0.660999
+                ],
+                [
+                  0.796651,
+                  0.630181
+                ],
+                [
+                  0.815789,
+                  0.587673
+                ]
+              ]
+            },
+            {
+              "id": "img01_sector_curva_derecha",
+              "nombre": "Gran curva derecha",
+              "observaciones": "El margen verde y el piano interior entran en la curva formando una lengüeta. Aquí está el coche amarillo.",
+              "puntos_px": [
+                [
+                  1364,
+                  553
+                ],
+                [
+                  1427,
+                  526
+                ],
+                [
+                  1472,
+                  499
+                ],
+                [
+                  1494,
+                  464
+                ],
+                [
+                  1505,
+                  426
+                ],
+                [
+                  1496,
+                  389
+                ],
+                [
+                  1475,
+                  361
+                ],
+                [
+                  1448,
+                  337
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.815789,
+                  0.587673
+                ],
+                [
+                  0.853469,
+                  0.55898
+                ],
+                [
+                  0.880383,
+                  0.530287
+                ],
+                [
+                  0.893541,
+                  0.493092
+                ],
+                [
+                  0.90012,
+                  0.45271
+                ],
+                [
+                  0.894737,
+                  0.41339
+                ],
+                [
+                  0.882177,
+                  0.383634
+                ],
+                [
+                  0.866029,
+                  0.35813
+                ]
+              ]
+            },
+            {
+              "id": "img01_sector_bajada_derecha",
+              "nombre": "Conexión posterior derecha y bajada",
+              "observaciones": "Transición entre la curva amplia y la ondulación superior, visible sobre una rampa de madera por el borde interior.",
+              "puntos_px": [
+                [
+                  1448,
+                  337
+                ],
+                [
+                  1410,
+                  318
+                ],
+                [
+                  1365,
+                  302
+                ],
+                [
+                  1312,
+                  286
+                ],
+                [
+                  1264,
+                  267
+                ],
+                [
+                  1220,
+                  243
+                ],
+                [
+                  1178,
+                  218
+                ],
+                [
+                  1145,
+                  198
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.866029,
+                  0.35813
+                ],
+                [
+                  0.843301,
+                  0.337938
+                ],
+                [
+                  0.816388,
+                  0.320935
+                ],
+                [
+                  0.784689,
+                  0.303932
+                ],
+                [
+                  0.755981,
+                  0.283741
+                ],
+                [
+                  0.729665,
+                  0.258236
+                ],
+                [
+                  0.704545,
+                  0.231668
+                ],
+                [
+                  0.684809,
+                  0.210414
+                ]
+              ]
+            },
+            {
+              "id": "img01_sector_cresta",
+              "nombre": "Cresta y rama elevada",
+              "observaciones": "Tramo ondulado sobre soportes. El violeta se sitúa sobre esta rama.",
+              "puntos_px": [
+                [
+                  1145,
+                  198
+                ],
+                [
+                  1111,
+                  184
+                ],
+                [
+                  1069,
+                  176
+                ],
+                [
+                  1025,
+                  173
+                ],
+                [
+                  983,
+                  174
+                ],
+                [
+                  943,
+                  181
+                ],
+                [
+                  902,
+                  193
+                ],
+                [
+                  866,
+                  210
+                ],
+                [
+                  826,
+                  226
+                ],
+                [
+                  780,
+                  242
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.684809,
+                  0.210414
+                ],
+                [
+                  0.664474,
+                  0.195537
+                ],
+                [
+                  0.639354,
+                  0.187035
+                ],
+                [
+                  0.613038,
+                  0.183847
+                ],
+                [
+                  0.587919,
+                  0.18491
+                ],
+                [
+                  0.563995,
+                  0.192349
+                ],
+                [
+                  0.539474,
+                  0.205101
+                ],
+                [
+                  0.517943,
+                  0.223167
+                ],
+                [
+                  0.494019,
+                  0.24017
+                ],
+                [
+                  0.466507,
+                  0.257173
+                ]
+              ]
+            },
+            {
+              "id": "img01_sector_ondulacion_izquierda",
+              "nombre": "Ondulación posterior izquierda",
+              "observaciones": "El eje proyectado baja hacia el centro y gira hacia la curva occidental. La calzada sigue en altura sobre parte de este sector.",
+              "puntos_px": [
+                [
+                  780,
+                  242
+                ],
+                [
+                  736,
+                  252
+                ],
+                [
+                  686,
+                  256
+                ],
+                [
+                  635,
+                  249
+                ],
+                [
+                  587,
+                  235
+                ],
+                [
+                  540,
+                  220
+                ],
+                [
+                  489,
+                  210
+                ],
+                [
+                  444,
+                  207
+                ],
+                [
+                  400,
+                  211
+                ],
+                [
+                  350,
+                  224
+                ],
+                [
+                  306,
+                  242
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.466507,
+                  0.257173
+                ],
+                [
+                  0.440191,
+                  0.2678
+                ],
+                [
+                  0.410287,
+                  0.272051
+                ],
+                [
+                  0.379785,
+                  0.264612
+                ],
+                [
+                  0.351077,
+                  0.249734
+                ],
+                [
+                  0.322967,
+                  0.233794
+                ],
+                [
+                  0.292464,
+                  0.223167
+                ],
+                [
+                  0.26555,
+                  0.219979
+                ],
+                [
+                  0.239234,
+                  0.22423
+                ],
+                [
+                  0.20933,
+                  0.238045
+                ],
+                [
+                  0.183014,
+                  0.257173
+                ]
+              ]
+            },
+            {
+              "id": "img01_sector_curva_izquierda",
+              "nombre": "Gran curva izquierda",
+              "observaciones": "Arco amplio que vuelve al plano delantero, con piano interior y exterior y margen verde. La superficie refleja luz cálida.",
+              "puntos_px": [
+                [
+                  306,
+                  242
+                ],
+                [
+                  269,
+                  260
+                ],
+                [
+                  232,
+                  286
+                ],
+                [
+                  199,
+                  318
+                ],
+                [
+                  173,
+                  354
+                ],
+                [
+                  152,
+                  398
+                ],
+                [
+                  143,
+                  445
+                ],
+                [
+                  144,
+                  494
+                ],
+                [
+                  157,
+                  541
+                ],
+                [
+                  184,
+                  581
+                ],
+                [
+                  220,
+                  613
+                ],
+                [
+                  268,
+                  635
+                ],
+                [
+                  322,
+                  651
+                ]
+              ],
+              "puntos_01": [
+                [
+                  0.183014,
+                  0.257173
+                ],
+                [
+                  0.160885,
+                  0.276302
+                ],
+                [
+                  0.138756,
+                  0.303932
+                ],
+                [
+                  0.119019,
+                  0.337938
+                ],
+                [
+                  0.103469,
+                  0.376196
+                ],
+                [
+                  0.090909,
+                  0.422954
+                ],
+                [
+                  0.085526,
+                  0.472901
+                ],
+                [
+                  0.086124,
+                  0.524973
+                ],
+                [
+                  0.0939,
+                  0.57492
+                ],
+                [
+                  0.110048,
+                  0.617428
+                ],
+                [
+                  0.131579,
+                  0.651435
+                ],
+                [
+                  0.160287,
+                  0.674814
+                ],
+                [
+                  0.192584,
+                  0.691817
+                ]
+              ]
+            }
+          ]
+        },
+        "perfil_altimetrico": {
+          "evidencia": "Cantos de madera expuestos sobre la isla, seis zapatas rectangulares claramente visibles, puntales verticales y refuerzos diagonales. Hacia los laterales la calzada se aproxima al plano de la base.",
+          "secuencia_conceptual": [
+            "recta a nivel bajo",
+            "aproximación lateral",
+            "rama elevada sobre apoyos",
+            "cresta aparente en el fondo derecho",
+            "descenso",
+            "enlace con la recta"
+          ],
+          "altura_real": null,
+          "pendiente_real": null,
+          "coordenadas_3d": null
+        },
+        "marcas": [
+          {
+            "entidad": "img01_meta",
+            "ubicacion": "Recta delantera, ligeramente a la derecha del centro del cuadro."
+          },
+          {
+            "entidad": "img01_parrilla",
+            "ubicacion": "A la izquierda de la línea ajedrezada."
+          }
+        ],
+        "orientacion_de_carrera": "Indeterminada. En imagen, turquesa y rojo miran hacia la derecha y amarillo y violeta hacia la izquierda. En una curva, la orientación aparente del morro no basta para reconstruir una vuelta."
+      },
+      "relaciones_espaciales": [
+        {
+          "sujeto_id": "img01_tablero",
+          "relacion": "se_apoya_sobre",
+          "objeto_id": "img01_banco",
+          "evidencia": "El canto laminado proyecta sombra de contacto sobre el banco."
+        },
+        {
+          "sujeto_id": "img01_calzada",
+          "relacion": "rodea",
+          "objeto_id": "img01_isla_interior",
+          "evidencia": "Las dos ramas de la calzada y sus curvas laterales envuelven la zona central de madera."
+        },
+        {
+          "sujeto_id": "img01_auto_turquesa",
+          "relacion": "a_la_izquierda_de",
+          "objeto_id": "img01_parrilla",
+          "evidencia": "El morro del coche termina visualmente antes de la primera marca de la parrilla."
+        },
+        {
+          "sujeto_id": "img01_auto_rojo",
+          "relacion": "a_la_derecha_de",
+          "objeto_id": "img01_meta",
+          "evidencia": "El coche rojo está separado del ajedrezado por un breve tramo de asfalto."
+        },
+        {
+          "sujeto_id": "img01_parrilla",
+          "relacion": "a_la_izquierda_de",
+          "objeto_id": "img01_meta",
+          "evidencia": "Las siete marcas visibles se agrupan en un tramo contiguo al ajedrezado."
+        },
+        {
+          "sujeto_id": "img01_auto_violeta",
+          "relacion": "sobre",
+          "objeto_id": "img01_elevacion",
+          "evidencia": "La rama donde se apoya está por encima de las zapatas visibles en la isla."
+        },
+        {
+          "sujeto_id": "img01_auto_amarillo",
+          "relacion": "a_la_derecha_de",
+          "objeto_id": "img01_isla_interior",
+          "evidencia": "Ocupa el arco de asfalto junto a la lengüeta verde del extremo derecho."
+        },
+        {
+          "sujeto_id": "img01_valla_exterior",
+          "relacion": "bordea_por_fuera",
+          "objeto_id": "img01_pianos_exteriores",
+          "evidencia": "Una franja verde queda normalmente entre el piano y la malla."
+        },
+        {
+          "sujeto_id": "img01_valla_interior",
+          "relacion": "separa",
+          "objeto_id": "img01_isla_interior",
+          "evidencia": "El tramo frontal de malla separa la isla de la recta."
+        },
+        {
+          "sujeto_id": "img01_foco_interior_izq",
+          "relacion": "en",
+          "objeto_id": "img01_isla_interior",
+          "evidencia": "La base se ve sobre la madera dentro del lazo."
+        },
+        {
+          "sujeto_id": "img01_foco_interior_der",
+          "relacion": "en",
+          "objeto_id": "img01_isla_interior",
+          "evidencia": "La base queda del lado de la isla en la curva de valla derecha."
+        },
+        {
+          "sujeto_id": "img01_llave_ajustable",
+          "relacion": "detras_de",
+          "objeto_id": "img01_tablero",
+          "evidencia": "Descansa sobre el banco, por encima de la calzada posterior en el encuadre."
+        },
+        {
+          "sujeto_id": "img01_frasco_herrajes",
+          "relacion": "a_la_derecha_de",
+          "objeto_id": "img01_recipiente_herramientas",
+          "evidencia": "Forman parte del grupo de objetos del ángulo superior izquierdo."
+        },
+        {
+          "sujeto_id": "img01_organizador",
+          "relacion": "a_la_derecha_de",
+          "objeto_id": "img01_frasco_herrajes",
+          "evidencia": "El borde de la bandeja comienza junto al lado derecho del frasco."
+        },
+        {
+          "sujeto_id": "img01_foco_fondo_der",
+          "relacion": "delante_de",
+          "objeto_id": "img01_cajonera",
+          "evidencia": "El foco se superpone visualmente a la chapa roja de la cajonera."
+        },
+        {
+          "sujeto_id": "img01_placa_vacia",
+          "relacion": "fuera_del_perimetro_de",
+          "objeto_id": "img01_tablero",
+          "evidencia": "Se distingue banco oscuro entre el borde irregular de la base y el marco de la placa."
+        }
+      ],
+      "texturas_y_microdetalle": [
+        {
+          "zona": "Tablero",
+          "rasgos": [
+            "Veta ondulada en superficie",
+            "Bandas horizontales paralelas en el canto",
+            "Aristas fresadas de aspecto suave",
+            "Cabezas circulares embutidas"
+          ]
+        },
+        {
+          "zona": "Banco",
+          "rasgos": [
+            "Arañazos cruzados",
+            "Desgaste irregular",
+            "Manchas y pequeños restos de pintura",
+            "Canto delantero oscuro"
+          ]
+        },
+        {
+          "zona": "Calzada y pianos",
+          "rasgos": [
+            "Grano muy fino en asfalto",
+            "Marcas oscuras de trayectoria curvada",
+            "Bordes bicolores con pequeñas variaciones de saturación",
+            "Líneas y cuadros pintados sobre la rodadura"
+          ]
+        },
+        {
+          "zona": "Vallas y focos",
+          "rasgos": [
+            "Malla cuadriculada fina",
+            "Postes segmentados con zapatas",
+            "Metales gris pardo y reflejos cálidos",
+            "Cuadrícula rectangular de emisores"
+          ]
+        },
+        {
+          "zona": "Vehículos",
+          "rasgos": [
+            "Franjas claras sobre colores saturados",
+            "Sombras en uniones de carrocería",
+            "Reflejos en paneles curvos",
+            "Llantas metálicas y caucho negro"
+          ]
+        },
+        {
+          "zona": "Taller al fondo",
+          "rasgos": [
+            "Perforaciones repetidas",
+            "Chapa roja desgastada",
+            "Metal cepillado o bruñido",
+            "Vidrio con reflejos especulares"
+          ]
+        }
+      ],
+      "texto_y_simbolos": {
+        "texto_legible": [],
+        "placa_vacia": {
+          "entidad": "img01_placa_vacia",
+          "contenido_visible": null,
+          "estado": "campo_liso_sin_inscripcion_legible"
+        },
+        "marcas_no_alfanumericas": [
+          "Patrón ajedrezado de meta",
+          "Corchetes abiertos de parrilla",
+          "Pianos bicolores",
+          "Franjas longitudinales de los vehículos"
+        ],
+        "marcas_no_resueltas": "Posibles incisiones en el mango de la llave y detalles minúsculos de los vehículos carecen de resolución suficiente para transcripción fiable."
+      },
+      "incertidumbres": [
+        {
+          "aspecto": "Procedencia y proceso",
+          "estado": "indeterminado",
+          "detalle": "La apariencia es fotográfica y de maqueta. Una sola imagen no permite confirmar si representa una maqueta física, un render o una composición."
+        },
+        {
+          "aspecto": "Vehículos",
+          "estado": "identidad_no_confirmada",
+          "detalle": "Las categorías hatchback de rally y coupé son lecturas de la silueta. Fabricantes, modelos, pilotos y escalas comerciales son indeterminados."
+        },
+        {
+          "aspecto": "Función de la placa",
+          "estado": "indeterminado",
+          "detalle": "Solo se distingue un inserto vacío sujeto por un marco. Etiqueta, display o elemento decorativo son interpretaciones posibles."
+        },
+        {
+          "aspecto": "Dinámica",
+          "estado": "indeterminado",
+          "detalle": "Poses visuales separadas. Velocidad, orden de carrera, momento de salida y reglas no se pueden confirmar."
+        },
+        {
+          "aspecto": "Geometría métrica",
+          "estado": "indeterminado",
+          "detalle": "Las cajas, centros y polilíneas son aproximaciones en proyección. El desnivel, los radios, las dimensiones reales y la calibración de cámara no son recuperables de forma única."
+        },
+        {
+          "aspecto": "Conteo de apoyos y postes",
+          "estado": "conteo_parcial",
+          "detalle": "Se individualizan seis zapatas rectangulares claras bajo el tramo elevado. La malla, las sombras y la perspectiva pueden ocultar otras fijaciones y apoyos."
+        },
+        {
+          "aspecto": "Materiales y fuentes",
+          "estado": "apariencia",
+          "detalle": "Las denominaciones de materiales se basan en color, textura, reflexión y forma. Composición real, tipo de bombilla y potencia no se pueden confirmar."
+        }
+      ],
+      "mediciones_cromaticas": {
+        "cantidad_pixeles": 1573352,
+        "espacio_supuesto_para_calculos_lineales": "sRGB",
+        "promedio_rgb_codificado": [
+          145,
+          100,
+          69
+        ],
+        "promedio_hex": "#916445",
+        "extremos_por_canal": {
+          "min_rgb": [
+            0,
+            0,
+            0
+          ],
+          "max_rgb": [
+            255,
+            255,
+            255
+          ]
+        },
+        "fraccion_con_rojo_mayor_que_azul": 0.991415,
+        "luminancia_relativa_Y": {
+          "metodo": "Se linealizan los canales como sRGB y se calcula 0.2126 R + 0.7152 G + 0.0722 B. Los cuantiles usan un histograma con paso 0.0001.",
+          "media": 0.202262,
+          "p05": 0.0228,
+          "p25": 0.0708,
+          "p50": 0.1262,
+          "p75": 0.3103,
+          "p95": 0.571
+        },
+        "paleta_global": {
+          "metodo": "Histograma RGB de 5 bits por canal sobre todos los píxeles originales. Conversión a OKLab de la media RGB redondeada de cada celda ocupada. K-means ponderado por frecuencia, distancia euclídea en OKLab, 16 grupos y 32 iteraciones. El primer centro es la celda más frecuente. Cada centro inicial restante maximiza frecuencia por distancia cuadrática al centro más próximo. Los empates usan el primer índice. Color de salida igual a la media RGB codificada de todos los píxeles asignados a cada grupo.",
+          "alcance": "Los grupos cromáticos corresponden a toda la imagen y sus proporciones son proporciones de píxeles, no medidas de superficie física.",
+          "colores": [
+            {
+              "hex": "#694937",
+              "rgb_8bit": [
+                105,
+                73,
+                55
+              ],
+              "pixeles": 221223,
+              "fraccion": 0.140606
+            },
+            {
+              "hex": "#7C553C",
+              "rgb_8bit": [
+                124,
+                85,
+                60
+              ],
+              "pixeles": 175226,
+              "fraccion": 0.111371
+            },
+            {
+              "hex": "#D8945E",
+              "rgb_8bit": [
+                216,
+                148,
+                94
+              ],
+              "pixeles": 171454,
+              "fraccion": 0.108974
+            },
+            {
+              "hex": "#966242",
+              "rgb_8bit": [
+                150,
+                98,
+                66
+              ],
+              "pixeles": 161042,
+              "fraccion": 0.102356
+            },
+            {
+              "hex": "#554136",
+              "rgb_8bit": [
+                85,
+                65,
+                54
+              ],
+              "pixeles": 155713,
+              "fraccion": 0.098969
+            },
+            {
+              "hex": "#EBA970",
+              "rgb_8bit": [
+                235,
+                169,
+                112
+              ],
+              "pixeles": 148726,
+              "fraccion": 0.094528
+            },
+            {
+              "hex": "#B57A4E",
+              "rgb_8bit": [
+                181,
+                122,
+                78
+              ],
+              "pixeles": 119997,
+              "fraccion": 0.076268
+            },
+            {
+              "hex": "#4B2C19",
+              "rgb_8bit": [
+                75,
+                44,
+                25
+              ],
+              "pixeles": 89566,
+              "fraccion": 0.056927
+            },
+            {
+              "hex": "#EFCE9E",
+              "rgb_8bit": [
+                239,
+                206,
+                158
+              ],
+              "pixeles": 66119,
+              "fraccion": 0.042024
+            },
+            {
+              "hex": "#628349",
+              "rgb_8bit": [
+                98,
+                131,
+                73
+              ],
+              "pixeles": 63665,
+              "fraccion": 0.040465
+            },
+            {
+              "hex": "#331D12",
+              "rgb_8bit": [
+                51,
+                29,
+                18
+              ],
+              "pixeles": 55488,
+              "fraccion": 0.035267
+            },
+            {
+              "hex": "#64140C",
+              "rgb_8bit": [
+                100,
+                20,
+                12
+              ],
+              "pixeles": 46611,
+              "fraccion": 0.029625
+            },
+            {
+              "hex": "#9A221C",
+              "rgb_8bit": [
+                154,
+                34,
+                28
+              ],
+              "pixeles": 40822,
+              "fraccion": 0.025946
+            },
+            {
+              "hex": "#EC4338",
+              "rgb_8bit": [
+                236,
+                67,
+                56
+              ],
+              "pixeles": 24140,
+              "fraccion": 0.015343
+            },
+            {
+              "hex": "#1C0F09",
+              "rgb_8bit": [
+                28,
+                15,
+                9
+              ],
+              "pixeles": 20196,
+              "fraccion": 0.012836
+            },
+            {
+              "hex": "#F8EFDA",
+              "rgb_8bit": [
+                248,
+                239,
+                218
+              ],
+              "pixeles": 13364,
+              "fraccion": 0.008494
+            }
+          ]
+        },
+        "muestreo_local": {
+          "metodo": "Cuadrados seleccionados visualmente sobre la imagen original. Coordenadas de origen superior izquierdo, límites superiores de bbox exclusivos. Media aritmética por canal codificado, redondeada al entero. Las muestras describen color de imagen con iluminación y reflejos incorporados.",
+          "muestras": [
+            {
+              "zona_visual": "asfalto gris de la recta inferior",
+              "centro_px": [
+                660,
+                630
+              ],
+              "bbox_px": [
+                652,
+                622,
+                669,
+                639
+              ],
+              "bbox_01": [
+                0.389952,
+                0.660999,
+                0.40012,
+                0.679065
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                75,
+                68,
+                65
+              ],
+              "rgb_promedio": [
+                77,
+                70,
+                68
+              ],
+              "hex_promedio": "#4D4644"
+            },
+            {
+              "zona_visual": "asfalto cálido de la curva izquierda",
+              "centro_px": [
+                154,
+                490
+              ],
+              "bbox_px": [
+                146,
+                482,
+                163,
+                499
+              ],
+              "bbox_01": [
+                0.087321,
+                0.512221,
+                0.097488,
+                0.530287
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                96,
+                71,
+                60
+              ],
+              "rgb_promedio": [
+                106,
+                77,
+                63
+              ],
+              "hex_promedio": "#6A4D3F"
+            },
+            {
+              "zona_visual": "contrachapado del interior",
+              "centro_px": [
+                835,
+                407
+              ],
+              "bbox_px": [
+                827,
+                399,
+                844,
+                416
+              ],
+              "bbox_01": [
+                0.494617,
+                0.424017,
+                0.504785,
+                0.442083
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                236,
+                170,
+                116
+              ],
+              "rgb_promedio": [
+                233,
+                165,
+                109
+              ],
+              "hex_promedio": "#E9A56D"
+            },
+            {
+              "zona_visual": "canto laminado en el frente",
+              "centro_px": [
+                828,
+                798
+              ],
+              "bbox_px": [
+                823,
+                793,
+                834,
+                804
+              ],
+              "bbox_01": [
+                0.492225,
+                0.842721,
+                0.498804,
+                0.85441
+              ],
+              "pixeles": 121,
+              "rgb_central": [
+                155,
+                94,
+                50
+              ],
+              "rgb_promedio": [
+                136,
+                78,
+                36
+              ],
+              "hex_promedio": "#884E24"
+            },
+            {
+              "zona_visual": "banco gastado de taller",
+              "centro_px": [
+                923,
+                853
+              ],
+              "bbox_px": [
+                915,
+                845,
+                932,
+                862
+              ],
+              "bbox_01": [
+                0.547249,
+                0.897981,
+                0.557416,
+                0.916047
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                120,
+                81,
+                64
+              ],
+              "rgb_promedio": [
+                127,
+                84,
+                61
+              ],
+              "hex_promedio": "#7F543D"
+            },
+            {
+              "zona_visual": "arcén verde en el exterior izquierdo",
+              "centro_px": [
+                43,
+                555
+              ],
+              "bbox_px": [
+                40,
+                552,
+                47,
+                559
+              ],
+              "bbox_01": [
+                0.023923,
+                0.58661,
+                0.02811,
+                0.594049
+              ],
+              "pixeles": 49,
+              "rgb_central": [
+                103,
+                127,
+                66
+              ],
+              "rgb_promedio": [
+                107,
+                129,
+                68
+              ],
+              "hex_promedio": "#6B8144"
+            },
+            {
+              "zona_visual": "piano rojo en el lado exterior de la curva izquierda",
+              "centro_px": [
+                63,
+                555
+              ],
+              "bbox_px": [
+                60,
+                552,
+                67,
+                559
+              ],
+              "bbox_01": [
+                0.035885,
+                0.58661,
+                0.040072,
+                0.594049
+              ],
+              "pixeles": 49,
+              "rgb_central": [
+                239,
+                71,
+                58
+              ],
+              "rgb_promedio": [
+                238,
+                68,
+                55
+              ],
+              "hex_promedio": "#EE4437"
+            },
+            {
+              "zona_visual": "piano crema en el lado exterior de la curva izquierda",
+              "centro_px": [
+                68,
+                567
+              ],
+              "bbox_px": [
+                66,
+                565,
+                71,
+                570
+              ],
+              "bbox_01": [
+                0.039474,
+                0.600425,
+                0.042464,
+                0.605739
+              ],
+              "pixeles": 25,
+              "rgb_central": [
+                252,
+                215,
+                158
+              ],
+              "rgb_promedio": [
+                253,
+                217,
+                157
+              ],
+              "hex_promedio": "#FDD99D"
+            },
+            {
+              "zona_visual": "carrocería turquesa en puerta lateral",
+              "centro_px": [
+                316,
+                640
+              ],
+              "bbox_px": [
+                314,
+                638,
+                319,
+                643
+              ],
+              "bbox_01": [
+                0.187799,
+                0.678002,
+                0.190789,
+                0.683316
+              ],
+              "pixeles": 25,
+              "rgb_central": [
+                39,
+                113,
+                105
+              ],
+              "rgb_promedio": [
+                38,
+                106,
+                99
+              ],
+              "hex_promedio": "#266A63"
+            },
+            {
+              "zona_visual": "carrocería roja en puerta lateral",
+              "centro_px": [
+                976,
+                618
+              ],
+              "bbox_px": [
+                973,
+                615,
+                980,
+                622
+              ],
+              "bbox_01": [
+                0.581938,
+                0.65356,
+                0.586124,
+                0.660999
+              ],
+              "pixeles": 49,
+              "rgb_central": [
+                147,
+                21,
+                11
+              ],
+              "rgb_promedio": [
+                157,
+                25,
+                12
+              ],
+              "hex_promedio": "#9D190C"
+            },
+            {
+              "zona_visual": "carrocería amarilla en el frontal",
+              "centro_px": [
+                1459,
+                437
+              ],
+              "bbox_px": [
+                1456,
+                434,
+                1463,
+                441
+              ],
+              "bbox_01": [
+                0.870813,
+                0.461211,
+                0.875,
+                0.46865
+              ],
+              "pixeles": 49,
+              "rgb_central": [
+                239,
+                191,
+                2
+              ],
+              "rgb_promedio": [
+                219,
+                179,
+                12
+              ],
+              "hex_promedio": "#DBB30C"
+            },
+            {
+              "zona_visual": "carrocería violeta junto a la ventanilla",
+              "centro_px": [
+                921,
+                183
+              ],
+              "bbox_px": [
+                920,
+                182,
+                923,
+                185
+              ],
+              "bbox_01": [
+                0.550239,
+                0.193411,
+                0.552033,
+                0.196599
+              ],
+              "pixeles": 9,
+              "rgb_central": [
+                199,
+                62,
+                149
+              ],
+              "rgb_promedio": [
+                197,
+                72,
+                149
+              ],
+              "hex_promedio": "#C54895"
+            },
+            {
+              "zona_visual": "cajonera roja de taller",
+              "centro_px": [
+                1471,
+                103
+              ],
+              "bbox_px": [
+                1466,
+                98,
+                1477,
+                109
+              ],
+              "bbox_01": [
+                0.876794,
+                0.104145,
+                0.883373,
+                0.115834
+              ],
+              "pixeles": 121,
+              "rgb_central": [
+                72,
+                12,
+                7
+              ],
+              "rgb_promedio": [
+                86,
+                30,
+                23
+              ],
+              "hex_promedio": "#561E17"
+            },
+            {
+              "zona_visual": "superficie crema de la placa",
+              "centro_px": [
+                1557,
+                785
+              ],
+              "bbox_px": [
+                1549,
+                777,
+                1566,
+                794
+              ],
+              "bbox_01": [
+                0.926435,
+                0.825717,
+                0.936603,
+                0.843783
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                236,
+                205,
+                170
+              ],
+              "rgb_promedio": [
+                236,
+                206,
+                170
+              ],
+              "hex_promedio": "#ECCEAA"
+            },
+            {
+              "zona_visual": "núcleo de un foco de la izquierda",
+              "centro_px": [
+                122,
+                162
+              ],
+              "bbox_px": [
+                121,
+                161,
+                124,
+                164
+              ],
+              "bbox_01": [
+                0.072368,
+                0.171095,
+                0.074163,
+                0.174283
+              ],
+              "pixeles": 9,
+              "rgb_central": [
+                255,
+                254,
+                255
+              ],
+              "rgb_promedio": [
+                255,
+                254,
+                253
+              ],
+              "hex_promedio": "#FFFEFD"
+            },
+            {
+              "zona_visual": "sombra bajo tramo elevado",
+              "centro_px": [
+                767,
+                327
+              ],
+              "bbox_px": [
+                764,
+                324,
+                771,
+                331
+              ],
+              "bbox_01": [
+                0.456938,
+                0.344315,
+                0.461124,
+                0.351753
+              ],
+              "pixeles": 49,
+              "rgb_central": [
+                83,
+                43,
+                17
+              ],
+              "rgb_promedio": [
+                79,
+                40,
+                14
+              ],
+              "hex_promedio": "#4F280E"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "img02",
+      "titulo": "Dos autos en curva, a ras del circuito",
+      "descripcion_corta": "Un compacto turquesa con franja crema domina el primer plano de un circuito en miniatura, con un auto de rally rojo detrás, pianos bicolor y un taller iluminado en ámbar.",
+      "descripcion_extensa": "La cámara baja mira por el interior de una curva oscura. El compacto turquesa ocupa el centro derecho en tres cuartos frontal, con la parrilla y ambos faros a la vista, dos ruedas del flanco visible y tornillos sobredimensionados repartidos por la carrocería. Detrás, un auto rojo más pequeño en proyección repite la orientación general y exhibe cuatro faros redondos repartidos entre el frente y un par auxiliar central. El piano rojo y crema arranca ancho en la parte inferior y se curva hacia el fondo izquierdo junto a una franja verde. El grano de la calzada, la veta de la madera, el brillo de la pintura y la retícula de la valla se perciben a escalas distintas. Barreras de neumáticos, una llave grande, una lámpara cálida, herramientas y una cajonera roja sitúan la carrera sobre una mesa de taller.",
+      "archivo": {
+        "nombre": "02-detalle.png",
+        "formato": "PNG",
+        "mime": "image/png",
+        "bytes": 2473566,
+        "sha256": "470f72b5163c79a25ffbe84a848b35c3fd34e15b68ff0ef1407039d30752e3ac",
+        "ancho_px": 1672,
+        "alto_px": 941,
+        "orientacion": "horizontal",
+        "aspecto_ancho_alto": 1.776833156,
+        "ihdr": {
+          "bits_por_canal": 8,
+          "tipo_de_color_codigo": 2,
+          "tipo_de_color": "RGB de color verdadero",
+          "canales_codificados": 3,
+          "alfa_codificado": false,
+          "compresion_codigo": 0,
+          "compresion": "zlib/DEFLATE",
+          "metodo_de_filtrado_codigo": 0,
+          "entrelazado_codigo": 0,
+          "entrelazado": false,
+          "filas_por_filtro": [
+            0,
+            2,
+            0,
+            218,
+            721
+          ]
+        },
+        "chunks_en_orden": [
+          {
+            "tipo": "IHDR",
+            "offset_bytes": 8,
+            "longitud_datos_bytes": 13,
+            "crc32_hex": "3DE4705E",
+            "crc32_coincide": true
+          },
+          {
+            "tipo": "caBX",
+            "offset_bytes": 33,
+            "longitud_datos_bytes": 23654,
+            "crc32_hex": "126CEF3C",
+            "crc32_coincide": true
+          },
+          {
+            "tipo": "IDAT",
+            "offset_bytes": 23699,
+            "longitud_datos_bytes": 2449843,
+            "crc32_hex": "74F17648",
+            "crc32_coincide": true
+          },
+          {
+            "tipo": "IEND",
+            "offset_bytes": 2473554,
+            "longitud_datos_bytes": 0,
+            "crc32_hex": "AE426082",
+            "crc32_coincide": true
+          }
+        ],
+        "metadata_png_convencional": {
+          "chunks_textuales": [],
+          "exif_presente": false,
+          "perfil_color_icc_presente": false,
+          "sRGB_explicito": false,
+          "resolucion_fisica_pHYs_presente": false
+        },
+        "credenciales_c2pa": {
+          "estado_procedencia": "Declaraciones incrustadas en el archivo",
+          "contenedor": "PNG caBX con cajas JUMBF",
+          "etiqueta_manifiesto": "urn:c2pa:9adb1bb0-f445-45db-bc7a-f0083ef7789c",
+          "version_especificacion_declarada": "2.2.0",
+          "id_instancia_declarado": "xmp:iid:c17ccc58-0b93-4381-b20f-93e84505a62f",
+          "titulo_interno_declarado": "image.png",
+          "generador_de_credenciales_declarado": "OpenAI Media Service API",
+          "version_biblioteca_declarada": "0.79.2",
+          "acciones_declaradas": [
+            {
+              "accion": "c2pa.created",
+              "fecha_utc_declarada": "2026-11-09T17:48:28.165764802Z",
+              "agente_de_software": {
+                "nombre": "ChatGPT",
+                "version": "gpt-image"
+              },
+              "tipo_fuente_digital_iptc": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+            },
+            {
+              "accion": "c2pa.converted",
+              "fecha_utc_declarada": "2026-11-09T17:48:28.165768153Z",
+              "agente_de_software": null,
+              "tipo_fuente_digital_iptc": null
+            },
+            {
+              "accion": "c2pa.watermarked.unbound",
+              "fecha_utc_declarada": "2026-11-09T17:48:28.160525735Z",
+              "agente_de_software": null,
+              "tipo_fuente_digital_iptc": null
+            }
+          ],
+          "todas_las_acciones_incluidas_declarado": false,
+          "enlace_por_hash": {
+            "asercion": "c2pa.hash.data",
+            "algoritmo": "sha256",
+            "exclusiones_bytes": [
+              {
+                "inicio": 33,
+                "longitud": 23666
+              }
+            ],
+            "hash_declarado_hex": "5a1ba37e83bef265088f2f214c897edd410d16b327c3029ff7ebd61fc89b1902",
+            "hash_recalculado_hex": "5a1ba37e83bef265088f2f214c897edd410d16b327c3029ff7ebd61fc89b1902",
+            "coincide": true,
+            "metodo": "SHA-256 de los intervalos de bytes del PNG fuera de las exclusiones declaradas, concatenados en orden de archivo"
+          },
+          "caja_de_firma_presente": true,
+          "autenticidad_criptografica": "Firma y cadena de confianza sin comprobar",
+          "alcance": "Los identificadores, las fechas, el software y el tipo de fuente son declaraciones internas del manifiesto. La coincidencia del hash comprueba el enlace de datos cubierto por la aserción."
+        },
+        "ruta_relativa_al_proyecto": "referencias/02-detalle.png",
+        "ruta_relativa_a_este_json": "02-detalle.png",
+        "relacion_de_aspecto_exacta": "1672:941"
+      },
+      "camara": {
+        "tipo_de_plano": "Plano cercano de contexto en formato horizontal",
+        "angulo_observado": "Punto de vista bajo y oblicuo, con frente y flanco de los dos autos. El capó y una porción del techo del compacto quedan visibles.",
+        "posicion_relativa_inferida": "Junto al margen interior de la curva, cerca del nivel de la carrocería. El piano separa visualmente el observador de la calzada.",
+        "encuadre": "El compacto entra entero en el cuadro. El rojo también conserva su contorno principal. El piano, la madera próxima, los neumáticos próximos y buena parte del taller siguen fuera del cuadro.",
+        "profundidad_de_campo_observada": "Mayor detalle en el compacto turquesa, sus ruedas, los tornillos y el asfalto cercano. El auto rojo conserva forma y piezas reconocibles con bordes más suaves. El fondo de herramientas y parte del primerísimo plano izquierdo muestran desenfoque.",
+        "perspectiva_observada": "Los largueros de la valla lateral convergen en la imagen hacia la izquierda. El borde interior se ensancha con fuerza al acercarse al borde inferior. El auto rojo aparece más pequeño y más alto en el cuadro.",
+        "orientacion_de_los_autos_en_imagen": "Frentes hacia el observador y hacia la derecha del cuadro. La lectura de avance se deduce de su posición y orientación.",
+        "parametros_fisicos_no_determinados": [
+          "Altura exacta",
+          "Longitud focal",
+          "Distancia de enfoque",
+          "Apertura",
+          "Velocidad de obturación",
+          "Sensor o cámara"
+        ]
+      },
+      "composicion": {
+        "sujeto_principal_id": "img02_auto_turquesa",
+        "sujeto_secundario_id": "img02_auto_rojo",
+        "focos_en_orden_de_lectura": [
+          "Frente y carrocería turquesa",
+          "Capó rojo con cuatro ópticas circulares",
+          "Ritmo rojo y crema del piano cercano",
+          "Valla, neumáticos y objetos grandes del taller"
+        ],
+        "capas_de_profundidad": [
+          {
+            "capa": "primerisimo_plano",
+            "elementos": [
+              "Neumáticos oscuros desenfocados de la izquierda",
+              "Canto redondeado de la plataforma interior",
+              "Franja verde",
+              "Piano ancho con tornillos embutidos"
+            ]
+          },
+          {
+            "capa": "plano_principal",
+            "elementos": [
+              "Auto turquesa en tres cuartos frontal",
+              "Sombras de contacto",
+              "Textura fina de la calzada"
+            ]
+          },
+          {
+            "capa": "plano_intermedio",
+            "elementos": [
+              "Auto rojo",
+              "Valla metálica a la derecha",
+              "Pilas negras junto a la valla",
+              "Muro de madera longitudinal"
+            ]
+          },
+          {
+            "capa": "fondo",
+            "elementos": [
+              "Curva distante",
+              "Llave fija grande",
+              "Lámpara de taller",
+              "Recipientes de herramientas",
+              "Cajonera roja gastada"
+            ]
+          }
+        ],
+        "lineas_directrices": [
+          "Piano desde el primer plano inferior hacia el fondo izquierdo",
+          "Largueros de la valla que suben en la imagen hacia el extremo derecho",
+          "Orientación repetida de ambos autos hacia el frente derecho"
+        ],
+        "contraste_cromatico": "El azul verdoso saturado del protagonista destaca entre la luz ámbar, el rojo de la cajonera y del auto secundario y los grises cálidos de la pista.",
+        "masas_y_ritmo": "Coche principal concentrado a la derecha, auto secundario y neumáticos a la izquierda, valla y cajonera a la derecha superior. Se repiten círculos en faros, ruedas, tornillos y neumáticos. La malla agrega un patrón fino frente a las grandes manchas de color."
+      },
+      "iluminacion": {
+        "aspecto_global": "Cálida, direccional y de alto contraste local. Brillos ámbar en la madera, el metal, el caucho y los cantos de las carrocerías.",
+        "fuentes_visibles": [
+          {
+            "id": "img02_lampara_taller",
+            "tipo": "Lámpara de trabajo",
+            "estado": "Encendida",
+            "observacion": "Interior brillante amarillo anaranjado bajo una pantalla oscura."
+          }
+        ],
+        "luz_inferida": [
+          {
+            "tipo": "principal cálida",
+            "direccion_aproximada": "Desde arriba y la izquierda del encuadre",
+            "evidencia": "Reflejos cálidos en cantos superiores y sombra larga del compacto hacia la derecha inferior."
+          },
+          {
+            "tipo": "relleno o rebote",
+            "direccion_aproximada": null,
+            "evidencia": "Parrilla, ópticas, goma y lateral de sombra retienen suficiente información tonal para distinguir sus piezas."
+          }
+        ],
+        "sombras": [
+          "Sombra de contacto densa bajo chasis y neumáticos",
+          "Sombra alargada del compacto proyectada sobre la calzada hacia la derecha inferior",
+          "Oclusión fuerte bajo las pilas y detrás del muro de madera"
+        ],
+        "reflejos": [
+          "Puntos brillantes sobre hombros de guardabarros y capós",
+          "Bandas de luz en paragolpes y bordes de vidrio",
+          "Brillo de gran ángulo en el verde junto al piano",
+          "Destellos cálidos en los alambres y postes de valla",
+          "Línea naranja reflejada en el mango de la llave"
+        ],
+        "limite": "La posición de una lámpara visible no permite separar su contribución de otras fuentes ni medir temperaturas de color."
+      },
+      "inventario": [
+        {
+          "id": "img02_auto_turquesa",
+          "categoria": "vehiculo",
+          "tipo": "vehiculo_miniatura",
+          "etiqueta": "Compacto turquesa con franja crema",
+          "bbox_px": [
+            619,
+            241,
+            1312,
+            632
+          ],
+          "bbox_01": [
+            0.370215,
+            0.256111,
+            0.784689,
+            0.671626
+          ],
+          "visibilidad": "completa_en_encuadre",
+          "observaciones": [
+            "Silueta compacta y cuadrada de competición, con techo alto, morro corto y pasos de rueda ensanchados.",
+            "Carrocería turquesa brillante con una franja longitudinal ancha de tono crema visible en el techo y en el capó. El parabrisas separa ambos tramos en la vista.",
+            "En la franja del capó se distinguen líneas finas y trazas de desgaste. El panel inferior, los pasos de rueda y el paragolpes muestran desconchados y abrasión.",
+            "Dos faros redondos principales con vidrio texturado flanquean una parrilla negra rectangular de listones horizontales.",
+            "Paragolpes metálico bajo la parrilla con dos pilotos ámbar rectangulares. Dos tornillos de cruz grandes en el faldón turquesa bajo el paragolpes.",
+            "Fijaciones redondas con cabeza de cruz o punto oscuro en aletas ensanchadas y zócalos. Dos pequeñas fijaciones o marcas oscuras en el capó y juntas de panel perceptibles.",
+            "Dos ruedas del lado visible claramente delineadas, con goma negra ranurada, centros oscuros y aro metálico. Una forma oscura bajo el extremo frontal derecho parece corresponder a parte de una tercera rueda.",
+            "Parabrisas de marco oscuro y ribete reflectante, limpiaparabrisas al pie, volante oscuro a la derecha de la zona de parabrisas en imagen, espejo interior rectangular y siluetas de asientos. Cristales laterales con reflejos y tirador metálico en la puerta cercana.",
+            "En el flanco bajo se distingue una banda clara oblicua de borde irregular. La imagen aislada no separa con certeza una decoración, un reflejo y el desgaste superficial."
+          ],
+          "rasgos_localizados": [
+            {
+              "parte": "techo_y_franja",
+              "bbox_px": [
+                730,
+                241,
+                1089,
+                286
+              ],
+              "bbox_01": [
+                0.436603,
+                0.256111,
+                0.651316,
+                0.303932
+              ],
+              "detalle": "Techo turquesa, banda crema hacia el centro proyectado y contorno cromado."
+            },
+            {
+              "parte": "parabrisas_e_interior",
+              "bbox_px": [
+                844,
+                265,
+                1148,
+                383
+              ],
+              "bbox_01": [
+                0.504785,
+                0.281615,
+                0.686603,
+                0.407014
+              ],
+              "detalle": "Volante, retrovisor interior, asientos, trazos oscuros de limpiaparabrisas y reflejos verticales."
+            },
+            {
+              "parte": "ventanas_y_puerta_del_flanco",
+              "bbox_px": [
+                675,
+                261,
+                847,
+                528
+              ],
+              "bbox_01": [
+                0.403708,
+                0.277365,
+                0.506579,
+                0.561105
+              ],
+              "detalle": "Dos zonas acristaladas de perfil, pilar oscuro, junta de puerta y manija metálica."
+            },
+            {
+              "parte": "capo",
+              "bbox_px": [
+                846,
+                363,
+                1300,
+                460
+              ],
+              "bbox_01": [
+                0.505981,
+                0.38576,
+                0.777512,
+                0.488842
+              ],
+              "detalle": "Franja central clara, paneles turquesa, brillos y pequeñas fijaciones."
+            },
+            {
+              "parte": "conjunto_optico_y_parrilla",
+              "bbox_px": [
+                987,
+                448,
+                1295,
+                523
+              ],
+              "bbox_01": [
+                0.590311,
+                0.476089,
+                0.774522,
+                0.555792
+              ],
+              "detalle": "Dos ópticas circulares exteriores y ranuras horizontales oscuras en el centro."
+            },
+            {
+              "parte": "paragolpes_y_faldon",
+              "bbox_px": [
+                944,
+                519,
+                1310,
+                609
+              ],
+              "bbox_01": [
+                0.564593,
+                0.551541,
+                0.783493,
+                0.647184
+              ],
+              "detalle": "Dos rectángulos ámbar, metal rayado y dos tornillos visibles en la parte inferior."
+            },
+            {
+              "parte": "rueda_cercana_delantera",
+              "bbox_px": [
+                808,
+                444,
+                926,
+                630
+              ],
+              "bbox_01": [
+                0.483254,
+                0.471838,
+                0.553828,
+                0.669501
+              ],
+              "detalle": "Neumático de mayor tamaño aparente, dibujo fino y aro de aleación de brillo cálido."
+            },
+            {
+              "parte": "rueda_cercana_trasera",
+              "bbox_px": [
+                624,
+                412,
+                720,
+                555
+              ],
+              "bbox_01": [
+                0.373206,
+                0.437832,
+                0.430622,
+                0.589798
+              ],
+              "detalle": "Neumático parcialmente cubierto por aleta, aro metálico y sombra de contacto."
+            }
+          ],
+          "orientacion_frente_px": [
+            1208,
+            515
+          ],
+          "ruedas_principales_visibles": 2,
+          "faros_principales_visibles": 2,
+          "silueta": "Compacto clásico de competición con perfil de portón, pasos de rueda ensanchados y cristales casi verticales.",
+          "acabados": [
+            "Pintura brillante",
+            "Metal pulido y rayado",
+            "Caucho negro",
+            "Vidrio con reflejos",
+            "Rejilla y sombras oscuras"
+          ]
+        },
+        {
+          "id": "img02_auto_rojo",
+          "categoria": "vehiculo",
+          "tipo": "vehiculo_miniatura",
+          "etiqueta": "Auto rojo de rally con faros auxiliares",
+          "bbox_px": [
+            248,
+            260,
+            587,
+            455
+          ],
+          "bbox_01": [
+            0.148325,
+            0.276302,
+            0.351077,
+            0.483528
+          ],
+          "visibilidad": "completa_en_encuadre",
+          "observaciones": [
+            "Auto rojo anaranjado de formas angulares, en tres cuartos frontal. Su vista es más suave por la profundidad, pero la silueta queda separada del fondo.",
+            "Dos faros exteriores redondos flanquean la parrilla y dos lámparas auxiliares redondas grandes se montan por delante de la zona central.",
+            "Capó elevado con una toma o ranura negra central de baja altura. Pintura brillante con reflejos blancos y ámbar.",
+            "Alerón posterior rojo, pasos de rueda anchos con pequeñas fijaciones y dos ruedas visibles con aros metálicos.",
+            "Paragolpes delantero de franja metálica, detalles rectangulares cálidos y dos fijaciones pequeñas en el faldón.",
+            "Parabrisas y ventanillas oscuros con filete reflectante y formas vagas del habitáculo."
+          ],
+          "rasgos_localizados": [
+            {
+              "parte": "aleron_trasero",
+              "bbox_px": [
+                265,
+                281,
+                324,
+                313
+              ],
+              "bbox_01": [
+                0.158493,
+                0.298618,
+                0.19378,
+                0.332625
+              ],
+              "detalle": "Saliente rojo visible detrás de la cabina."
+            },
+            {
+              "parte": "cabina",
+              "bbox_px": [
+                300,
+                261,
+                505,
+                339
+              ],
+              "bbox_01": [
+                0.179426,
+                0.277365,
+                0.302033,
+                0.360255
+              ],
+              "detalle": "Techo rojo, parabrisas oscuro y superficies reflectantes en bordes."
+            },
+            {
+              "parte": "capo_y_toma",
+              "bbox_px": [
+                365,
+                313,
+                560,
+                365
+              ],
+              "bbox_01": [
+                0.218301,
+                0.332625,
+                0.334928,
+                0.387885
+              ],
+              "detalle": "Brillo especular, perfil del capó y ranura oscura."
+            },
+            {
+              "parte": "opticas",
+              "bbox_px": [
+                398,
+                350,
+                577,
+                403
+              ],
+              "bbox_01": [
+                0.238038,
+                0.371945,
+                0.345096,
+                0.428268
+              ],
+              "detalle": "Dos faros primarios exteriores y dos auxiliares redondos centrales."
+            },
+            {
+              "parte": "paragolpes",
+              "bbox_px": [
+                380,
+                397,
+                587,
+                435
+              ],
+              "bbox_01": [
+                0.227273,
+                0.421892,
+                0.351077,
+                0.462274
+              ],
+              "detalle": "Tira metálica clara y elementos ámbar en el frontal inferior."
+            }
+          ],
+          "orientacion_frente_px": [
+            496,
+            404
+          ],
+          "ruedas_principales_visibles": 2,
+          "faros_principales_visibles": 2,
+          "faros_auxiliares_visibles": 2,
+          "nota_decoracion": "En esta toma predominan el rojo y los reflejos. Una franja longitudinal blanca doble como la de la vista general no se distingue con claridad."
+        },
+        {
+          "id": "img02_calzada",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "infraestructura",
+          "etiqueta": "Calzada oscura de la curva",
+          "bbox_px": [
+            0,
+            329,
+            1672,
+            941
+          ],
+          "bbox_01": [
+            0,
+            0.349628,
+            1,
+            1
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Superficie ancha color carbón marrón con granulado visible, más prominente abajo a la derecha.",
+            "El eje visual curva desde el fondo izquierdo hacia el frente derecho. El tramo más cercano llena buena parte de la mitad inferior derecha.",
+            "Sombras superpuestas de los autos y pequeñas variaciones cálidas por incidencia rasante de la luz."
+          ]
+        },
+        {
+          "id": "img02_piano_interior",
+          "categoria": "senalizacion",
+          "tipo": "infraestructura",
+          "etiqueta": "Piano interior rojo y crema",
+          "bbox_px": [
+            190,
+            442,
+            962,
+            941
+          ],
+          "bbox_01": [
+            0.113636,
+            0.469713,
+            0.575359,
+            1
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Bloques alternos de rojo y crema de borde biselado. La modulación crece en proyección hacia el observador.",
+            "Desgaste, rayas, suciedad fina y cabezas de tornillo o fijaciones embutidas en segmentos visibles.",
+            "Desarrolla una gran diagonal curva desde abajo hacia la izquierda del fondo y separa el verde de la calzada.",
+            "Una línea estrecha de tono claro acompaña la unión del piano y la pista."
+          ]
+        },
+        {
+          "id": "img02_franja_verde",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "infraestructura",
+          "etiqueta": "Margen interior verde pintado",
+          "bbox_px": [
+            157,
+            474,
+            652,
+            941
+          ],
+          "bbox_01": [
+            0.0939,
+            0.503719,
+            0.389952,
+            1
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Franja verde oscura y brillante entre el piano y la base redonda de madera. Lleva rasguños longitudinales y reflejos ámbar.",
+            "Una banda verde más delgada también aparece al fondo izquierdo junto a las barreras pequeñas, con continuidad fuera de vista."
+          ]
+        },
+        {
+          "id": "img02_linea_blanca_exterior",
+          "categoria": "senalizacion",
+          "tipo": "demarcacion",
+          "etiqueta": "Línea clara junto a la barrera derecha",
+          "bbox_px": [
+            1291,
+            480,
+            1672,
+            542
+          ],
+          "bbox_01": [
+            0.772129,
+            0.510096,
+            1,
+            0.575983
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Trazo estrecho y oblicuo que sigue el borde de calzada delante del muro bajo a la derecha. El coche oculta la porción hacia el centro."
+          ]
+        },
+        {
+          "id": "img02_plataforma_interior",
+          "categoria": "infraestructura_de_pista",
+          "tipo": "infraestructura",
+          "etiqueta": "Canto curvo de madera laminada",
+          "bbox_px": [
+            0,
+            526,
+            282,
+            941
+          ],
+          "bbox_01": [
+            0,
+            0.55898,
+            0.16866,
+            1
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Plataforma curva con borde de capas horizontales, acabado cálido y tornillo lateral visible abajo a la izquierda.",
+            "Sostiene neumáticos apilados. Se prolonga fuera del encuadre a la izquierda y por abajo."
+          ]
+        },
+        {
+          "id": "img02_neumaticos_primer_plano",
+          "categoria": "barrera",
+          "tipo": "barrera",
+          "etiqueta": "Pilas de neumáticos del interior próximo",
+          "bbox_px": [
+            0,
+            345,
+            229,
+            747
+          ],
+          "bbox_01": [
+            0,
+            0.366631,
+            0.136962,
+            0.793836
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Varios neumáticos de caucho negro, con surcos inclinados, en más de una pila parcialmente superpuesta.",
+            "Una rueda se distingue de perfil por detrás de las pilas cercanas. Recorte, oclusión y desenfoque impiden un conteo individual fiable."
+          ]
+        },
+        {
+          "id": "img02_barrera_neumaticos_lateral",
+          "categoria": "barrera",
+          "tipo": "barrera",
+          "etiqueta": "Pilas de neumáticos junto al muro derecho",
+          "bbox_px": [
+            1230,
+            266,
+            1634,
+            423
+          ],
+          "bbox_01": [
+            0.735646,
+            0.282678,
+            0.977273,
+            0.449522
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Tres pilas frontales bien diferenciadas. Se aprecian tres niveles en las pilas izquierda y central. En la derecha se ven tres niveles principales y una banda inferior de interpretación menos segura.",
+            "Surcos, flancos negros y luz cálida rasante. Un poste y la malla tapan objetos negros adicionales cerca del extremo derecho."
+          ],
+          "pilas_frontales_distinguibles": 3,
+          "conteo_total_verificado": false
+        },
+        {
+          "id": "img02_barrera_baja_fondo",
+          "categoria": "barrera",
+          "tipo": "barrera",
+          "etiqueta": "Módulos oscuros del fondo izquierdo",
+          "bbox_px": [
+            0,
+            300,
+            626,
+            342
+          ],
+          "bbox_01": [
+            0,
+            0.31881,
+            0.374402,
+            0.363443
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Serie baja de módulos oscuros verticales con tonos negros y gris amarronado, paralela a la valla del fondo.",
+            "Su patrón evoca piezas de protección o neumáticos a escala. El desenfoque limita una identificación de cada módulo."
+          ]
+        },
+        {
+          "id": "img02_valla_derecha",
+          "categoria": "barrera",
+          "tipo": "infraestructura",
+          "etiqueta": "Valla metálica de retícula estrecha",
+          "bbox_px": [
+            610,
+            72,
+            1672,
+            423
+          ],
+          "bbox_01": [
+            0.364833,
+            0.076514,
+            1,
+            0.449522
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Enrejado rectangular de alambres metálicos, con postes de refuerzo repetidos y coronación inclinada.",
+            "El metal atrapa reflejos dorados en bordes y largueros. El patrón se vuelve más grande y nítido hacia la derecha.",
+            "La valla arranca en el plano medio detrás del compacto, se extiende en diagonal y sale por el borde derecho."
+          ]
+        },
+        {
+          "id": "img02_muro_madera_derecho",
+          "categoria": "barrera",
+          "tipo": "infraestructura",
+          "etiqueta": "Muro bajo de madera y placas metálicas",
+          "bbox_px": [
+            609,
+            336,
+            1672,
+            525
+          ],
+          "bbox_01": [
+            0.364234,
+            0.357067,
+            1,
+            0.557917
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Tablones claros con veta y tornillos que soportan los postes y retienen las pilas negras.",
+            "En el poste derecho se distingue una placa metálica vertical con dos fijaciones. Las cabezas de tornillo se repiten sobre la madera.",
+            "Se aprecian dos alturas de tablón junto a las ruedas apiladas. Su función precisa es una lectura visual."
+          ]
+        },
+        {
+          "id": "img02_valla_fondo",
+          "categoria": "barrera",
+          "tipo": "infraestructura",
+          "etiqueta": "Valla distante de la curva",
+          "bbox_px": [
+            0,
+            253,
+            628,
+            328
+          ],
+          "bbox_01": [
+            0,
+            0.268863,
+            0.375598,
+            0.348565
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Postes oscuros delgados con cabeza angulada y repetición regular tras el auto rojo.",
+            "El enrejado es poco definido por la distancia y el foco. Se lee como continuación del perímetro de la curva en este encuadre."
+          ]
+        },
+        {
+          "id": "img02_banco_taller",
+          "categoria": "entorno",
+          "tipo": "entorno",
+          "etiqueta": "Superficie elevada de madera al fondo",
+          "bbox_px": [
+            0,
+            216,
+            928,
+            301
+          ],
+          "bbox_01": [
+            0,
+            0.229543,
+            0.555024,
+            0.319872
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Banda horizontal de madera dorada bajo la llave y tras la valla distante, con veta suave y cantos poco definidos.",
+            "Los útiles grandes sobre esta superficie refuerzan la escala aparente de los autos y la pista."
+          ]
+        },
+        {
+          "id": "img02_llave_fija",
+          "categoria": "utileria",
+          "tipo": "herramienta",
+          "etiqueta": "Llave metálica grande de boca abierta",
+          "bbox_px": [
+            62,
+            119,
+            579,
+            242
+          ],
+          "bbox_01": [
+            0.037081,
+            0.126461,
+            0.346292,
+            0.257173
+          ],
+          "visibilidad": "completa_en_encuadre",
+          "observaciones": [
+            "Boca fija abierta a la izquierda, mango horizontal alargado y orificio redondeado en el extremo derecho.",
+            "Cantos plateados y reflejo naranja a lo largo del mango. Se insinúan marcas grabadas borrosas sin texto fiable."
+          ]
+        },
+        {
+          "id": "img02_lampara_taller",
+          "categoria": "iluminacion",
+          "tipo": "luminaria",
+          "etiqueta": "Lámpara cálida con pantalla metálica",
+          "bbox_px": [
+            442,
+            0,
+            670,
+            102
+          ],
+          "bbox_01": [
+            0.264354,
+            0,
+            0.400718,
+            0.108395
+          ],
+          "visibilidad": "parcial_por_encuadre",
+          "observaciones": [
+            "Pantalla oscura recortada por el borde superior con boca elíptica luminosa, interior color ámbar y centro de mayor intensidad.",
+            "Se ve detrás y arriba de la curva. Una estructura vertical tenue en el fondo inmediato podría pertenecer al soporte."
+          ],
+          "estado": "encendida"
+        },
+        {
+          "id": "img02_cajonera_roja",
+          "categoria": "entorno",
+          "tipo": "mobiliario",
+          "etiqueta": "Cajonera metálica roja envejecida",
+          "bbox_px": [
+            913,
+            0,
+            1592,
+            239
+          ],
+          "bbox_01": [
+            0.546053,
+            0,
+            0.952153,
+            0.253985
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Dos tiradores metálicos rectangulares claros sobre frentes de cajón rojos.",
+            "Pintura escamada, raspaduras y manchas. Uniones oscuras entre cajones y borde vertical oscuro a la derecha.",
+            "La valla y las pilas tapan parte del mueble y el borde superior lo recorta."
+          ],
+          "tiradores_visibles": 2
+        },
+        {
+          "id": "img02_portalapices_metal_central",
+          "categoria": "utileria",
+          "tipo": "contenedor",
+          "etiqueta": "Recipiente metálico central con útiles largos",
+          "bbox_px": [
+            631,
+            0,
+            853,
+            231
+          ],
+          "bbox_01": [
+            0.377392,
+            0,
+            0.510167,
+            0.245484
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Cilindro metálico con iluminación cálida y superficie moteada. Varios mangos salen en abanico y quedan recortados arriba.",
+            "Las puntas y la función de cada útil son difíciles de identificar por desenfoque y recorte."
+          ]
+        },
+        {
+          "id": "img02_recipientes_herramientas_izquierda",
+          "categoria": "utileria",
+          "tipo": "contenedor",
+          "etiqueta": "Conjunto de recipientes y mangos desenfocados",
+          "bbox_px": [
+            0,
+            0,
+            411,
+            220
+          ],
+          "bbox_01": [
+            0,
+            0,
+            0.245813,
+            0.233794
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Mangos de distintos grosores sobresalen de recipientes oscuros o metálicos en el fondo izquierdo.",
+            "Una forma vertical con brillo y base ancha se recorta en el extremo izquierdo. La llave oculta parcialmente estos objetos."
+          ]
+        },
+        {
+          "id": "img02_recipiente_bajo_centro",
+          "categoria": "utileria",
+          "tipo": "contenedor",
+          "etiqueta": "Cuerpo cilíndrico pequeño detrás de la llave",
+          "bbox_px": [
+            574,
+            154,
+            662,
+            226
+          ],
+          "bbox_01": [
+            0.343301,
+            0.163656,
+            0.395933,
+            0.24017
+          ],
+          "visibilidad": "parcial_por_oclusiones",
+          "observaciones": [
+            "Forma baja circular o cilíndrica con borde superior reflectante, difusa bajo la lámpara y junto al recipiente alto.",
+            "La imagen no permite determinar su contenido o función."
+          ]
+        },
+        {
+          "id": "img02_lateral_fondo_derecho",
+          "categoria": "entorno",
+          "tipo": "entorno",
+          "etiqueta": "Canto vertical del extremo derecho del taller",
+          "bbox_px": [
+            1573,
+            0,
+            1642,
+            194
+          ],
+          "bbox_01": [
+            0.940789,
+            0,
+            0.982057,
+            0.206164
+          ],
+          "visibilidad": "parcial_por_encuadre_y_oclusiones",
+          "observaciones": [
+            "Franja oscura con restos de pintura azul y reflejos cálidos en el extremo derecho de la cajonera.",
+            "Su delimitación física entre mueble, marco y fondo es incierta."
+          ]
+        }
+      ],
+      "pista": {
+        "visibilidad": "Tramo de curva en perspectiva baja, con zonas recortadas por el encuadre y por objetos cercanos.",
+        "bordes_observados": {
+          "interior": "Piano alternado con margen verde y barreras de neumáticos cercanas.",
+          "exterior": "Línea clara estrecha junto a un muro de madera, neumáticos negros y valla."
+        },
+        "superficie": {
+          "apariencia": "Gris carbón cálido con granulado fino, sombras y reflejos puntuales.",
+          "marcaciones_visibles": [
+            "Piano alterno en el interior",
+            "Línea fina clara en la unión del piano con la calzada",
+            "Línea clara estrecha junto al muro exterior"
+          ]
+        },
+        "guias_2d_aproximadas": {
+          "origen": "esquina superior izquierda",
+          "formato": "[x,y] en px",
+          "metodo": "Puntos estimados a ojo sobre las zonas reconocibles en el encuadre.",
+          "borde_piano_calzada_px": [
+            [
+              214,
+              449
+            ],
+            [
+              313,
+              477
+            ],
+            [
+              417,
+              516
+            ],
+            [
+              530,
+              568
+            ],
+            [
+              653,
+              639
+            ],
+            [
+              775,
+              728
+            ],
+            [
+              865,
+              829
+            ],
+            [
+              960,
+              940
+            ]
+          ],
+          "borde_calzada_exterior_px": [
+            [
+              1303,
+              487
+            ],
+            [
+              1416,
+              507
+            ],
+            [
+              1538,
+              522
+            ],
+            [
+              1671,
+              539
+            ]
+          ],
+          "coronacion_valla_px": [
+            [
+              611,
+              216
+            ],
+            [
+              756,
+              204
+            ],
+            [
+              912,
+              192
+            ],
+            [
+              1085,
+              175
+            ],
+            [
+              1313,
+              148
+            ],
+            [
+              1519,
+              101
+            ],
+            [
+              1671,
+              75
+            ]
+          ],
+          "borde_piano_calzada_01": [
+            [
+              0.12799,
+              0.477152
+            ],
+            [
+              0.187201,
+              0.506908
+            ],
+            [
+              0.249402,
+              0.548353
+            ],
+            [
+              0.316986,
+              0.603613
+            ],
+            [
+              0.39055,
+              0.679065
+            ],
+            [
+              0.463517,
+              0.773645
+            ],
+            [
+              0.517344,
+              0.880978
+            ],
+            [
+              0.574163,
+              0.998937
+            ]
+          ],
+          "borde_calzada_exterior_01": [
+            [
+              0.779306,
+              0.517535
+            ],
+            [
+              0.84689,
+              0.538789
+            ],
+            [
+              0.919856,
+              0.554729
+            ],
+            [
+              0.999402,
+              0.572795
+            ]
+          ],
+          "coronacion_valla_01": [
+            [
+              0.365431,
+              0.229543
+            ],
+            [
+              0.452153,
+              0.216791
+            ],
+            [
+              0.545455,
+              0.204038
+            ],
+            [
+              0.648923,
+              0.185972
+            ],
+            [
+              0.785287,
+              0.157279
+            ],
+            [
+              0.908493,
+              0.107333
+            ],
+            [
+              0.999402,
+              0.079702
+            ]
+          ]
+        }
+      },
+      "relaciones_espaciales": [
+        {
+          "sujeto_id": "img02_auto_turquesa",
+          "relacion": "por_delante_en_profundidad_y_a_la_derecha",
+          "objeto_id": "img02_auto_rojo",
+          "evidencia": "Escala en pantalla, posición sobre la curva y separación de planos."
+        },
+        {
+          "sujeto_id": "img02_auto_turquesa",
+          "relacion": "sobre",
+          "objeto_id": "img02_calzada",
+          "evidencia": "Ruedas apoyadas en asfalto aparente y sombra de contacto."
+        },
+        {
+          "sujeto_id": "img02_auto_rojo",
+          "relacion": "sobre",
+          "objeto_id": "img02_calzada",
+          "evidencia": "Ruedas, sombra y continuidad visible de la pista."
+        },
+        {
+          "sujeto_id": "img02_piano_interior",
+          "relacion": "contiguo",
+          "objeto_id": "img02_franja_verde",
+          "evidencia": "Contacto visible de los cantos en el primer plano."
+        },
+        {
+          "sujeto_id": "img02_neumaticos_primer_plano",
+          "relacion": "sobre",
+          "objeto_id": "img02_plataforma_interior",
+          "evidencia": "El perfil curvo de la plataforma queda visible bajo la goma."
+        },
+        {
+          "sujeto_id": "img02_barrera_neumaticos_lateral",
+          "relacion": "por_delante_en_profundidad",
+          "objeto_id": "img02_valla_derecha",
+          "evidencia": "La malla continúa detrás de las pilas. El tablón frontal oculta sus bases."
+        },
+        {
+          "sujeto_id": "img02_linea_blanca_exterior",
+          "relacion": "al_pie_del_lado_calzada",
+          "objeto_id": "img02_muro_madera_derecho",
+          "evidencia": "Trazo casi paralelo visible bajo la cara inferior del muro."
+        },
+        {
+          "sujeto_id": "img02_valla_derecha",
+          "relacion": "por_delante_en_profundidad",
+          "objeto_id": "img02_cajonera_roja",
+          "evidencia": "La retícula y el borde superior de la valla se recortan contra los cajones."
+        },
+        {
+          "sujeto_id": "img02_llave_fija",
+          "relacion": "sobre",
+          "objeto_id": "img02_banco_taller",
+          "evidencia": "Apoyo y sombra suave de la herramienta en la superficie del fondo."
+        },
+        {
+          "sujeto_id": "img02_lampara_taller",
+          "relacion": "por_encima_en_imagen",
+          "objeto_id": "img02_llave_fija",
+          "evidencia": "Pantalla superior entre el fondo de herramientas y el recipiente central."
+        }
+      ],
+      "conteos_visuales": {
+        "vehiculos_visibles": 2,
+        "faros_redondos_frontales_visibles": {
+          "img02_auto_turquesa": {
+            "principales": 2,
+            "auxiliares": 0
+          },
+          "img02_auto_rojo": {
+            "principales": 2,
+            "auxiliares": 2
+          }
+        },
+        "lamparas_de_taller_encendidas_en_cuadro": 1,
+        "llaves_grandes_de_boca_abierta_visibles": 1,
+        "tiradores_de_cajonera_visibles": 2,
+        "pilas_laterales_frontales_distinguibles": 3,
+        "total_de_neumaticos": null
+      },
+      "texturas_y_materiales_aparentes": [
+        {
+          "grupo": "Carrocería",
+          "rasgos": [
+            "Pintura saturada y brillante",
+            "Juntas de panel finas",
+            "Arañazos y pequeños desconchones",
+            "Cantos metálicos y tornillería"
+          ]
+        },
+        {
+          "grupo": "Calzada y piano",
+          "rasgos": [
+            "Grano oscuro denso",
+            "Rojo y crema erosionados",
+            "Fijaciones hundidas",
+            "Verde satinado con marcas largas"
+          ]
+        },
+        {
+          "grupo": "Madera",
+          "rasgos": [
+            "Veta dorada",
+            "Capas visibles en el borde curvo",
+            "Tablones claros",
+            "Fijación con tornillos oscuros"
+          ]
+        },
+        {
+          "grupo": "Metal y caucho",
+          "rasgos": [
+            "Malla delgada con brillo ámbar",
+            "Neumáticos de relieve ranurado",
+            "Llave pulida con bordes brillantes",
+            "Chapa roja astillada con tiradores metálicos"
+          ]
+        }
+      ],
+      "narrativa_visual": {
+        "observado": "Dos autos se orientan en dirección parecida y ocupan posiciones separadas de la misma curva.",
+        "lectura_posible": "El auto rojo sigue al turquesa al salir de la curva. La distancia aparente y el encuadre bajo sugieren una persecución en miniatura.",
+        "limite": "La imagen fija no aporta orden de carrera, medición de movimiento, velocidad o secuencia temporal."
+      },
+      "texto_visible": {
+        "transcripciones": [],
+        "observaciones": [
+          "En el mango de la llave se perciben huellas de grabado sin lectura fiable.",
+          "No se distinguen matrículas, dorsales ni marcas de automóvil legibles."
+        ]
+      },
+      "incertidumbres": [
+        {
+          "tema": "Identidad y escala",
+          "observacion": "Siluetas y tornillería sugieren autos a escala, con herramientas grandes al fondo.",
+          "no_determinado": "Fabricante, modelo, escala nominal, dimensiones físicas y correspondencia exacta con los autos de otra toma."
+        },
+        {
+          "tema": "Captura y materiales",
+          "observacion": "Se reproducen características fotográficas de un diorama con reflejos, desenfoque y sombras.",
+          "no_determinado": "Origen fotográfico o sintético, composición material real y parámetros ópticos."
+        },
+        {
+          "tema": "Decoraciones",
+          "observacion": "Franja crema claramente visible en techo y capó del compacto. El capó rojo está atravesado por destellos cálidos.",
+          "no_determinado": "Trazo completo de ambas decoraciones en zonas ocultas y causa de las bandas claras del lateral turquesa."
+        },
+        {
+          "tema": "Conteo de neumáticos y estructura",
+          "observacion": "Tres pilas frontales junto a la valla y neumáticos superpuestos en el interior próximo.",
+          "no_determinado": "Cantidad total de neumáticos, postes, tornillos, segmentos de piano y piezas ocultas."
+        },
+        {
+          "tema": "Topología",
+          "observacion": "Un tramo de curva con borde interior y exterior reconocibles.",
+          "no_determinado": "Punto exacto del trazado general, radio, peralte, sentido reglamentario y continuidad fuera de cuadro."
+        },
+        {
+          "tema": "Movimiento",
+          "observacion": "Orientación concordante de los autos sobre el tramo.",
+          "no_determinado": "Velocidad, frenado, adelantamiento, estado de giro y posición en una carrera real."
+        }
+      ],
+      "mediciones_cromaticas": {
+        "cantidad_pixeles": 1573352,
+        "espacio_supuesto_para_calculos_lineales": "sRGB",
+        "promedio_rgb_codificado": [
+          97,
+          68,
+          50
+        ],
+        "promedio_hex": "#614432",
+        "extremos_por_canal": {
+          "min_rgb": [
+            0,
+            0,
+            0
+          ],
+          "max_rgb": [
+            255,
+            255,
+            255
+          ]
+        },
+        "fraccion_con_rojo_mayor_que_azul": 0.907286,
+        "luminancia_relativa_Y": {
+          "metodo": "Se linealizan los canales como sRGB y se calcula 0.2126 R + 0.7152 G + 0.0722 B. Los cuantiles usan un histograma con paso 0.0001.",
+          "media": 0.105717,
+          "p05": 0.0041,
+          "p25": 0.0264,
+          "p50": 0.057,
+          "p75": 0.1125,
+          "p95": 0.4445
+        },
+        "paleta_global": {
+          "metodo": "Histograma RGB de 5 bits por canal sobre todos los píxeles originales. Conversión a OKLab de la media RGB redondeada de cada celda ocupada. K-means ponderado por frecuencia, distancia euclídea en OKLab, 16 grupos y 32 iteraciones. El primer centro es la celda más frecuente. Cada centro inicial restante maximiza frecuencia por distancia cuadrática al centro más próximo. Los empates usan el primer índice. Color de salida igual a la media RGB codificada de todos los píxeles asignados a cada grupo.",
+          "alcance": "Los grupos cromáticos corresponden a toda la imagen y sus proporciones son proporciones de píxeles, no medidas de superficie física.",
+          "colores": [
+            {
+              "hex": "#4F392E",
+              "rgb_8bit": [
+                79,
+                57,
+                46
+              ],
+              "pixeles": 253483,
+              "fraccion": 0.16111
+            },
+            {
+              "hex": "#684836",
+              "rgb_8bit": [
+                104,
+                72,
+                54
+              ],
+              "pixeles": 243859,
+              "fraccion": 0.154993
+            },
+            {
+              "hex": "#855D45",
+              "rgb_8bit": [
+                133,
+                93,
+                69
+              ],
+              "pixeles": 130509,
+              "fraccion": 0.08295
+            },
+            {
+              "hex": "#462112",
+              "rgb_8bit": [
+                70,
+                33,
+                18
+              ],
+              "pixeles": 120997,
+              "fraccion": 0.076904
+            },
+            {
+              "hex": "#2B1C12",
+              "rgb_8bit": [
+                43,
+                28,
+                18
+              ],
+              "pixeles": 111018,
+              "fraccion": 0.070561
+            },
+            {
+              "hex": "#B47853",
+              "rgb_8bit": [
+                180,
+                120,
+                83
+              ],
+              "pixeles": 88233,
+              "fraccion": 0.05608
+            },
+            {
+              "hex": "#1C120B",
+              "rgb_8bit": [
+                28,
+                18,
+                11
+              ],
+              "pixeles": 83232,
+              "fraccion": 0.052901
+            },
+            {
+              "hex": "#213028",
+              "rgb_8bit": [
+                33,
+                48,
+                40
+              ],
+              "pixeles": 79814,
+              "fraccion": 0.050729
+            },
+            {
+              "hex": "#D79B6C",
+              "rgb_8bit": [
+                215,
+                155,
+                108
+              ],
+              "pixeles": 78909,
+              "fraccion": 0.050153
+            },
+            {
+              "hex": "#3E4928",
+              "rgb_8bit": [
+                62,
+                73,
+                40
+              ],
+              "pixeles": 76067,
+              "fraccion": 0.048347
+            },
+            {
+              "hex": "#6C150D",
+              "rgb_8bit": [
+                108,
+                21,
+                13
+              ],
+              "pixeles": 65334,
+              "fraccion": 0.041525
+            },
+            {
+              "hex": "#EBC49B",
+              "rgb_8bit": [
+                235,
+                196,
+                155
+              ],
+              "pixeles": 59632,
+              "fraccion": 0.037901
+            },
+            {
+              "hex": "#A73220",
+              "rgb_8bit": [
+                167,
+                50,
+                32
+              ],
+              "pixeles": 54272,
+              "fraccion": 0.034495
+            },
+            {
+              "hex": "#0F0803",
+              "rgb_8bit": [
+                15,
+                8,
+                3
+              ],
+              "pixeles": 46353,
+              "fraccion": 0.029461
+            },
+            {
+              "hex": "#3D7880",
+              "rgb_8bit": [
+                61,
+                120,
+                128
+              ],
+              "pixeles": 45723,
+              "fraccion": 0.029061
+            },
+            {
+              "hex": "#030201",
+              "rgb_8bit": [
+                3,
+                2,
+                1
+              ],
+              "pixeles": 35917,
+              "fraccion": 0.022828
+            }
+          ]
+        },
+        "muestreo_local": {
+          "metodo": "Cuadrados seleccionados visualmente sobre la imagen original. Coordenadas de origen superior izquierdo, límites superiores de bbox exclusivos. Media aritmética por canal codificado, redondeada al entero. Las muestras describen color de imagen con iluminación y reflejos incorporados.",
+          "muestras": [
+            {
+              "zona_visual": "asfalto iluminado en el lado derecho",
+              "centro_px": [
+                1430,
+                548
+              ],
+              "bbox_px": [
+                1422,
+                540,
+                1439,
+                557
+              ],
+              "bbox_01": [
+                0.850478,
+                0.573858,
+                0.860646,
+                0.591923
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                79,
+                61,
+                55
+              ],
+              "rgb_promedio": [
+                92,
+                69,
+                62
+              ],
+              "hex_promedio": "#5C453E"
+            },
+            {
+              "zona_visual": "asfalto en la sombra del turquesa",
+              "centro_px": [
+                1320,
+                666
+              ],
+              "bbox_px": [
+                1314,
+                660,
+                1327,
+                673
+              ],
+              "bbox_01": [
+                0.785885,
+                0.701382,
+                0.79366,
+                0.715197
+              ],
+              "pixeles": 169,
+              "rgb_central": [
+                43,
+                43,
+                48
+              ],
+              "rgb_promedio": [
+                43,
+                43,
+                48
+              ],
+              "hex_promedio": "#2B2B30"
+            },
+            {
+              "zona_visual": "piano rojo en primer término",
+              "centro_px": [
+                727,
+                721
+              ],
+              "bbox_px": [
+                720,
+                714,
+                735,
+                729
+              ],
+              "bbox_01": [
+                0.430622,
+                0.758767,
+                0.439593,
+                0.774708
+              ],
+              "pixeles": 225,
+              "rgb_central": [
+                150,
+                38,
+                26
+              ],
+              "rgb_promedio": [
+                156,
+                49,
+                36
+              ],
+              "hex_promedio": "#9C3124"
+            },
+            {
+              "zona_visual": "piano crema en primer término",
+              "centro_px": [
+                753,
+                808
+              ],
+              "bbox_px": [
+                746,
+                801,
+                761,
+                816
+              ],
+              "bbox_01": [
+                0.446172,
+                0.851222,
+                0.455144,
+                0.867163
+              ],
+              "pixeles": 225,
+              "rgb_central": [
+                224,
+                184,
+                159
+              ],
+              "rgb_promedio": [
+                223,
+                179,
+                150
+              ],
+              "hex_promedio": "#DFB396"
+            },
+            {
+              "zona_visual": "arcén verde en primer término",
+              "centro_px": [
+                470,
+                765
+              ],
+              "bbox_px": [
+                462,
+                757,
+                479,
+                774
+              ],
+              "bbox_01": [
+                0.276316,
+                0.804463,
+                0.286483,
+                0.822529
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                70,
+                78,
+                36
+              ],
+              "rgb_promedio": [
+                69,
+                76,
+                36
+              ],
+              "hex_promedio": "#454C24"
+            },
+            {
+              "zona_visual": "madera de la barrera derecha",
+              "centro_px": [
+                1458,
+                456
+              ],
+              "bbox_px": [
+                1451,
+                449,
+                1466,
+                464
+              ],
+              "bbox_01": [
+                0.867823,
+                0.477152,
+                0.876794,
+                0.493092
+              ],
+              "pixeles": 225,
+              "rgb_central": [
+                211,
+                137,
+                76
+              ],
+              "rgb_promedio": [
+                213,
+                139,
+                78
+              ],
+              "hex_promedio": "#D58B4E"
+            },
+            {
+              "zona_visual": "flanco de neumático apilado a la derecha",
+              "centro_px": [
+                1478,
+                346
+              ],
+              "bbox_px": [
+                1473,
+                341,
+                1484,
+                352
+              ],
+              "bbox_01": [
+                0.880981,
+                0.36238,
+                0.88756,
+                0.37407
+              ],
+              "pixeles": 121,
+              "rgb_central": [
+                58,
+                36,
+                25
+              ],
+              "rgb_promedio": [
+                45,
+                30,
+                20
+              ],
+              "hex_promedio": "#2D1E14"
+            },
+            {
+              "zona_visual": "carrocería turquesa de la puerta",
+              "centro_px": [
+                762,
+                400
+              ],
+              "bbox_px": [
+                755,
+                393,
+                770,
+                408
+              ],
+              "bbox_01": [
+                0.451555,
+                0.417641,
+                0.460526,
+                0.433581
+              ],
+              "pixeles": 225,
+              "rgb_central": [
+                45,
+                113,
+                111
+              ],
+              "rgb_promedio": [
+                49,
+                113,
+                112
+              ],
+              "hex_promedio": "#317170"
+            },
+            {
+              "zona_visual": "carrocería turquesa en parte alta del capó",
+              "centro_px": [
+                994,
+                405
+              ],
+              "bbox_px": [
+                990,
+                401,
+                999,
+                410
+              ],
+              "bbox_01": [
+                0.592105,
+                0.426142,
+                0.597488,
+                0.435707
+              ],
+              "pixeles": 81,
+              "rgb_central": [
+                47,
+                132,
+                147
+              ],
+              "rgb_promedio": [
+                55,
+                133,
+                147
+              ],
+              "hex_promedio": "#378593"
+            },
+            {
+              "zona_visual": "franja crema del capó",
+              "centro_px": [
+                1124,
+                415
+              ],
+              "bbox_px": [
+                1119,
+                410,
+                1130,
+                421
+              ],
+              "bbox_01": [
+                0.669258,
+                0.435707,
+                0.675837,
+                0.447396
+              ],
+              "pixeles": 121,
+              "rgb_central": [
+                217,
+                185,
+                151
+              ],
+              "rgb_promedio": [
+                217,
+                186,
+                153
+              ],
+              "hex_promedio": "#D9BA99"
+            },
+            {
+              "zona_visual": "grilla oscura del frontal",
+              "centro_px": [
+                1138,
+                477
+              ],
+              "bbox_px": [
+                1134,
+                473,
+                1143,
+                482
+              ],
+              "bbox_01": [
+                0.67823,
+                0.502657,
+                0.683612,
+                0.512221
+              ],
+              "pixeles": 81,
+              "rgb_central": [
+                46,
+                34,
+                26
+              ],
+              "rgb_promedio": [
+                25,
+                22,
+                19
+              ],
+              "hex_promedio": "#191613"
+            },
+            {
+              "zona_visual": "cromado del paragolpes delantero",
+              "centro_px": [
+                1117,
+                535
+              ],
+              "bbox_px": [
+                1114,
+                532,
+                1121,
+                539
+              ],
+              "bbox_01": [
+                0.666268,
+                0.565356,
+                0.670455,
+                0.572795
+              ],
+              "pixeles": 49,
+              "rgb_central": [
+                249,
+                235,
+                228
+              ],
+              "rgb_promedio": [
+                167,
+                154,
+                152
+              ],
+              "hex_promedio": "#A79A98"
+            },
+            {
+              "zona_visual": "reflector rectangular naranja",
+              "centro_px": [
+                1025,
+                548
+              ],
+              "bbox_px": [
+                1023,
+                546,
+                1028,
+                551
+              ],
+              "bbox_01": [
+                0.611842,
+                0.580234,
+                0.614833,
+                0.585547
+              ],
+              "pixeles": 25,
+              "rgb_central": [
+                120,
+                35,
+                0
+              ],
+              "rgb_promedio": [
+                117,
+                34,
+                0
+              ],
+              "hex_promedio": "#752200"
+            },
+            {
+              "zona_visual": "carrocería roja del segundo auto",
+              "centro_px": [
+                388,
+                328
+              ],
+              "bbox_px": [
+                384,
+                324,
+                393,
+                333
+              ],
+              "bbox_01": [
+                0.229665,
+                0.344315,
+                0.235048,
+                0.353879
+              ],
+              "pixeles": 81,
+              "rgb_central": [
+                188,
+                48,
+                29
+              ],
+              "rgb_promedio": [
+                210,
+                67,
+                41
+              ],
+              "hex_promedio": "#D24329"
+            },
+            {
+              "zona_visual": "cajonera roja del fondo",
+              "centro_px": [
+                1440,
+                100
+              ],
+              "bbox_px": [
+                1432,
+                92,
+                1449,
+                109
+              ],
+              "bbox_01": [
+                0.856459,
+                0.097768,
+                0.866627,
+                0.115834
+              ],
+              "pixeles": 289,
+              "rgb_central": [
+                123,
+                12,
+                7
+              ],
+              "rgb_promedio": [
+                124,
+                13,
+                8
+              ],
+              "hex_promedio": "#7C0D08"
+            },
+            {
+              "zona_visual": "interior encendido de lámpara de taller",
+              "centro_px": [
+                568,
+                57
+              ],
+              "bbox_px": [
+                563,
+                52,
+                574,
+                63
+              ],
+              "bbox_01": [
+                0.336722,
+                0.05526,
+                0.343301,
+                0.06695
+              ],
+              "pixeles": 121,
+              "rgb_central": [
+                254,
+                228,
+                149
+              ],
+              "rgb_promedio": [
+                253,
+                222,
+                142
+              ],
+              "hex_promedio": "#FDDE8E"
+            },
+            {
+              "zona_visual": "cuerpo de llave metálica",
+              "centro_px": [
+                277,
+                180
+              ],
+              "bbox_px": [
+                273,
+                176,
+                282,
+                185
+              ],
+              "bbox_01": [
+                0.163278,
+                0.187035,
+                0.16866,
+                0.196599
+              ],
+              "pixeles": 81,
+              "rgb_central": [
+                210,
+                139,
+                97
+              ],
+              "rgb_promedio": [
+                190,
+                130,
+                99
+              ],
+              "hex_promedio": "#BE8263"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "correspondencias_entre_imagenes": {
+    "criterio": "Correspondencia por rasgos de diseño, con confianza cualitativa. Las fotos no bastan para establecer un mismo instante, un mismo objeto físico, una transformación geométrica única ni una continuidad exacta del circuito.",
+    "vehiculos": [
+      {
+        "id": "motivo_auto_turquesa",
+        "estado": "inferido",
+        "confianza_cualitativa": "alta para el motivo, no determinada para la identidad física",
+        "referencias": [
+          "img01_auto_turquesa",
+          "img02_auto_turquesa"
+        ],
+        "evidencia": [
+          "pintura turquesa",
+          "banda longitudinal clara",
+          "compacto anguloso con techo relativamente alto",
+          "ruedas oscuras y superficies metálicas claras"
+        ],
+        "limite": "En la vista general se leen líneas claras próximas; en el detalle domina una banda crema ancha. La resolución local y los reflejos impiden validar una coincidencia exacta de las franjas, tornillos o molduras."
+      },
+      {
+        "id": "motivo_auto_rojo",
+        "estado": "inferido",
+        "confianza_cualitativa": "alta para el motivo, no determinada para la identidad física",
+        "referencias": [
+          "img01_auto_rojo",
+          "img02_auto_rojo"
+        ],
+        "evidencia": [
+          "carrocería roja",
+          "alerón posterior",
+          "frente con luces circulares y auxiliares"
+        ],
+        "limite": "Las bandas claras del rojo se leen mejor en la vista general. En la toma baja no se puede asegurar que tengan el mismo dibujo. La separación de los coches y el recorte cambian; no permiten establecer una cronología o posición en carrera."
+      }
+    ],
+    "entorno": [
+      {
+        "motivo": "cajonera de herramientas roja",
+        "visible_en": [
+          "img01",
+          "img02"
+        ],
+        "coincidencia": "rojo, metal y tiradores horizontales; aparece recortada arriba y a la derecha",
+        "limite": "El tipo de cajonera es reconocible; no se establece identidad física."
+      },
+      {
+        "motivo": "llave de gran tamaño",
+        "visible_en": [
+          "img01",
+          "img02"
+        ],
+        "coincidencia": "herramienta metálica con boca a la izquierda y mango hacia la derecha",
+        "limite": "En img01 se distingue un mecanismo de ajuste; en img02 el desenfoque y la forma visible no permiten confirmar el mismo mecanismo o la misma llave."
+      },
+      {
+        "motivo": "recipiente cilíndrico de taller",
+        "visible_en": [
+          "img01",
+          "img02"
+        ],
+        "coincidencia": "vasos de apariencia metálica con herramientas de mango o varillas",
+        "limite": "Cantidad y ubicación dependen del encuadre; no se emparejan recipientes uno a uno."
+      },
+      {
+        "motivo": "piano, franja verde y calzada",
+        "visible_en": [
+          "img01",
+          "img02"
+        ],
+        "coincidencia": "bordes rojos y crema, zona verde y asfalto oscuro",
+        "limite": "No hay puntos de control suficientes para localizar inequívocamente la curva del detalle en el mapa general."
+      },
+      {
+        "motivo": "cerramiento metálico",
+        "visible_en": [
+          "img01",
+          "img02"
+        ],
+        "coincidencia": "malla sostenida por postes regulares",
+        "limite": "La valla del detalle tiene coronación inclinada y montantes prominentes; no se traslada cada detalle constructivo al perímetro de la otra imagen."
+      }
+    ],
+    "rasgos_visibles_en_una_sola_vista": [
+      {
+        "imagen": "img01",
+        "rasgos": [
+          "coche amarillo",
+          "coche violeta",
+          "franja a cuadros y marcas de parrilla",
+          "tramo elevado y apoyos expuestos",
+          "placa crema vacía",
+          "conjunto de reflectores de pista",
+          "perímetro casi íntegro del tablero"
+        ]
+      },
+      {
+        "imagen": "img02",
+        "rasgos": [
+          "pilas de neumáticos dominantes a izquierda y derecha",
+          "pantalla de lámpara cálida en la parte alta",
+          "pernos de la valla y pianos a escala visible",
+          "microdesgaste e interior parcial del turquesa",
+          "faros auxiliares del rojo vistos de frente"
+        ]
+      }
+    ],
+    "no_demostrable_por_inspeccion_visual": [
+      "marca, modelo y escala real de los coches",
+      "lugar o época de la escena",
+      "historial completo de producción o captura",
+      "velocidad, clasificación, vuelta y sentido reglamentario de carrera",
+      "perspectivas calibradas o registro 3D entre imágenes"
+    ]
+  },
+  "guia_de_recreacion": {
+    "naturaleza": "propuesta derivada del análisis visual",
+    "prioridad_por_paso": [
+      {
+        "orden": 1,
+        "objetivo": "Silueta y lectura de escala",
+        "criterio": "Formar primero una maqueta baja de madera laminada sobre un banco más grande. Dibujar la vuelta cerrada, el gran interior claro, la recta frontal, la curva ancha de la izquierda, el tramo de atrás con desnivel y los cambios de dirección de la derecha.",
+        "prueba_visual": "En miniatura de pantalla todavía se distinguen el vacío interior, la cinta oscura, los bordes de color y los cuatro coches."
+      },
+      {
+        "orden": 2,
+        "objetivo": "Geometría y detalle que expliquen la construcción",
+        "criterio": "Separar la cubierta, los cantos laminados, la calzada, el borde claro, los pianos, la franja verde, las vallas, las bases de postes y la madera bajo el tramo alto. Hacer modular el vallado para repetirlo respetando el contorno.",
+        "prueba_visual": "En el plano general se lee el apoyo físico del tramo alto; en el plano bajo se reconocen perfiles, pernos, malla y apilamiento de ruedas."
+      },
+      {
+        "orden": 3,
+        "objetivo": "Identidad de los vehículos",
+        "criterio": "Diferenciar las cuatro siluetas antes del pintado. Dedicar el mayor nivel de detalle al compacto turquesa y al coche rojo; separar carrocería, vidrios, interior visible, neumáticos, llantas, luces, rejillas y detalles de metal.",
+        "prueba_visual": "El turquesa se reconoce por su perfil cuadrado y faros circulares; el rojo, por su silueta, alerón y par de faros auxiliares."
+      },
+      {
+        "orden": 4,
+        "objetivo": "Luz y materiales",
+        "criterio": "Combinar sombras de contacto, focos pequeños cálidos, destellos en metal, pintura brillante desgastada, asfalto rugoso y madera con veta continua. Mantener el fondo de taller en un segundo nivel de contraste.",
+        "prueba_visual": "Se conserva textura en la calzada y la madera y el brillo separa superficies pintadas, vidrio y metal."
+      },
+      {
+        "orden": 5,
+        "objetivo": "Dos cámaras con funciones distintas",
+        "criterio": "Para la toma general usar vista oblicua elevada y encuadre horizontal que muestre frente y profundidad. Para el detalle acercar la cámara a la calzada, dejar que el piano entre desde abajo y usar la valla como diagonal de fuga.",
+        "prueba_visual": "El general explica el circuito; el detalle dirige la vista al coche turquesa y al rojo detrás. Se conserva la diferencia de altura, profundidad y recorte."
+      }
+    ],
+    "materiales": [
+      {
+        "id": "mat_madera_tablero",
+        "apariencia": "veta miel y canto de capas de contrachapado",
+        "respuesta_propuesta": "satinado moderado; veta de la cara superior y estratos del canto con orientaciones independientes",
+        "detalle_prioritario": "borde curvado y puntos de fijación"
+      },
+      {
+        "id": "mat_banco_taller",
+        "apariencia": "madera más oscura, marcada, con manchas y reflejos desiguales",
+        "respuesta_propuesta": "rugosidad variable y relieves suaves a escala de banco",
+        "detalle_prioritario": "borde delantero con golpes y manchas"
+      },
+      {
+        "id": "mat_calzada",
+        "apariencia": "marrón negruzco con grano y vetas, más visible a ras de pista",
+        "respuesta_propuesta": "material mate con micrograno; usar la luz rasante para hacer visible el relieve sin aclarar toda la superficie",
+        "detalle_prioritario": "contacto de la rueda con el suelo y borde claro"
+      },
+      {
+        "id": "mat_pianos",
+        "apariencia": "bandas alternadas en rojo y crema con desgaste y fijaciones",
+        "respuesta_propuesta": "piezas pintadas con ligeros golpes y variación local; mantener el ritmo de color alrededor de las curvas",
+        "detalle_prioritario": "tornillos embutidos en el plano bajo"
+      },
+      {
+        "id": "mat_verde",
+        "apariencia": "franja pintada de verde entre el piano y zonas exteriores o interiores de la pista",
+        "respuesta_propuesta": "capa de pintura con marcas superficiales; usar brillo irregular donde la luz entra de costado",
+        "detalle_prioritario": "curva limpia y separación cromática respecto de la calzada"
+      },
+      {
+        "id": "mat_valla",
+        "apariencia": "alambre metálico cuadriculado con postes más gruesos",
+        "respuesta_propuesta": "metal con reflejos finos y pátina leve; geometría de malla visible en el detalle",
+        "detalle_prioritario": "perfiles, anclajes y tramo superior doblado en img02"
+      },
+      {
+        "id": "mat_pintura_auto",
+        "apariencia": "colores saturados, bandas claras y desconchados locales",
+        "respuesta_propuesta": "base pigmentada y capa brillante con irregularidad en bordes; separar desgaste de la pintura de los reflejos",
+        "detalle_prioritario": "turquesa en guardabarros, parachoques y extremos de panel"
+      },
+      {
+        "id": "mat_goma",
+        "apariencia": "negro con dibujo, cantos redondeados y reflejo tenue",
+        "respuesta_propuesta": "goma oscura con rugosidad y contraste moderados; modelar dibujo visible en rueda de primer plano",
+        "detalle_prioritario": "diferenciar ruedas montadas y pilas de protección"
+      },
+      {
+        "id": "mat_vidrio",
+        "apariencia": "ventanas oscuras que reflejan la luz y dejan leer partes del interior",
+        "respuesta_propuesta": "transmisión y reflejos controlados; mantener visibles el volante y asientos donde corresponde",
+        "detalle_prioritario": "parabrisas del turquesa y contornos claros"
+      },
+      {
+        "id": "mat_cajonera",
+        "apariencia": "chapa roja gastada con tiradores metálicos",
+        "respuesta_propuesta": "variar el brillo por roce y desconchado, desenfocando en el plano bajo",
+        "detalle_prioritario": "grandes formas rojas reconocibles sin competir con los coches"
+      }
+    ],
+    "configuracion_de_activos": {
+      "reutilizables": [
+        "tramos de malla y postes",
+        "bases y cabezales de reflector",
+        "pernos",
+        "secciones de piano rojo y crema",
+        "bloques de apoyos y vigas",
+        "neumáticos de protección"
+      ],
+      "personalizados": [
+        "perfil curvo del tablero",
+        "recorrido cerrado de la calzada",
+        "sección elevada",
+        "los cuatro coches",
+        "placa crema con marco metálico",
+        "grupo de herramientas de fondo"
+      ],
+      "detalle_cercano": [
+        "frente y lateral del turquesa",
+        "frente del rojo",
+        "piano de primer plano",
+        "tuercas, tornillos y coronación de la valla",
+        "dibujo de neumáticos"
+      ],
+      "detalle_lejano": [
+        "cajonera de taller",
+        "herramientas en recipientes",
+        "tablero perforado",
+        "secciones de valla ocultas tras los coches"
+      ]
+    },
+    "uso_de_las_anotaciones": {
+      "referencia_2d": "Usar las cajas para recorte, navegación o alineación visual. Para [x0,y0,x1,y1], el ancho del recorte es x1-x0 y el alto es y1-y0.",
+      "etiquetado": "Si se exportan ejemplos de detección, conservar el ID de la imagen y filtrar categorías o partes según la tarea. Una anotación de conjunto y las cajas de sus miembros pueden solaparse intencionalmente.",
+      "recreacion_3d": "Trazar una aproximación en planta y ajustar una cámara para comparar su proyección con img01. Ajustar después la cámara baja y el detalle local contra img02 de manera independiente. Estimar a criterio de producción la altura de la cámara, el radio de giro y los desniveles.",
+      "limites_de_reutilizacion": "No usar las cajas, muestras de color ni el trazado como medidas de fabricación, segmentación a nivel de píxel, albedo calibrado, intrínsecos de cámara o prueba de continuidad física."
+    },
+    "prompts_fieles": [
+      {
+        "imagen": "img01",
+        "positivo": "Plano general horizontal elevado y oblicuo de una maqueta de carreras sobre un banco de taller gastado. Tablero grueso de contrachapado miel con canto laminado y esquinas redondeadas, una sola cinta de asfalto marrón oscuro con recta frontal y meta a cuadros, curva grande izquierda, ondulación elevada al fondo sostenida por patas y travesaños y sucesión de curvas en el extremo derecho. Isla interior grande de madera clara vista. Pianos rojo y crema, franjas verdes, valla metálica fina con postes, ocho reflectores cálidos de seis luces aparentes. Cuatro coches clásicos de miniatura: turquesa en la recta izquierda, rojo con alerón en la recta derecha, amarillo en la curva de la derecha y violeta en el tramo de atrás. Cajonera roja, llave grande, recipientes de taller y banco marcado. Placa crema vacía con marco oscuro y cuatro tornillos en la esquina inferior derecha.",
+        "evitar": [
+          "texto o marca en la placa",
+          "coches adicionales",
+          "cruce en ocho",
+          "línea divisoria central continua",
+          "pista de tamaño real",
+          "personas",
+          "neones fríos que dominen la escena"
+        ]
+      },
+      {
+        "imagen": "img02",
+        "positivo": "Plano horizontal bajo a ras de calzada de una carrera en miniatura en un taller cálido. Compacto turquesa de aspecto clásico con banda crema longitudinal, frente de tres cuartos a la derecha del centro, faros redondos, rejilla negra horizontal, parachoques metálico, intermitentes rectangulares, pernos, desconchados y ruedas negras de llanta metálica. Detrás y a la izquierda, coche rojo con alerón y dos faros auxiliares redondos, más pequeño en el encuadre. Primer plano de piano curvo rojo y crema atornillado y franja verde. Neumáticos apilados a la izquierda y junto a la valla, malla metálica de coronación inclinada sobre barrera de madera a la derecha. Lámpara ámbar, llave grande y cajonera roja en un fondo suave; grano del asfalto, sombras de contacto y reflejos cálidos.",
+        "evitar": [
+          "vista aérea",
+          "turquesa o rojo con logos inventados",
+          "personas visibles",
+          "humo o chispas añadidos",
+          "eliminar los pernos y las pilas de neumáticos",
+          "fondo igual de nítido que el coche protagonista"
+        ]
+      }
+    ]
+  }
+}

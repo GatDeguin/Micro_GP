@@ -1,1 +1,43 @@
-# Micro_GP
+# Micro GP · Taller 07
+
+Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la carrera. Cada celular maneja un autito desde su navegador.
+
+## Jugar en Windows
+
+1. Abrí **Jugar.cmd** o entrá en **http://127.0.0.1:4173/** si el servidor ya está activo.
+2. Conectá el celular a la misma red que la PC y escaneá la placa QR de abajo a la derecha con la cámara.
+3. Mirá el color y el dorsal que te asignó el mando. Mové la palanca a los lados para girar y mantené **GAS** para acelerar. **FRENO** tiene prioridad. Una vez detenido, soltalo y presionalo de nuevo para dar marcha atrás.
+
+Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
+
+Hay cuatro plazas. Los bots conducen los autos libres y retoman el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
+
+En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución y **3** para ver a ras de pista. **C** abre el menú de cámaras y **M** activa o desactiva la pantalla dividida. También podés abrir el menú desde la esquina superior izquierda. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
+
+## Ejecutar desde la terminal
+
+Requiere Node.js 24 o posterior.
+
+```powershell
+npm ci
+npm run build
+npm start
+```
+
+El servidor detecta la IPv4 local y genera un QR con esa dirección. Si la PC tiene varias interfaces, podés elegir la correcta antes de arrancar. Usá la IP de la interfaz que comparte red con el celular.
+
+```powershell
+$env:PUBLIC_ORIGIN = 'http://192.168.1.38:4173'
+npm start
+```
+
+El puerto predeterminado es 4173. `PORT` y `HOST` permiten cambiarlo. Para un despliegue público, configurá un origen HTTPS, reenviá el encabezado `Host` y habilitá el upgrade de WebSocket en el proxy. El juego usa el mismo origen para ambas pantallas.
+
+## Desarrollo y verificación
+
+- `npm run dev` sirve el código fuente con Vite y mantiene la misma ruta de conexión para el teléfono.
+- `npm test` ejecuta las pruebas del trazado, las reglas de carrera y el enlace de los mandos.
+- `npm run build` verifica tipos y genera las dos pantallas en `dist`.
+- El diseño está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. La escena jugable usa geometría y materiales procedurales. Las imágenes de `referencias/` documentan el diseño.
+
+Se verificaron 18 pruebas automáticas y el flujo completo en Chrome con emulación móvil. Se leyó el QR renderizado en dos tamaños de pantalla, se asignaron cuatro plazas, se comprobó el límite de capacidad y se movió un auto con dos dedos. La prueba de reconexión incluyó un corte silencioso del enlace. Queda la comprobación con un celular físico.
