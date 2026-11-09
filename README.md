@@ -2,6 +2,10 @@
 
 Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la carrera. Cada celular maneja un autito desde su navegador.
 
+## Jugar en GitHub Pages
+
+Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para correr contra tres bots. Usá las flechas o WASD para manejar y las teclas 1, 2 y 3 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar. Para usar celulares como mandos por QR y jugar en multijugador, iniciá el servidor local.
+
 ## Jugar en Windows
 
 1. Abrí **Jugar.cmd** o entrá en **http://127.0.0.1:4173/** si el servidor ya está activo.

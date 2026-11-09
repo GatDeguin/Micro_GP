@@ -1,7 +1,7 @@
 import './style.css';
 import type { ViewMode } from './race-views';
 
-export function buildViewControls() {
+export function buildViewControls(multiplayer = true) {
   const root = document.createElement('div');
   root.className = 'view-tools';
   root.innerHTML = `
@@ -23,16 +23,16 @@ export function buildViewControls() {
         <label><input type="radio" name="camera-view" value="trackside" aria-keyshortcuts="3">
           <span>A ras</span><kbd aria-hidden="true">3</kbd></label>
       </fieldset>
-      <label class="view-tools-split"><input type="checkbox" aria-keyshortcuts="M" aria-describedby="view-tools-status">
+      ${multiplayer ? `<label class="view-tools-split"><input type="checkbox" aria-keyshortcuts="M" aria-describedby="view-tools-status">
         <span>Pantalla dividida</span><kbd aria-hidden="true">M</kbd></label>
-      <p id="view-tools-status" class="view-tools-status" role="status"></p>
+      <p id="view-tools-status" class="view-tools-status" role="status"></p>` : ''}
     </section>`;
   document.body.append(root);
 
   const trigger = root.querySelector<HTMLButtonElement>('button')!;
   const panel = root.querySelector<HTMLElement>('section')!;
-  const split = root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
-  const status = root.querySelector<HTMLParagraphElement>('.view-tools-status')!;
+  const split = root.querySelector<HTMLInputElement>('input[type=checkbox]');
+  const status = root.querySelector<HTMLParagraphElement>('.view-tools-status');
   const modes = {
     general: root.querySelector<HTMLInputElement>('input[value=general]')!,
     chase: root.querySelector<HTMLInputElement>('input[value=chase]')!,
@@ -54,6 +54,7 @@ export function buildViewControls() {
   }
 
   function updateStatus() {
+    if (!split || !status) return;
     let message = 'La división arranca con dos mandos conectados.';
     if (split.checked && playerCount < 2) message = 'Activada. Esperando dos mandos.';
     else if (playerCount >= 2) message = `${playerCount} mandos conectados. Vista dividida disponible.`;
@@ -64,7 +65,7 @@ export function buildViewControls() {
     modes[mode].addEventListener('change', () => { if (modes[mode].checked) selectMode(mode); });
   }
   trigger.addEventListener('click', () => setOpen(panel.hidden));
-  split.addEventListener('change', updateStatus);
+  split?.addEventListener('change', updateStatus);
   document.addEventListener('pointerdown', event => {
     if (!panel.hidden && event.target instanceof Node && !root.contains(event.target)) setOpen(false);
   });
@@ -80,7 +81,7 @@ export function buildViewControls() {
     } else if (key === 'c') {
       event.preventDefault();
       setOpen(panel.hidden, true);
-    } else if (key === 'm') {
+    } else if (key === 'm' && split) {
       event.preventDefault();
       split.checked = !split.checked;
       updateStatus();
@@ -94,7 +95,7 @@ export function buildViewControls() {
 
   return {
     get mode(): ViewMode { return currentMode; },
-    get split(): boolean { return split.checked; },
+    get split(): boolean { return split?.checked ?? false; },
     setPlayerCount(count: number) {
       if (playerCount === count) return;
       playerCount = count;

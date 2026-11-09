@@ -14,12 +14,14 @@ import { ReplayHistory, replayCompanion } from './replay';
 import { buildReplayShot } from './replay-shot';
 import { buildSceneLighting } from './scene-lighting';
 import { buildPlacard, buildRaceSigns, placardLayout } from './signs';
+import { startSolo } from './solo';
 import { buildViewControls } from './view-controls';
 import { buildWorkshop } from './workshop';
 
 type DisplayMessage = { type: 'hello'; url: string } | { type: 'state'; state: RaceSnapshot };
 
 const canvas = document.querySelector<HTMLCanvasElement>('#track')!;
+const pages = import.meta.env.MODE === 'pages';
 const lowQuality = new URLSearchParams(location.search).get('quality') === 'low';
 // Fit to the projected centerline and finish stripe annotated in img01 of the atlas.
 const target = new THREE.Vector3(-2.29, 0.11, 1.745);
@@ -96,8 +98,8 @@ function bootstrap() {
   if (!lowQuality) infield.captureReflections(renderer, scene);
   const cars = buildCars(scene);
   const signs = buildRaceSigns(scene);
-  const placard = buildPlacard(scene);
-  const controls = buildViewControls();
+  const placard = buildPlacard(scene, !pages);
+  const controls = buildViewControls(!pages);
   const renderViews = buildRaceViews(renderer, camera, placard, cameraFit, {
     wall: backWall,
     build: () => buildCollectorBackdrop(renderer),
@@ -173,7 +175,8 @@ function bootstrap() {
     });
     socket.addEventListener('open', () => audio.mute(document.hidden));
   }
-  connect();
+  const solo = pages ? startSolo(updateState) : undefined;
+  if (!pages) connect();
 
   for (const event of ['pointerdown', 'keydown']) addEventListener(event, audio.unlock, { passive: true });
   document.addEventListener('visibilitychange', () => audio.mute(document.hidden));
@@ -188,6 +191,7 @@ function bootstrap() {
     if (lostContext) return;
     const dt = Math.min(0.05, (now - lastFrame) / 1000);
     lastFrame = now;
+    solo?.advance(dt);
     infield.update(now);
     const mode = controls.mode;
     const split = controls.split && ownedSlots.length > 1;

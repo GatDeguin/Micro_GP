@@ -224,8 +224,9 @@ export function placardLayout(width: number, height: number, maxSize = 210) {
   return { size, x, y, left: x - size * 0.60, top: y - size * 0.572 };
 }
 
-export function buildPlacard(parent: THREE.Object3D) {
+export function buildPlacard(parent: THREE.Object3D, enabled = true) {
   const plaque = new THREE.Group();
+  plaque.visible = enabled;
   parent.add(plaque);
   const { canvas: metalCanvas, context: metalPaint } = canvas2d(192, 192);
   const rng = random(705);
@@ -254,6 +255,7 @@ export function buildPlacard(parent: THREE.Object3D) {
   addScrews(plaque, 1.088, 1.102, 0.048, 0.031, true);
   box(plaque, foot, 0, -0.613, -0.103, 1.03, 0.061, 0.37, false);
   const contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), horizontalShadow());
+  contact.visible = enabled;
   contact.rotation.x = -Math.PI / 2;
   parent.add(contact);
   const bottomRay = new THREE.Vector3();
@@ -274,7 +276,7 @@ export function buildPlacard(parent: THREE.Object3D) {
   let encoded = '';
   return {
     object: plaque,
-    setGrounded(grounded: boolean) { contact.visible = grounded; },
+    setGrounded(grounded: boolean) { contact.visible = enabled && grounded; },
     setUrl(url: string) {
       if (url === encoded) return;
       const code = qrcode(0, 'M');
