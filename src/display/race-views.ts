@@ -95,10 +95,12 @@ export function buildRaceViews(
     }
 
     const room = scene.background;
+    const roomBlur = scene.backgroundBlurriness;
     const collector = mode === 'general' ? undefined : (displayWindow ??= backdrop.build());
     const draw = (camera: THREE.PerspectiveCamera, following: boolean) => {
       const background = following ? collector : undefined;
       scene.background = background ?? room;
+      scene.backgroundBlurriness = background ? 0.05 : roomBlur;
       backdrop.wall.visible = background === undefined;
       renderer.render(scene, camera);
     };
@@ -147,6 +149,7 @@ export function buildRaceViews(
       draw(followers[slot](mode, cars[slot], width, height, dt), true);
     }
     scene.background = room;
+    scene.backgroundBlurriness = roomBlur;
     backdrop.wall.visible = true;
 
     renderer.autoClear = false;
