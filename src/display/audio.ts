@@ -387,11 +387,11 @@ function createSoundtrack(context: AudioContext) {
     track.src = tracks[index];
     setPlaying(enabled);
   });
-  const levels = { demo: 0.185, grid: 0.093, race: 0.14, results: 0.185 };
+  const levels = { demo: 0.23125, grid: 0.11625, race: 0.175, results: 0.23125 };
   return {
     setPlaying,
     mix(phase: RaceSnapshot['phase'], view: View) {
-      const next = view === 'replay' ? 0.105 : levels[phase];
+      const next = view === 'replay' ? 0.13125 : levels[phase];
       if (next === target) return;
       target = next;
       volume.gain.setTargetAtTime(next, context.currentTime, 0.28);
