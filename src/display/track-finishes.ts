@@ -20,21 +20,32 @@ export function asphaltMaps() {
   const albedo = road.context.createImageData(width, height);
   const roughness = relief.context.createImageData(width, height);
 
+  const racingLine = Array.from({ length: width }, (_, x) => {
+    const s = x / width * TRACK.length;
+    const entry = TRACK.sampleAt(s - 2.8);
+    const exit = TRACK.sampleAt(s + 2.8);
+    const bend = entry.dx * exit.dz - entry.dz * exit.dx;
+    return 0.5 - 0.13 * Math.tanh(bend * 2.7);
+  });
   for (let y = 0; y < height; y++) {
     const v = y / height;
+    const shoulder = THREE.MathUtils.smoothstep(Math.abs(v - 0.5), 0.30, 0.5);
     for (let x = 0; x < width; x++) {
       const u = x / width;
       const patch = binder(u, v);
       const brushed = brushMarks(u, v + 0.018 * patch);
       const grit = aggregate(u, v);
       const fleck = rng();
-      const shade = 211 + (patch - 0.5) * 16 + (brushed - 0.5) * 22 + (grit - 0.5) * 35 + (fleck - 0.5) * 38;
+      const rubber = 1 - THREE.MathUtils.smoothstep(Math.abs(v - racingLine[x]), 0.048, 0.20);
+      const shade = 211 + (patch - 0.5) * 16 + (brushed - 0.5) * 22
+        + (grit - 0.5) * (35 + 22 * shoulder) + (fleck - 0.5) * 38 + 7 * shoulder - 18 * rubber;
       const i = (y * width + x) * 4;
       albedo.data[i] = shade - 3;
       albedo.data[i + 1] = shade;
       albedo.data[i + 2] = shade + 3;
       albedo.data[i + 3] = 255;
-      roughness.data[i] = roughness.data[i + 1] = roughness.data[i + 2] = 189 + 29 * patch + 21 * brushed + grit * 8;
+      roughness.data[i] = roughness.data[i + 1] = roughness.data[i + 2]
+        = 189 + 29 * patch + 21 * brushed + grit * 8 + 9 * shoulder - 31 * rubber;
       roughness.data[i + 3] = 255;
     }
   }
@@ -103,6 +114,37 @@ export function asphaltMaps() {
         context.moveTo(x + i * 0.66, toY(offset + shift, s));
         context.quadraticCurveTo(x + (end - x) * 0.56, toY(offset + turn * 0.12 + shift, s + length * 0.56),
           end - i * 0.54, toY(offset + turn + shift, s + length));
+        context.stroke();
+      }
+    }
+  }
+
+  // Fine fractures start at the exposed edge and feather out into the pavement.
+  for (const [s, side, reach] of [[9.6, 1, 0.96], [18.5, 1, 0.62], [mark.esses - 0.3, 1, 0.79],
+    [mark.hairpinApex - 3.2, 1, 1.33], [mark.hairpinApex + 5.7, 1, 0.83], [mark.rearLink + 0.7, -1, 0.70],
+    [mark.chicaneApexIn - 1.6, -1, 0.66], [mark.chicaneApexOut + 1.0, 1, 0.77],
+    [mark.sweepApex - 2.2, -1, 1.12], [mark.sweepApex + 3.3, -1, 0.87]]) {
+    const edge = side * (roadHalfAt(s) - 0.055);
+    const zig = (rng() - 0.5) * 0.80;
+    const path: [number, number][] = [[s, edge]];
+    for (let j = 1; j <= 6; j++) {
+      path.push([s + zig * j / 6 + (rng() - 0.5) * 0.24, edge - side * reach * j / 6]);
+    }
+    const fork = path[3];
+    const branch: [number, number][] = [fork, [fork[0] + 0.20, fork[1] - side * 0.12],
+      [fork[0] + 0.34, fork[1] - side * 0.09], [fork[0] + 0.46, fork[1] - side * 0.20]];
+    for (const [context, color, strength] of [[road.context, '40,36,36', 0.62], [relief.context, '102,102,102', 0.36]] as const) {
+      const fade = context.createLinearGradient(0, toY(edge, s), 0, toY(edge - side * reach, s));
+      fade.addColorStop(0, `rgba(${color},${strength})`);
+      fade.addColorStop(0.62, `rgba(${color},${strength * 0.74})`);
+      fade.addColorStop(1, `rgba(${color},0)`);
+      context.strokeStyle = fade;
+      context.lineJoin = context.lineCap = 'round';
+      for (const [points, thickness] of [[path, 1.12], [branch, 0.70]] as const) {
+        context.lineWidth = thickness;
+        context.beginPath();
+        context.moveTo(toX(points[0][0]), toY(points[0][1], points[0][0]));
+        for (const [distance, offset] of points.slice(1)) context.lineTo(toX(distance), toY(offset, distance));
         context.stroke();
       }
     }

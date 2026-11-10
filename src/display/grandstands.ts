@@ -26,6 +26,7 @@ const pennants = [0xb84f3d, 0x509da5, 0xd6ab50].map(color => new THREE.MeshStand
 }));
 const up = new THREE.Vector3(0, 1, 0);
 type Point = [x: number, y: number, z: number];
+type Photo = { rig: THREE.Group; flash: THREE.Sprite };
 
 export const grandstandSections = [{ s: -6.88, offset: -6.7 }, { s: 0, offset: -6.55 }].map(({ s, offset }) => {
   const p = TRACK.sampleAt(s);
@@ -104,7 +105,7 @@ function pennant(figure: THREE.Object3D, hand: Point, color: number) {
 }
 
 function spectator(parent: THREE.Object3D, motion: THREE.Object3D, place: Point, variation: number, scale: number, yaw: number,
-  pose: 'seated' | 'wave' | 'flag' | 'standing') {
+  pose: 'seated' | 'wave' | 'flag' | 'standing' | 'photo', flashMap: THREE.Texture) {
   const figure = new THREE.Group();
   figure.position.set(...place);
   figure.scale.setScalar(scale);
@@ -119,7 +120,33 @@ function spectator(parent: THREE.Object3D, motion: THREE.Object3D, place: Point,
   const hip = standing ? 0.285 : 0.188;
   const shoulder = hip + 0.196;
   const headY = shoulder + 0.078;
+  let motionAnchor: THREE.Group | undefined;
+  if (pose === 'photo' || pose === 'flag' || pose === 'wave') {
+    motionAnchor = new THREE.Group();
+    motionAnchor.position.copy(figure.position);
+    motionAnchor.quaternion.copy(figure.quaternion);
+    motionAnchor.scale.copy(figure.scale);
+    motion.add(motionAnchor);
+  }
   let wave: THREE.Group | undefined;
+  let photo: Photo | undefined;
+  if (pose === 'photo' && motionAnchor) {
+    const rig = new THREE.Group();
+    rig.name = 'Espectador con cámara';
+    rig.position.y = shoulder - 0.057;
+    motionAnchor.add(rig);
+    box(rig, shoes, 0, 0.123, 0.119, 0.116, 0.068, 0.067, false);
+    const lens = piece(rig, cylinder, frame, 0, 0.122, 0.158, 0.030, 0.045, 0.030);
+    lens.rotation.x = Math.PI / 2;
+    box(rig, deckEdge, 0.043, 0.148, 0.155, 0.022, 0.014, 0.006, false);
+    const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashMap, blending: THREE.AdditiveBlending,
+      transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
+    flash.position.set(0.043, 0.148, 0.189);
+    flash.scale.setScalar(0.43);
+    flash.visible = false;
+    rig.add(flash);
+    photo = { rig, flash };
+  }
   piece(figure, shirt, jacket, 0, (hip + shoulder) / 2, -0.004, 0.235, shoulder - hip + 0.034, 0.135);
   piece(figure, sphere, face, 0, headY, 0.008, 0.070, 0.078, 0.067);
   piece(figure, cap, coiffure, 0, headY + 0.017, -0.004, 0.073, 0.064, 0.070);
@@ -131,20 +158,24 @@ function spectator(parent: THREE.Object3D, motion: THREE.Object3D, place: Point,
     rod(figure, pants, knee, foot, 0.030);
     piece(figure, sphere, shoes, foot[0], foot[1], foot[2] + 0.024, 0.036, 0.021, 0.068);
 
+    if (photo) {
+      const elbow: Point = [side * 0.110, -0.005, 0.090];
+      const hand: Point = [side * 0.056, 0.103, 0.123];
+      rod(photo.rig, jacket, [side * 0.087, 0.049, 0], elbow, 0.028);
+      rod(photo.rig, face, elbow, hand, 0.018);
+      piece(photo.rig, sphere, face, ...hand, 0.021, 0.024, 0.021);
+      continue;
+    }
+
     const waving = side === 1 && (pose === 'wave' || pose === 'flag');
     const elbow: Point = [side * 0.144, shoulder + (waving ? 0.041 : -0.073), 0.055];
     const hand: Point = waving ? [side * 0.177, shoulder + 0.146, 0.078]
       : [side * 0.115, hip + (standing ? -0.037 : 0.005), standing ? 0.049 : 0.171];
     const joint: Point = [side * 0.087, shoulder - 0.008, 0];
-    if (waving) {
-      const anchor = new THREE.Group();
-      anchor.position.copy(figure.position);
-      anchor.quaternion.copy(figure.quaternion);
-      anchor.scale.copy(figure.scale);
-      motion.add(anchor);
+    if (waving && motionAnchor) {
       wave = new THREE.Group();
       wave.position.set(...joint);
-      anchor.add(wave);
+      motionAnchor.add(wave);
       const local = (point: Point): Point => [point[0] - joint[0], point[1] - joint[1], point[2] - joint[2]];
       rod(wave, jacket, [0, 0, 0], local(elbow), 0.028);
       rod(wave, face, local(elbow), local(hand), 0.019);
@@ -156,13 +187,13 @@ function spectator(parent: THREE.Object3D, motion: THREE.Object3D, place: Point,
       piece(figure, sphere, face, ...hand, 0.024, 0.025, 0.021);
     }
   }
-  return wave;
+  return { wave, photo };
 }
 
 export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3D = parent) {
   const finish = TRACK.sampleAt(0);
   const waving: THREE.Group[] = [];
-  const flashes: THREE.Sprite[] = [];
+  const photographers: Photo[] = [];
   const spark = canvas2d(64, 64);
   const glow = spark.context.createRadialGradient(32, 32, 1, 32, 32, 31);
   glow.addColorStop(0, 'rgba(255,255,248,1)');
@@ -202,25 +233,15 @@ export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3
 
     for (const [row, { z, y, occupied }] of rows.entries()) {
       for (const place of occupied) {
-        const pose = (row === 2 && place === 2) || (row === 1 && place === 7) ? 'flag'
+        const pose = (row === 1 && place === 0) || (row === 2 && place === 5) ? 'photo'
+          : (row === 2 && place === 2) || (row === 1 && place === 7) ? 'flag'
           : (row === 2 && place === 7) || (row === 0 && place === 5) ? 'standing'
             : (row * 3 + place + section) % 6 === 1 ? 'wave' : 'seated';
-        const wave = spectator(stands, crowd, [places[place], y, z + (pose === 'standing' ? 0.12 : -0.13)],
-          Math.floor(rng() * 121), 0.93 + rng() * 0.095, (rng() - 0.5) * 0.32, pose);
+        const { wave, photo } = spectator(stands, crowd, [places[place], y, z + (pose === 'standing' ? 0.12 : -0.13)],
+          Math.floor(rng() * 121), 0.93 + rng() * 0.095, (rng() - 0.5) * 0.32, pose, flashMap);
         if (wave) waving.push(wave);
+        if (photo) photographers.push(photo);
       }
-    }
-    for (const [x, y, z] of [[-2.57, 0.81, -0.24], [1.03, 0.59, 0.56]]) {
-      box(stands, frame, x, y - 0.34, z, 0.052, 0.68, 0.056, false);
-      box(stands, shoes, x, y, z, 0.18, 0.106, 0.16, false);
-      box(stands, rail, x, y + 0.006, z + 0.086, 0.081, 0.065, 0.076, false);
-      const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashMap, blending: THREE.AdditiveBlending,
-        transparent: true, depthWrite: false, toneMapped: false, opacity: 0 }));
-      flash.position.set(x, y + 0.066, z + 0.13);
-      flash.scale.setScalar(0.50);
-      flash.visible = false;
-      crowd.add(flash);
-      flashes.push(flash);
     }
   }
 
@@ -249,10 +270,14 @@ export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3
         wave.rotation.set(Math.cos(phase * 0.74) * (0.05 + energy * 0.2) * amount, 0,
           Math.sin(phase) * (0.11 + energy * 0.51) * amount);
       }
-      for (const [i, flash] of flashes.entries()) {
+      for (const [i, { rig, flash }] of photographers.entries()) {
         const age = now - reactionAt - (i % 2) * 224 - Math.floor(i / 2) * 28;
-        flash.visible = !reduced && (finishReaction || i % 2 === 0) && age >= 0 && age < 115;
-        if (flash.visible) flash.material.opacity = (1 - age / 115) ** 2;
+        const shooting = !reduced && (finishReaction || i % 2 === 0);
+        const lift = shooting ? THREE.MathUtils.smoothstep(age, 0, 270) * (1 - THREE.MathUtils.smoothstep(age, 520, 910)) : 0;
+        rig.rotation.x = 0.53 * (1 - lift);
+        const exposure = age - 320;
+        flash.visible = shooting && exposure >= 0 && exposure < 115;
+        if (flash.visible) flash.material.opacity = (1 - exposure / 115) ** 2;
       }
     },
   };
