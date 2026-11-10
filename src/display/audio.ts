@@ -299,7 +299,7 @@ function createMixer(context: AudioContext) {
       const blip = voice.shiftDirection < 0 ? limit(shiftAge / 0.024) * limit(1 - shiftAge / 0.19) ** 1.25 : 0;
       const coastLoad = transmission?.gear === 0 ? 0.30 : 0.24 - 0.20 * motion;
       const load = Math.max((coastLoad + (1 - coastLoad) * throttle) * (1 - 0.95 * lift), blip);
-      const engaged = 1 - 0.68 * lift;
+      const engineLevel = 0.75 * (1 - 0.68 * lift);
       const revAccent = limit(rev - 0.09 * lift + 0.28 * blip, 0, 1.10);
       const pitch = (voice.style.idle + voice.style.sweep * revAccent) * doppler;
       const energized = limit(motion * 1.6 + load * 1.2);
@@ -310,7 +310,7 @@ function createMixer(context: AudioContext) {
       const loadFade = load * Math.PI / 2;
       // The shared fundamental can add coherently at a crossover. Trim the midpoint.
       const overlapTrim = 1 - 0.15 * (Math.sin(2 * lowFade) + Math.sin(2 * highFade) + Math.sin(2 * loadFade));
-      const level = engaged * (0.105 + 0.16 * load) * (0.84 + 0.16 * revAccent) * overlapTrim;
+      const level = engineLevel * (0.105 + 0.16 * load) * (0.84 + 0.16 * revAccent) * overlapTrim;
       const coastGain = level * Math.cos(loadFade);
       const powerGain = level * Math.sin(loadFade);
       const bridge = limit((car.y - 0.18) / 1.34);
@@ -327,8 +327,8 @@ function createMixer(context: AudioContext) {
       target(voice.gearOscillator.frequency, pitch * voice.style.mesh, response);
       target(voice.whine.frequency, pitch * (voice.style.mesh + 1.57), response);
       target(voice.engineFilter.frequency, 700 + 1800 * revAccent + 1500 * load, response);
-      target(voice.gearGain.gain, engaged * energized * (0.006 + 0.030 * revAccent + 0.012 * load) * voice.style.color, response);
-      target(voice.whineGain.gain, engaged * energized * revAccent ** 2 * (0.009 + 0.013 * load) * voice.style.color, response);
+      target(voice.gearGain.gain, engineLevel * energized * (0.006 + 0.030 * revAccent + 0.012 * load) * voice.style.color, response);
+      target(voice.whineGain.gain, engineLevel * energized * revAccent ** 2 * (0.009 + 0.013 * load) * voice.style.color, response);
       target(voice.asphalt.gain, motion * (0.117 + bridge * 0.046) * (1 - 0.8 * runoff));
       target(voice.asphaltFilter.frequency, 680 + motion * 570 - bridge * 360, 0.11);
       target(voice.bridge.gain, motion * bridge * 0.20);
@@ -387,11 +387,11 @@ function createSoundtrack(context: AudioContext) {
     track.src = tracks[index];
     setPlaying(enabled);
   });
-  const levels = { demo: 0.16, grid: 0.08, race: 0.12, results: 0.16 };
+  const levels = { demo: 0.185, grid: 0.093, race: 0.14, results: 0.185 };
   return {
     setPlaying,
     mix(phase: RaceSnapshot['phase'], view: View) {
-      const next = view === 'replay' ? 0.09 : levels[phase];
+      const next = view === 'replay' ? 0.105 : levels[phase];
       if (next === target) return;
       target = next;
       volume.gain.setTargetAtTime(next, context.currentTime, 0.28);
