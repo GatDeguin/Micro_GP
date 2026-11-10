@@ -151,7 +151,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   const style = car.handling;
   car.steer = approach(car.steer, clamp(input.x, -1, 1), dt * style.steerRate);
   const fullPower = input.gas && !input.brake;
-  car.throttle = approach(car.throttle, fullPower ? 1 : 0, dt * (fullPower ? 18 : 28));
+  car.throttle = fullPower ? approach(car.throttle, 1, dt * 18) : 0;
   const speedRatio = clamp(Math.abs(car.speed) / BASE_TOP_SPEED, 0, 1);
   const steerLoad = Math.abs(car.steer) * speedRatio;
   const cornerLoad = steerLoad ** 2;
@@ -183,9 +183,10 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
       ? 5 + 4 * loose + 2.4 * cornerLoad + uphill
       : Math.max(0, engine - uphill - 1.35 * cornerLoad);
     car.speed = approach(car.speed, speedLimit, acceleration * dt);
-  } else {
-    const drag = 0.79 + Math.abs(car.speed) * 0.18 + 2.5 * loose + 1.6 * cornerLoad + uphill;
-    if (car.speed > 0) car.speed = Math.max(0, car.speed - drag * dt);
+  } else if (car.speed > 0) {
+    // Closed-throttle engine braking keeps the car slowing even down the bridge.
+    const drag = 1.45 + car.speed * 0.18 + 2.5 * loose + 1.6 * cornerLoad + uphill;
+    car.speed = Math.max(0, car.speed - drag * dt);
   }
   car.braking = input.brake;
 

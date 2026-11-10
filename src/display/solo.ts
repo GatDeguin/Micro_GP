@@ -206,10 +206,11 @@ export function startSolo(onState: (snapshot: RaceSnapshot) => void) {
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || target.matches('input, textarea, select'))) return;
     event.preventDefault();
-    heldKeys.add(event.code);
+    if (!event.repeat) heldKeys.add(event.code);
   });
-  addEventListener('keyup', event => heldKeys.delete(event.code));
+  addEventListener('keyup', event => heldKeys.delete(event.code), { capture: true });
   addEventListener('blur', resetInput);
+  addEventListener('pagehide', resetInput);
   document.addEventListener('visibilitychange', resetInput);
 
   for (const button of pedals.querySelectorAll<HTMLButtonElement>('[data-action]')) {

@@ -40,6 +40,32 @@ function roadOf(car: CarView): TrackLocation {
   return TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
 }
 
+test('lifting GAS cuts throttle on the first tick and slows a rolling car on the bridge descent', () => {
+  const { race, inputs } = ready(0);
+  const view = () => race.snapshot().cars[0];
+  tick(race, inputs(gas), 0.45);
+  assert.equal(view().sound?.throttle, 1);
+  const flatSpeed = view().speed;
+  race.step(TICK, inputs(stopped));
+  assert.equal(view().sound?.throttle, 0);
+  assert.ok(view().speed < flatSpeed);
+
+  const descent = TRACK.crossing.upperTo + 2.5;
+  for (let i = 0; i < 60 * 35; i++) {
+    const car = view();
+    const road = roadOf(car);
+    if (Math.abs(road.s - descent) < 1.3 && car.speed <= 0.85) break;
+    const brake = road.s >= descent - 1.2 && road.s <= descent + 1.3;
+    const driver = aimAt(car, road.s + 3, 0, 5);
+    race.step(TICK, inputs(brake ? { owned: true, input: { ...driver.input!, gas: false, brake: true } } : driver));
+  }
+  const rolling = view();
+  assert.ok(Math.abs(roadOf(rolling).s - descent) < 1.3 && rolling.speed > 0.2 && rolling.speed <= 0.85,
+    'the car is rolling slowly on the downhill section');
+  tick(race, inputs(stopped), 0.4);
+  assert.ok(view().speed < rolling.speed - 0.08, 'coasting downhill does not feel like more GAS');
+});
+
 test('a configured one-lap heat waits for launch and retains timed results', () => {
   const race = new Race({ manual: true });
   const drivers = [{ ...stopped, livery: 'clean' } as const];
