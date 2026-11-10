@@ -247,7 +247,9 @@ function bootstrap() {
         view.transmission = {
           gear: selected.gear,
           shift: selected.shift,
-          rev: THREE.MathUtils.lerp(from.transmission.rev, car.transmission.rev, alpha),
+          rev: from.transmission.gear === car.transmission.gear
+            ? THREE.MathUtils.lerp(from.transmission.rev, car.transmission.rev, alpha)
+            : selected.rev,
         };
       }
       let slope = 0;

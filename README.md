@@ -14,7 +14,7 @@ Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para 
 
 Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
 
-Los cuatro autitos tienen caja automática de cuatro marchas. El tablero de la maqueta indica la marcha y el dorsal. Los motores están afinados en Do3, Mi3, Sol3 y Do4, respectivamente para los dorsales 07, 21, 34 y 58.
+Los cuatro autitos tienen caja automática de cuatro marchas. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir.
 
 Hay cuatro plazas. Los bots conducen los autos libres y retoman el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
 
