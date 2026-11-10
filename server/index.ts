@@ -7,9 +7,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket, WebSocketServer } from "ws";
-import { Race } from "../src/sim/race.ts";
+import { readCommand, type DisplayLobbyPacket } from "../src/shared/lobby.ts";
+import type { RaceSnapshot } from "../src/shared/protocol.ts";
 import { addresses, selectOrigin } from "./origin.ts";
-import { Seats } from "./seats.ts";
+import { Room } from "./room.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const development = process.argv.includes("--dev");
@@ -49,10 +50,10 @@ const vite = development ? await (await import("vite")).createServer({
   server: { middlewareMode: true, hmr: false, ws: false, allowedHosts: [new URL(publicOrigin).hostname] },
 }) : undefined;
 
-const race = new Race();
-const seats = new Seats<WebSocket>();
+const room = new Room<WebSocket>();
 const displays = new Set<WebSocket>();
 const controllers = new Map<WebSocket, number>();
+const lastLobby = new WeakMap<WebSocket, string>();
 const wss = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false });
 
 function text(response: ServerResponse, code: number, value: string) {
@@ -121,42 +122,83 @@ function send(peer: WebSocket, data: object) {
   if (peer.readyState === WebSocket.OPEN) peer.send(JSON.stringify(data));
 }
 
-function display(peer: WebSocket) {
+function publishLobby(snapshot: RaceSnapshot = room.snapshot()) {
+  const lobby = room.lobby();
+  function deliver(peer: WebSocket, packet: object) {
+    const encoded = JSON.stringify(packet);
+    if (encoded === lastLobby.get(peer) || peer.readyState !== WebSocket.OPEN || peer.bufferedAmount > 64 * 1024) return;
+    peer.send(encoded);
+    lastLobby.set(peer, encoded);
+  }
+  for (const peer of displays) {
+    const packet: DisplayLobbyPacket = { type: "lobby", lobby, host: room.isHost(peer) };
+    deliver(peer, packet);
+  }
+  for (const [peer, slot] of controllers) {
+    const packet = room.controllerView(slot, lobby, snapshot);
+    if (packet) deliver(peer, packet);
+  }
+}
+
+function display(peer: WebSocket, local: boolean) {
   displays.add(peer);
-  peer.on("close", () => displays.delete(peer));
+  room.addDisplay(peer, local);
+  peer.on("close", () => {
+    displays.delete(peer);
+    room.removeDisplay(peer);
+    publishLobby();
+  });
+  peer.on("message", (buffer, binary) => {
+    if (binary) return;
+    const command = readCommand(buffer.toString());
+    if (command?.type !== "configure" && command?.type !== "launch" && command?.type !== "return") return;
+    const error = room.control(peer, command, performance.now());
+    if (error) send(peer, { type: "error", message: error });
+    publishLobby();
+  });
   send(peer, { type: "hello", url: controllerUrl });
-  send(peer, { type: "state", state: race.snapshot() });
+  const snapshot = room.snapshot();
+  send(peer, { type: "state", state: snapshot });
+  publishLobby(snapshot);
 }
 
 function controller(peer: WebSocket) {
   peer.on("close", () => {
     const slot = controllers.get(peer);
-    if (slot !== undefined) seats.disconnect(slot, peer, performance.now());
+    if (slot !== undefined) room.disconnect(slot, peer, performance.now());
     controllers.delete(peer);
+    if (slot !== undefined) publishLobby();
   });
   peer.on("message", (buffer, binary) => {
     if (binary) return;
-    let value: unknown;
-    try { value = JSON.parse(buffer.toString()); } catch { return; }
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return;
-    const message = value as Record<string, unknown>;
+    const message = readCommand(buffer.toString());
+    if (!message) return;
     const now = performance.now();
     const slot = controllers.get(peer);
     if (slot !== undefined) {
-      seats.receive(slot, peer, message, now);
+      if (message.type === "select" || message.type === "ready") {
+        const error = message.type === "select"
+          ? room.select(slot, peer, message.car, message.livery, now)
+          : room.ready(slot, peer, message.ready, now);
+        if (error) send(peer, { type: "error", message: error });
+        publishLobby();
+      } else {
+        room.receive(slot, peer, message, now);
+      }
       return;
     }
     if (message.type !== "join") return;
     const key = typeof message.key === "string" && /^[A-Za-z0-9_-]{24}$/.test(message.key)
       ? message.key : undefined;
-    const assigned = seats.join(peer, key, now);
-    if (!assigned) return send(peer, { type: "full" });
+    const assigned = room.join(peer, key, now);
+    if (!assigned) return send(peer, { type: room.lobby().phase === "lobby" ? "full" : "in-progress" });
     if (assigned.previous) {
       controllers.delete(assigned.previous);
       assigned.previous.close(4001, "Mando reemplazado");
     }
     controllers.set(peer, assigned.slot);
-    send(peer, { type: "assigned", slot: assigned.slot, key: assigned.key });
+    send(peer, { type: "assigned", slot: assigned.car, key: assigned.key });
+    publishLobby();
   });
 }
 
@@ -178,7 +220,11 @@ server.on("upgrade", (request, socket, head) => {
   }
   wss.handleUpgrade(request, socket, head, (peer) => {
     peer.on("error", () => peer.terminate());
-    if (path === "/live") display(peer);
+    const remote = request.socket.remoteAddress;
+    const loopback = remote === "127.0.0.1" || remote === "::ffff:127.0.0.1" || remote === "::1";
+    const localHost = request.headers.host === `127.0.0.1:${port}` || request.headers.host === `localhost:${port}`;
+    const localPage = !request.headers.origin || request.headers.origin === `http://${request.headers.host}`;
+    if (path === "/live") display(peer, loopback && localHost && localPage);
     else if (path === `/live/${token}`) controller(peer);
     else {
       send(peer, { type: "invalid" });
@@ -195,25 +241,29 @@ const loop = setInterval(() => {
   const now = performance.now();
   accumulated += Math.min((now - previousTime) / 1000, 0.1);
   previousTime = now;
-  const drivers = seats.drivers(now);
   while (accumulated >= delta) {
-    race.step(delta, drivers);
+    room.step(delta, now);
     accumulated -= delta;
     ticks++;
-    if (ticks % 3 === 0 && displays.size) {
-      const packet = JSON.stringify({ type: "state", state: race.snapshot() });
-      for (const display of displays) {
-        if (display.readyState === WebSocket.OPEN && display.bufferedAmount < 64 * 1024) display.send(packet);
+    if (ticks % 3 === 0 && (displays.size || controllers.size)) {
+      const snapshot = room.snapshot();
+      room.recordProgress(snapshot);
+      publishLobby(snapshot);
+      if (displays.size) {
+        const packet = JSON.stringify({ type: "state", state: snapshot });
+        for (const display of displays) {
+          if (display.readyState === WebSocket.OPEN && display.bufferedAmount < 64 * 1024) display.send(packet);
+        }
       }
     }
     if (ticks % 60 === 0) {
       for (const [peer, slot] of controllers) {
-        if (drivers[slot]?.input != null && peer.bufferedAmount < 1024) send(peer, { type: "pulse" });
+        if (room.has(slot, peer) && peer.bufferedAmount < 1024) send(peer, { type: "pulse" });
       }
     }
   }
   for (const [peer, slot] of controllers) {
-    if (!seats.has(slot, peer)) {
+    if (!room.has(slot, peer)) {
       controllers.delete(peer);
       peer.close(4002, "Plaza vencida");
     }

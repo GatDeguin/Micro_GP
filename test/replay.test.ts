@@ -52,3 +52,24 @@ test('the replay frames a nearby trailing rival instead of a closer car ahead', 
   assert.equal(replayCompanion(cars, 0), 2);
   assert.equal(replayCompanion(cars.slice(0, 2), 0), -1);
 });
+
+test('the requested recap plays an overtake, a return to the track and a close finish', () => {
+  const replay = new ReplayHistory(false);
+  const sound = { throttle: 0.6, curb: 0, runoff: 0, slip: 0, scrape: 0 };
+  for (let frame = 3; frame <= 390; frame += 3) {
+    const state = snapshot(frame, { order: frame < 120 ? [0, 1] : [1, 0], flag: frame >= 360 });
+    state.cars[0].sound = { ...sound, runoff: frame === 237 ? 0.8 : 0 };
+    replay.add(state, frame / 0.06);
+  }
+  replay.add(snapshot(393, { phase: 'results', flag: true }), 6550);
+  assert.equal(replay.sample(6550), null);
+  assert.equal(replay.count, 3);
+  assert.equal(replay.startSummary(7000), true);
+  assert.equal(replay.sample(7000)?.kind, 'overtake');
+  assert.equal(replay.sample(7000)?.rival, 0);
+  assert.equal(replay.sample(10000)?.kind, 'recovery');
+  assert.equal(replay.sample(12700)?.kind, 'finish');
+  assert.equal(replay.sample(12700)?.rival, 0);
+  replay.stop();
+  assert.equal(replay.sample(12750), null);
+});

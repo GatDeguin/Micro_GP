@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GRID_LANE_OFFSET } from '../shared/car-dimensions';
-import { GRID_ROWS, ROAD_HALF, TRACK } from '../shared/track';
+import { GRID_ROWS, ROAD_HALF, TRACK, roadHalfAt } from '../shared/track';
 import { canvas2d, noiseField, random, texture } from './materials';
 
 export function alongTrack(map: THREE.Texture) {
@@ -42,17 +42,22 @@ export function asphaltMaps() {
   relief.context.putImageData(roughness, 0, 0);
 
   const toX = (s: number) => s / TRACK.length * width;
-  const toY = (offset: number) => (0.5 - offset / (2 * ROAD_HALF)) * height;
+  const toY = (offset: number, s: number) => (0.5 - offset / (2 * roadHalfAt(s))) * height;
+  const mark = TRACK.anchors;
   const clusters = [
-    [10.0, 5.4, -0.26, 0.25], [15.2, 4.8, -0.83, 0.24],
-    [24.2, 5.0, -1.12, 0.35], [29.6, 5.4, -0.81, 0.49], [35.5, 5.1, -0.36, 0.53],
-    [45.7, 5.0, -0.73, 0.19], [53.7, 4.1, -0.48, 0.31], [62.4, 4.8, 0.83, -0.38],
-    [81.0, 5.3, -0.34, -0.55], [89.9, 5.9, -0.98, 0.31], [100.2, 6.5, -0.72, 0.53],
+    [17.6, 5.4, -0.26, 0.25], [mark.esses - 3.8, 5.4, -0.83, 0.24],
+    [mark.hairpin - 2.0, 8.5, -1.27, 0.24], [mark.hairpin - 1.2, 9.6, 1.30, -0.20],
+    [mark.hairpinApex + 0.5, 6.9, -1.01, 0.42], [mark.hairpinApex + 1.3, 7.8, 1.18, -0.44],
+    [mark.rearLink - 1.6, 5.4, -0.73, 0.19], [mark.rearBend - 4.0, 4.8, 0.83, -0.38],
+    [mark.crest - 8.2, 5.3, -0.34, -0.55], [mark.sweep - 3.1, 5.9, -0.98, 0.31],
+    [mark.sweepApex - 6.8, 6.5, -0.72, 0.53],
   ];
   for (const [start, span, offset, drift] of clusters) {
     for (let pass = 0; pass < 5; pass++) {
-      const begin = toX(start + rng() * 1.6);
-      const end = begin + toX(span * (0.47 + rng() * 0.47));
+      const from = start + rng() * 1.6;
+      const length = span * (0.47 + rng() * 0.47);
+      const begin = toX(from);
+      const end = toX(from + length);
       const lane = offset + (rng() - 0.5) * 0.58;
       for (const side of [-1, 1]) {
         const tire = lane + side * 0.36;
@@ -65,12 +70,12 @@ export function asphaltMaps() {
           fade.addColorStop(0.71, `rgba(${color},${strength * 0.66})`);
           fade.addColorStop(1, `rgba(${color},0)`);
           context.strokeStyle = fade;
-          context.lineWidth = stroke / (2 * ROAD_HALF) * height;
+          context.lineWidth = stroke / (2 * roadHalfAt(from + length / 2)) * height;
           context.lineCap = 'round';
           context.beginPath();
-          context.moveTo(begin, toY(tire));
-          context.bezierCurveTo(begin + (end - begin) * 0.34, toY(tire + drift * 0.19),
-            begin + (end - begin) * 0.63, toY(tire + drift * 0.70), end, toY(tire + drift));
+          context.moveTo(begin, toY(tire, from));
+          context.bezierCurveTo(begin + (end - begin) * 0.34, toY(tire + drift * 0.19, from + length * 0.34),
+            begin + (end - begin) * 0.63, toY(tire + drift * 0.70, from + length * 0.63), end, toY(tire + drift, from + length));
           context.stroke();
         }
       }

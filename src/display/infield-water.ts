@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TRACK } from '../shared/track';
+import { TRACK, wallHalfAt } from '../shared/track';
 
 export const waterline = -0.156;
 // x, z and radius. These rocks have matching wakes in the surface shader.
@@ -19,7 +19,7 @@ const waves = /* glsl */`
   }
 
   vec2 channelPoint(vec2 p) {
-    float center = 1.62 + 2.34 * smoothstep(-13.4, -6.50, p.y)
+    float center = 1.62 + 2.34 * smoothstep(-14.4, -6.50, p.y)
       - 0.48 * smoothstep(-6.40, -3.50, p.y) + 1.15 * smoothstep(-3.55, -0.9, p.y);
     return vec2(p.x - center, p.y);
   }
@@ -41,6 +41,8 @@ const surface = /* glsl */`
   uniform vec3 pondProbe;
   uniform vec3 bridgeCenters[3];
   uniform vec2 bridgeAxes[3];
+  uniform float bridgeWidths[3];
+  uniform float waterLight;
 
   vec3 bridgeReflectionRay(vec3 direction) {
     // Trace the reflected ray to the three deck spans that cross the water.
@@ -54,10 +56,10 @@ const surface = /* glsl */`
       vec2 local = vPondPosition.xz + direction.xz * distance - center.xz;
       vec2 axis = bridgeAxes[i];
       vec2 across = vec2(-axis.y, axis.x);
-      float edge = max(abs(dot(local, axis)) / 2.06, abs(dot(local, across)) / 3.43);
+      float edge = max(abs(dot(local, axis)) / 2.19, abs(dot(local, across)) / bridgeWidths[i]);
       if (edge < 1.0 && distance < nearest) {
         nearest = distance;
-        blend = 1.0 - smoothstep(0.92, 1.0, abs(dot(local, across)) / 3.43);
+        blend = 1.0 - smoothstep(0.92, 1.0, abs(dot(local, across)) / bridgeWidths[i]);
       }
     }
     vec3 hit = vPondPosition + direction * nearest;
@@ -95,14 +97,14 @@ const surface = /* glsl */`
 
 export function pondMaterials(bedMap: THREE.Texture) {
   const time = { value: 0 };
+  const light = { value: 1 };
   const bed = new THREE.MeshStandardMaterial({ map: bedMap, roughness: 0.96 });
   const water = new THREE.MeshPhysicalMaterial({
     color: 0x559f95, roughness: 0.17, metalness: 0, ior: 1.333, specularIntensity: 0.93,
     clearcoat: 0.73, clearcoatRoughness: 0.16, transparent: true, opacity: 0.27, depthWrite: false,
   });
   const probePosition = new THREE.Vector3(4.57, waterline + 0.11, -1.23);
-  const crest = TRACK.locate(3.55, -9.82);
-  const spans = [-3.72, 0, 3.72].map(offset => TRACK.sampleAt(crest.s + offset));
+  const spans = [-4.10, 0, 4.10].map(offset => TRACK.sampleAt(TRACK.bridge.crest + offset));
 
   bed.onBeforeCompile = shader => {
     shader.uniforms.pondTime = time;
@@ -121,10 +123,12 @@ export function pondMaterials(bedMap: THREE.Texture) {
 
   water.onBeforeCompile = shader => {
     shader.uniforms.pondTime = time;
+    shader.uniforms.waterLight = light;
     shader.uniforms.streamRocks = { value: streamRocks.map(rock => new THREE.Vector3(...rock)) };
     shader.uniforms.pondProbe = { value: probePosition };
     shader.uniforms.bridgeCenters = { value: spans.map(p => new THREE.Vector3(p.x, p.y - 0.34, p.z)) };
     shader.uniforms.bridgeAxes = { value: spans.map(p => new THREE.Vector2(p.dx, p.dz)) };
+    shader.uniforms.bridgeWidths = { value: spans.map(p => wallHalfAt(p.s, 1) + 0.14) };
     shader.vertexShader = 'varying vec3 vPondPosition;\n' + shader.vertexShader.replace('#include <worldpos_vertex>', pondVertex);
     const reflections = THREE.ShaderChunk.envmap_physical_pars_fragment.replace(
       'envMapRotation * reflectVec, roughness',
@@ -141,7 +145,7 @@ export function pondMaterials(bedMap: THREE.Texture) {
         float foam = waterFoam(vPondPosition.xz);
         float fresnel = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
         diffuseColor.a = min(0.85, diffuseColor.a + 0.54 * fresnel + 0.48 * foam);
-        outgoingLight = mix(outgoingLight, vec3(0.76, 0.85, 0.74), foam * 0.78);
+        outgoingLight = mix(outgoingLight, waterLight * vec3(0.76, 0.85, 0.74), foam * 0.78);
         #include <opaque_fragment>
       `);
   };
@@ -160,7 +164,7 @@ export function pondMaterials(bedMap: THREE.Texture) {
       renderer.shadowMap.needsUpdate = true;
       camera.update(renderer, scene);
       water.envMap = generator.fromCubemap(target.texture).texture;
-      water.envMapIntensity = 1.25;
+      water.envMapIntensity = 1.25 * light.value;
       water.needsUpdate = true;
     } finally {
       surfaceMesh.visible = true;
@@ -170,5 +174,12 @@ export function pondMaterials(bedMap: THREE.Texture) {
     }
   }
 
-  return { bed, water, capture, update: (seconds: number) => { time.value = seconds; } };
+  return {
+    bed, water, capture,
+    update: (seconds: number) => { time.value = seconds; },
+    setNight(enabled: boolean) {
+      light.value = enabled ? 0.43 : 1;
+      water.envMapIntensity = (water.envMap ? 1.25 : 1) * light.value;
+    },
+  };
 }

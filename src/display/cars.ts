@@ -39,6 +39,9 @@ const models = ([
 ] as const).map((model, i) => ({ ...model, wheelbase: CAR_DIMENSIONS[i].axle / CAR_DIMENSIONS[i].renderScale[2] }));
 type Model = (typeof models)[number];
 const enamelColors = [0x118e99, 0xc7291c, 0xf3c312, 0x902a8e] as const;
+const cleanEnamels = [0x206456, 0x802f28, 0xb78726, 0x65376e] as const;
+const sectorEnamels = [0x17384b, 0x4f2437, 0x4a4030, 0x34304f] as const;
+const sectorStripes = [0x54c8d2, 0xf07854, 0xffcb55, 0xe4a0ee] as const;
 
 const WHEEL_Y = 0.208;
 const GROUND_CLEARANCE = -0.001;
@@ -416,9 +419,10 @@ function topDecal(sections: readonly Section[], offset: number, width: number, f
   return geometry;
 }
 
-function stripe(parent: THREE.Object3D, sections: readonly Section[], offset: number, width: number, first: number, wheelbase?: number) {
+function stripe(parent: THREE.Object3D, sections: readonly Section[], offset: number, width: number, first: number,
+  material: THREE.Material, wheelbase?: number) {
   const last = sections[sections.length - 1][0];
-  const mesh = new THREE.Mesh(topDecal(sections, offset, width, first, last, wheelbase), stripePaint);
+  const mesh = new THREE.Mesh(topDecal(sections, offset, width, first, last, wheelbase), material);
   mesh.receiveShadow = true;
   parent.add(mesh);
 }
@@ -540,12 +544,14 @@ export function buildCars(parent: THREE.Object3D) {
     const trim = i === 0 ? chrome : satin;
     const root = new THREE.Group();
     const chassis = new THREE.Group();
+    const axles = new THREE.Group();
     const detail = new THREE.Group();
     chassis.scale.set(scaleX, scaleY, scaleZ);
+    axles.scale.copy(chassis.scale);
     const shadow = contactShadow(dimensions, shadowMaterial);
     const shadowVertices = shadow.geometry.getAttribute('position');
     chassis.add(detail);
-    root.add(shadow, chassis);
+    root.add(shadow, chassis, axles);
     parent.add(root);
 
     const paint = new THREE.MeshPhysicalMaterial({
@@ -566,10 +572,11 @@ export function buildCars(parent: THREE.Object3D) {
     windowBorders(chassis, model, trim);
     cockpit(detail, model);
     numberOnRoof(chassis, car.number, roof, (rear + front) / 2, i === 3 ? 0.19 : 0.23);
+    const stripes = stripePaint.clone();
     model.stripe.forEach(offset => {
       const width = i === 0 ? 0.072 : 0.062;
-      stripe(chassis, model.body, offset, width, model.hood, model.wheelbase);
-      stripe(chassis, roof, offset, width, roof[0][0]);
+      stripe(chassis, model.body, offset, width, model.hood, stripes, model.wheelbase);
+      stripe(chassis, roof, offset, width, roof[0][0], stripes);
     });
 
     const tail = model.body[0][0];
@@ -581,17 +588,25 @@ export function buildCars(parent: THREE.Object3D) {
     frontFascia(chassis, detail, model, i, nose, trim, paint);
     paintWear(detail, model, 114 + i * 317);
     const rearLamps = new THREE.MeshStandardMaterial({ color: 0x962522, emissive: 0xf82013, emissiveIntensity: 0.28, roughness: 0.43 });
+    const headlamp = lens.clone();
+    headlamp.emissive.setHex(0xffebc7);
+    headlamp.emissiveIntensity = 0;
+    const beam = new THREE.SpotLight(0xffe3b0, 32, 13, 0.37, 0.72, 2);
+    beam.position.set(0, 0.34, nose + 0.04);
+    beam.target.position.set(0, -0.21, 5.8);
+    beam.visible = false;
+    axles.add(beam, beam.target);
     const blink = new THREE.MeshStandardMaterial({ color: 0xf0aa42, emissive: 0xff9b19, emissiveIntensity: 4, roughness: 0.35 });
     const hazards: THREE.Mesh[] = [];
     const wheels: ReturnType<typeof wheel>[] = [];
     for (const side of [-1, 1]) {
       const wheelTrim = i === 0 || i === 2 ? wheelChrome : wheelSatin;
-      wheels.push(wheel(chassis, side, -model.wheelbase, tyre, wheelTrim, scaleY / scaleZ),
-        wheel(chassis, side, model.wheelbase, tyre, wheelTrim, scaleY / scaleZ));
+      wheels.push(wheel(axles, side, -model.wheelbase, tyre, wheelTrim, scaleY / scaleZ),
+        wheel(axles, side, model.wheelbase, tyre, wheelTrim, scaleY / scaleZ));
       sideDetails(chassis, detail, model, paint, trim, side);
       if (i < 2) {
-        roundHeadlight(chassis, trim, lens, side * (i === 0 ? 0.285 : 0.269), i === 0 ? 0.323 : 0.281, nose + 0.010, i === 0 ? 0.081 : 0.074);
-        if (i === 1) roundHeadlight(chassis, chrome, lens, side * 0.115, 0.245, nose + 0.076, 0.064);
+        roundHeadlight(chassis, trim, headlamp, side * (i === 0 ? 0.285 : 0.269), i === 0 ? 0.323 : 0.281, nose + 0.010, i === 0 ? 0.081 : 0.074);
+        if (i === 1) roundHeadlight(chassis, chrome, headlamp, side * 0.115, 0.245, nose + 0.076, 0.064);
         const markX = side * (i === 0 ? 0.277 : 0.254);
         const markY = bumperY(model);
         box(chassis, rubberSeal, markX, markY, nose + 0.046, 0.096, 0.027, 0.009, false);
@@ -599,11 +614,11 @@ export function buildCars(parent: THREE.Object3D) {
       } else if (i === 2) {
         const x = side * 0.312;
         const z = 0.816;
-        roundHeadlight(chassis, chrome, lens, x, crownHeight(sectionAt(model.body, z), x, true) - 0.007, z, 0.077, -1.00);
+        roundHeadlight(chassis, chrome, headlamp, x, crownHeight(sectionAt(model.body, z), x, true) - 0.007, z, 0.077, -1.00);
       } else {
         const x = side * 0.271;
         const z = 0.887;
-        roundHeadlight(chassis, satin, lens, x, crownHeight(sectionAt(model.body, z), x, true) - 0.007, z, 0.067, -1.02);
+        roundHeadlight(chassis, satin, headlamp, x, crownHeight(sectionAt(model.body, z), x, true) - 0.007, z, 0.067, -1.02);
         const intake = sidePoint(model.body, -0.30, 0.46, side, 0.007, model.wheelbase);
         box(chassis, rubberSeal, intake.x, intake.y, intake.z, 0.019, 0.086, 0.185, false).rotation.y = side * 0.19;
       }
@@ -626,20 +641,40 @@ export function buildCars(parent: THREE.Object3D) {
     // Close hardware is batched separately so it can be hidden in the race camera.
     mergeStatic(detail, new Set());
     detail.visible = false;
-    mergeStatic(chassis, new Set([detail, glazing, ...hazards, ...wheels.map(({ pivot }) => pivot)]));
+    mergeStatic(chassis, new Set([detail, glazing, ...hazards]));
     let angle = 0;
     let settled = false;
+    let night = false;
+    let livery: CarView['livery'] = 'original';
     return {
+      setNight(enabled: boolean) {
+        night = enabled;
+        beam.visible = enabled;
+        headlamp.emissiveIntensity = enabled ? 2.5 : 0;
+      },
       setDetail(close: boolean) {
         if (detail.visible === close) return;
         detail.visible = close;
         glazing.material = close ? closeGlass : glass;
       },
       update(view: CarView, delta: number, slope: number, now: number) {
+        root.visible = view.active !== false;
+        if (!root.visible) return;
+        const nextLivery = view.livery ?? 'original';
+        if (nextLivery !== livery) {
+          livery = nextLivery;
+          paint.color.setHex(livery === 'clean' ? cleanEnamels[i] : livery === 'sector' ? sectorEnamels[i] : enamelColors[i]);
+          stripes.color.setHex(livery === 'clean' ? 0xffc875 : livery === 'sector' ? sectorStripes[i] : 0xf0e2c7);
+        }
         root.position.set(view.x, view.y + GROUND_CLEARANCE, view.z);
         root.rotation.y = view.yaw;
         const pitch = -Math.atan(slope);
-        shadow.rotation.x = chassis.rotation.x = pitch;
+        const roll = view.suspension?.roll ?? 0;
+        const heave = view.suspension?.heave ?? 0;
+        shadow.rotation.x = axles.rotation.x = pitch;
+        chassis.rotation.x = pitch + (view.suspension?.pitch ?? 0);
+        chassis.rotation.z = roll;
+        chassis.position.y = heave;
         angle = (angle + view.speed * delta / (WHEEL_RADIUS * scaleY)) % (Math.PI * 2);
         const road = detail.visible ? TRACK.locate(view.x, view.z) : null;
         const settle = road !== null && Math.abs(road.offset) < WALL_HALF && Math.abs(road.y - view.y) < 0.10;
@@ -650,19 +685,22 @@ export function buildCars(parent: THREE.Object3D) {
         wheels.forEach(({ spin, pivot }, index) => {
           spin.rotation.x = angle;
           pivot.rotation.y = index % 2 ? -view.steer * 0.31 : 0;
+          let correction = 0;
           if (settle || settled) {
             const x = pivot.position.x * scaleX;
             const z = pivot.position.z * scaleZ;
             const ground = settle ? TRACK.locate(view.x + cosYaw * x + sinYaw * z * cosPitch,
               view.z - sinYaw * x + cosYaw * z * cosPitch).y : root.position.y - sinPitch * z;
-            const correction = THREE.MathUtils.clamp(ground - root.position.y + sinPitch * z, -0.044, 0.044) / cosPitch;
-            pivot.position.y = WHEEL_Y + correction / scaleY;
+            correction = THREE.MathUtils.clamp(ground - root.position.y + sinPitch * z, -0.044, 0.044) / cosPitch;
             for (let corner = 0; corner < 4; corner++) shadowVertices.setY(4 + index * 4 + corner, 0.002 + correction);
           }
+          const lightSide = roll < 0 ? -1 : 1;
+          const unload = index % 2 === 1 && pivot.position.x * lightSide > 0 ? Math.max(0, heave - 0.009) * 0.38 : 0;
+          pivot.position.y = WHEEL_Y + (correction + unload) / scaleY;
         });
         if (settle || settled) shadowVertices.needsUpdate = true;
         settled = settle;
-        rearLamps.emissiveIntensity = view.braking ? 3.4 : 0.24;
+        rearLamps.emissiveIntensity = view.braking ? 3.4 : night ? 0.95 : 0.24;
         for (const hazard of hazards) hazard.visible = view.blink && Math.floor(now / 170) % 2 === 0;
       },
     };

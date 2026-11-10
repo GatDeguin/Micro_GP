@@ -354,6 +354,44 @@ body {
   text-align: center;
 }
 
+.panel [hidden] { display: none; }
+
+.garage {
+  display: grid;
+  align-content: start;
+  gap: clamp(.38rem, 1.5dvh, .85rem);
+  width: min(100%, 32rem);
+  min-height: 0;
+  justify-self: center;
+  padding-block: clamp(.5rem, 2dvh, 1rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.garage h2 { margin: 0; font-size: clamp(1.05rem, 5vw, 1.45rem); line-height: 1.1; }
+.garage-cars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .38rem; }
+.garage :is(button, select), .garage-pit {
+  min-height: 44px;
+  border: 1px solid #8c765a;
+  border-radius: .32rem;
+  background: #211b17;
+  color: #f5e4c9;
+  font: 650 .82rem/1.25 system-ui, sans-serif;
+}
+.garage :is(button, select):not(:disabled), .garage-pit { cursor: pointer; }
+.garage :is(button, select):focus-visible, .garage-pit:focus-visible { outline: 2px solid #f2d5a2; outline-offset: -2px; }
+.garage-cars button { display: grid; justify-items: start; min-width: 0; gap: .14rem; padding: .36rem .45rem; text-align: left; }
+.garage-cars button[aria-pressed="true"] { border-color: var(--choice-color); background: #332a22; }
+.garage-cars button:disabled, .garage-ready:disabled { opacity: .67; }
+.garage-cars strong { color: var(--choice-color); font: 850 1.15rem/1 var(--mono); }
+.garage-cars small { color: #dac7ad; font-size: .68rem; }
+.garage-livery { display: flex; align-items: center; justify-content: space-between; gap: .7rem; font-weight: 650; }
+.garage-livery select { max-width: 78%; padding: .3rem; }
+#garage-status { min-height: 2.3em; margin: 0; color: #e0cfb6; font-size: .78rem; line-height: 1.2; }
+.garage .garage-ready, .garage-pit { background: #e1bf8c; color: #25170e; }
+.garage .garage-ready[aria-pressed="true"] { background: #b8d6a6; border-color: #b8d6a6; }
+.garage-pit { padding: .25rem .65rem; }
+
 @media (orientation: portrait) {
   .panel {
     --padding-inline: clamp(17px, 5vw, 45px);
@@ -372,6 +410,8 @@ body {
     gap: clamp(7px, 2.7vw, 26px);
     padding-block-end: clamp(21px, 12dvh, 118px);
   }
+
+  .garage-cars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (orientation: landscape) and (max-height: 290px) {
@@ -381,7 +421,7 @@ body {
     padding-block: 12px;
   }
 
-  .panel-footer { display: none; }
+  .panel-footer:not(:has(.garage-pit:not([hidden]))) { display: none; }
 }
 
 @media (max-width: 290px) {

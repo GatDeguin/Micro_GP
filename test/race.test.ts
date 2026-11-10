@@ -35,19 +35,21 @@ function follow(track: typeof Track, progress: LapProgress, from: number, to: nu
 }
 
 test('the closed course has a compound right entry and stays within the grade limit', async () => {
-  const { TRACK, ROAD_HALF, WALL_HALF } = await import('../src/shared/track.ts');
+  const { TRACK, ROAD_HALF, PIT_LANE, isPitLane, roadHalfAt, wallHalfAt } = await import('../src/shared/track.ts');
   const start = TRACK.sampleAt(0);
   assert.deepEqual([start.x, start.y, start.z, start.dx, start.dz], [-3.75, 0, 8.6875, 1, 0]);
   assert.equal(ROAD_HALF * 2, 78 / 16);
-  assert.ok(Math.abs(TRACK.length - 119.26) < 0.05);
+  assert.ok(Math.abs(TRACK.length - 162.26) < 0.05);
   assert.deepEqual(TRACK.sampleAt(TRACK.length), start);
 
-  const bendIn = TRACK.locate(15.98, 6.70);
-  const bendOut = TRACK.locate(20.69, 4.79);
-  const apex = TRACK.locate(24.77, 0.81);
-  assert.ok(Math.abs(bendIn.offset) < 0.01 && Math.abs(bendOut.offset) < 0.01);
+  const bendIn = TRACK.sampleAt(TRACK.anchors.esses + 4);
+  const bendOut = TRACK.sampleAt(TRACK.anchors.essesMid + 0.5);
+  const apex = TRACK.sampleAt(TRACK.anchors.hairpinApex);
   assert.ok(bendIn.s < bendOut.s && bendOut.s < apex.s);
-  assert.ok(bendIn.dz < -0.5 && bendOut.dz > -0.34 && apex.dz < -0.9);
+  assert.ok(bendIn.dz < -0.49 && bendOut.dz > -0.46 && apex.dz < -0.9);
+  assert.ok(roadHalfAt(apex.s) > ROAD_HALF * 1.3);
+  assert.ok(isPitLane(PIT_LANE.stalls[0], PIT_LANE.offset));
+  assert.ok(wallHalfAt(PIT_LANE.stalls[0], -1) > 6);
 
   let steepestClimb = 0;
   let steepestDescent = 0;
@@ -55,9 +57,11 @@ test('the closed course has a compound right entry and stays within the grade li
     const next = TRACK.samples[(i + 1) % TRACK.samples.length];
     const run = Math.hypot(next.x - point.x, next.z - point.z);
     const rise = next.y - point.y;
-    for (const offset of [-WALL_HALF, WALL_HALF]) {
-      const edgeX = next.x - point.x - (next.dz - point.dz) * offset;
-      const edgeZ = next.z - point.z + (next.dx - point.dx) * offset;
+    for (const side of [-1, 1]) {
+      const offset = side * wallHalfAt(point.s, side);
+      const nextOffset = side * wallHalfAt(next.s, side);
+      const edgeX = next.x - point.x - (next.dz * nextOffset - point.dz * offset);
+      const edgeZ = next.z - point.z + (next.dx * nextOffset - point.dx * offset);
       const edgeRun = Math.hypot(edgeX, edgeZ);
       assert.ok(edgeX * (next.x - point.x) + edgeZ * (next.z - point.z) > 0);
       const grade = rise / edgeRun;
@@ -69,7 +73,8 @@ test('the closed course has a compound right entry and stays within the grade li
   });
   assert.ok(Math.min(...segmentLengths) / Math.max(...segmentLengths) > 0.99);
   assert.ok(steepestClimb > 0.10 && steepestDescent > 0.10);
-  assert.equal(Math.max(...TRACK.samples.map(point => point.y)), 2.15);
+  assert.equal(Math.max(...TRACK.samples.map(point => point.y)), TRACK.bridge.height);
+  assert.ok(TRACK.bridge.height > 3);
 
   const lane = TRACK.locate(-3.75, 9.8875);
   assert.ok(Math.min(lane.s, TRACK.length - lane.s) < 0.001);
@@ -96,13 +101,16 @@ test('a jump past Curvón cannot award its checkpoint or the lap', async () => {
   const { TRACK } = await import('../src/shared/track.ts');
   const { LapProgress } = await import('../src/sim/progress.ts');
   const progress = new LapProgress(-1.6);
-  follow(TRACK, progress, -1.6, 90);
+  const gate = TRACK.anchors.sweepApex;
+  const before = gate - 2.1;
+  const after = gate + 2.1;
+  follow(TRACK, progress, -1.6, before);
   const beforeJump = progress.distance;
-  progress.advance(TRACK.sampleAt(90), TRACK.sampleAt(96), true);
+  progress.advance(TRACK.sampleAt(before), TRACK.sampleAt(after), true);
   assert.equal(progress.distance, beforeJump);
-  follow(TRACK, progress, 96, TRACK.length + 0.4);
+  follow(TRACK, progress, after, TRACK.length + 0.4);
   assert.equal(progress.lap, 0);
-  assert.ok(progress.distance < 93, 'ranking remains below the missed gate');
+  assert.ok(progress.distance < gate, 'ranking remains below the missed gate');
 });
 
 test('four bots drive the whole race and the result resets to a new grid', async () => {
@@ -125,9 +133,9 @@ test('four bots drive the whole race and the result resets to a new grid', async
   assert.equal(race.snapshot().lights, 0);
 
   const bots = [{ owned: true, input: null }];
-  const openingLap = runUntil(race, 27, bots, () => race.snapshot().cars.every(car => car.lap >= 1));
-  const firstFinish = openingLap + runUntil(race, 74 - openingLap, bots, () => race.snapshot().flag);
-  assert.ok(firstFinish >= 53);
+  const openingLap = runUntil(race, 35, bots, () => race.snapshot().cars.every(car => car.lap >= 1));
+  const firstFinish = openingLap + runUntil(race, 97 - openingLap, bots, () => race.snapshot().flag);
+  assert.ok(firstFinish >= 72);
   const resultsDelay = runUntil(race, 15.1, bots, () => race.snapshot().phase === 'results');
   assert.ok(resultsDelay < 15);
   const result = race.snapshot();
@@ -148,7 +156,7 @@ test('after the first finish the race closes with unfinished cars ranked by vali
   const { Race } = await import('../src/sim/race.ts');
   const race = new Race();
   const human = drive(NEUTRAL);
-  runUntil(race, 77, human, () => race.snapshot().flag);
+  runUntil(race, 100, human, () => race.snapshot().flag);
   step(race, 14.95, human);
   assert.equal(race.snapshot().phase, 'race');
   step(race, 0.07, human);
@@ -339,7 +347,10 @@ test('the run-off slows a car even when it has not struck the wall', async () =>
 
 test('FRENO overrides GAS and reverse needs a fresh press after stopping', async () => {
   const { Race } = await import('../src/sim/race.ts');
-  const race = new Race();
+  const { defaultRaceConfig } = await import('../src/shared/protocol.ts');
+  const race = new Race({ manual: true });
+  race.configure({ ...defaultRaceConfig, bots: 0 });
+  race.launch();
   const gas = drive({ ...NEUTRAL, gas: true });
   const both = drive({ ...NEUTRAL, gas: true, brake: true });
   step(race, 3.75, gas);

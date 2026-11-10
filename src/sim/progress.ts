@@ -1,16 +1,16 @@
-import { TRACK, WALL_HALF, type TrackPoint } from '../shared/track.ts';
+import { TRACK, wallHalfAt, type TrackPoint } from '../shared/track.ts';
 
 type CrossingPoint = Pick<TrackPoint, 'x' | 'z' | 's'>;
 
-// Meta, Horquilla, Ese Alta and Curvón in travel order.
+// Meta, Horquilla, Puente and Curvón in travel order.
 const gates = [
   TRACK.sampleAt(0),
-  TRACK.locate(25, 1.25),
-  TRACK.locate(11.875, -9.375),
-  TRACK.locate(-24.1875, -1.4375),
+  TRACK.sampleAt(TRACK.anchors.hairpinApex),
+  TRACK.sampleAt(TRACK.anchors.crest),
+  TRACK.sampleAt(TRACK.anchors.sweepApex),
 ];
 
-function arcDelta(from: number, to: number) {
+export function arcDelta(from: number, to: number) {
   const difference = to - from;
   if (difference > TRACK.length / 2) return difference - TRACK.length;
   if (difference < -TRACK.length / 2) return difference + TRACK.length;
@@ -25,7 +25,8 @@ function crossGate(from: CrossingPoint, to: CrossingPoint, gate: TrackPoint) {
   const fraction = -before / (after - before);
   const x = from.x + (to.x - from.x) * fraction - gate.x;
   const z = from.z + (to.z - from.z) * fraction - gate.z;
-  return Math.abs(z * gate.dx - x * gate.dz) <= WALL_HALF ? fraction : null;
+  const offset = z * gate.dx - x * gate.dz;
+  return Math.abs(offset) <= wallHalfAt(gate.s, Math.sign(offset)) ? fraction : null;
 }
 
 export class LapProgress {
@@ -48,6 +49,10 @@ export class LapProgress {
 
   get distance() {
     return Math.max(this.lastGateDistance, Math.min(this.nextGateDistance - 0.001, this.rankedDistance));
+  }
+
+  get checkpoint() {
+    return (this.next + gates.length - 1) % gates.length;
   }
 
   advance(from: CrossingPoint, to: CrossingPoint, forward: boolean) {

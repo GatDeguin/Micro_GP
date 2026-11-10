@@ -9,6 +9,10 @@ const GEARS = [
 const SHIFT_SECONDS = 0.066;
 const IDLE = 0.15;
 
+function gearAt(speed: number) {
+  return speed < 0 ? -1 : speed === 0 ? 0 : GEARS.findIndex(ratio => speed < ratio.up) + 1;
+}
+
 export class AutomaticTransmission {
   private gear: number;
   private serial = 0;
@@ -17,7 +21,7 @@ export class AutomaticTransmission {
   private kickdownHold = false;
 
   constructor(speed: number) {
-    this.gear = speed === 0 ? 0 : GEARS.findIndex(ratio => speed < ratio.up) + 1;
+    this.gear = gearAt(speed);
   }
 
   private select(gear: number) {
@@ -61,6 +65,14 @@ export class AutomaticTransmission {
   neutralize() {
     this.select(0);
     this.powered = false;
+  }
+
+  relocate(speed: number) {
+    this.select(gearAt(speed));
+    this.remainingCut = 0;
+    this.powered = false;
+    this.kickdownHold = false;
+    return this;
   }
 
   view(speed: number): TransmissionView {

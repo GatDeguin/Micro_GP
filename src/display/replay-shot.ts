@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ReplayKind } from './replay';
 import type { CarView } from '../shared/protocol';
 import { TRACK } from '../shared/track';
 import type { buildPlacard } from './signs';
@@ -83,16 +84,20 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
   return {
     stop() { active = false; },
     render(scene: THREE.Scene, car: CarView, rival: CarView | undefined, width: number, height: number, dt: number,
-      placard: ReturnType<typeof buildPlacard>) {
+      placard: ReturnType<typeof buildPlacard>, kind: ReplayKind, lowQuality: boolean) {
       const lane = TRACK.locate(car.x, car.z);
       if (!active) side = lane.offset > 1.25 ? -1 : 1;
       // The low atlas view puts the lens on the shoulder with the curb crossing the foreground.
-      const ahead = TRACK.sampleAt(lane.s + 4.72);
-      const shoulder = THREE.MathUtils.clamp(lane.offset + 3.83 * side, -3.13, 3.13);
-      position.set(ahead.x - ahead.dz * shoulder, ahead.y + 0.67, ahead.z + ahead.dx * shoulder);
+      const ahead = TRACK.sampleAt(lane.s + (kind === 'recovery' ? -5.1 : kind === 'overtake' ? 1.85 : 5.15));
+      const shoulder = kind === 'recovery' ? lane.offset * 0.46
+        : THREE.MathUtils.clamp(lane.offset + 3.83 * side, -3.4, 3.4);
+      position.set(ahead.x - ahead.dz * shoulder, ahead.y + (kind === 'recovery' ? 2.45 : kind === 'overtake' ? 1.15 : 0.75),
+        ahead.z + ahead.dx * shoulder);
       subject.set(car.x, car.y + 0.54, car.z);
       groupAim.set(car.x, car.y + 0.24, car.z);
-      if (rival) groupAim.lerp(sight.set(rival.x, rival.y + 0.29, rival.z), 0.16);
+      if (rival && Math.hypot(rival.x - car.x, rival.z - car.z) < 9) {
+        groupAim.lerp(sight.set(rival.x, rival.y + 0.29, rival.z), kind === 'overtake' ? 0.36 : 0.22);
+      }
       if (active) {
         camera.position.lerp(position, 1 - Math.exp(-dt * 14));
         aim.lerp(groupAim, 1 - Math.exp(-dt * 10));
@@ -102,7 +107,8 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
       }
       active = true;
       camera.aspect = width / height;
-      camera.fov = THREE.MathUtils.clamp(38.5 + 14 * (16 / 9 - camera.aspect), 38.5, 55);
+      const baseFov = kind === 'finish' ? 35 : 45;
+      camera.fov = THREE.MathUtils.clamp(baseFov + 14 * (16 / 9 - camera.aspect), baseFov, 59);
       camera.updateProjectionMatrix();
       camera.lookAt(aim);
       camera.updateMatrixWorld();
@@ -117,6 +123,11 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
       camera.getWorldDirection(sight);
       material.uniforms.focus.value = subject.sub(camera.position).dot(sight);
 
+      if (lowQuality) {
+        placard.resize(camera, width, height, ahead.y);
+        renderer.render(scene, camera);
+        return camera;
+      }
       const ratio = Math.min(1, 1600 / Math.max(width, height));
       const targetWidth = Math.max(1, Math.round(width * ratio));
       const targetHeight = Math.max(1, Math.round(height * ratio));

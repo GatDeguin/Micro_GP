@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { type CarView, type RaceSnapshot } from '../shared/protocol';
-import { ROAD_HALF, TRACK, WALL_HALF } from '../shared/track';
+import { roadHalfAt, TRACK, wallHalfAt } from '../shared/track';
 import { raceAudio } from './audio';
 import { instanceStatic } from './batches';
 import { buildCars } from './cars';
@@ -8,10 +8,12 @@ import { buildCircuit } from './circuit';
 import { buildCollectorBackdrop } from './collector-backdrop';
 import { buildGrandstands } from './grandstands';
 import { buildInfield } from './infield';
+import { buildMultiplayerLobby } from './lobby';
 import { BENCH_SURFACE, plankMap } from './materials';
 import { buildRaceViews } from './race-views';
 import { ReplayHistory, replayCompanion } from './replay';
 import { buildReplayShot } from './replay-shot';
+import { buildRaceResults } from './results';
 import { buildSceneLighting } from './scene-lighting';
 import { readAudioSettings, useLowQuality } from './settings';
 import { buildPlacard, buildRaceSigns, placardLayout } from './signs';
@@ -25,7 +27,7 @@ const canvas = document.querySelector<HTMLCanvasElement>('#track')!;
 const pages = import.meta.env.MODE === 'pages';
 const lowQuality = useLowQuality();
 // Fit to the projected centerline and finish stripe annotated in img01 of the atlas.
-const target = new THREE.Vector3(-2.29, 0.11, 1.745);
+const target = new THREE.Vector3(-1.1, 0.11, -0.6);
 const eyeDirection = new THREE.Vector3(-0.338, 0.779, 0.625).normalize();
 
 function atEdge(p: (typeof TRACK.samples)[number], offset: number, y: number) {
@@ -33,9 +35,9 @@ function atEdge(p: (typeof TRACK.samples)[number], offset: number, y: number) {
 }
 
 function cameraFit(camera: THREE.PerspectiveCamera) {
-  const deck = TRACK.samples.map(p => atEdge(p, WALL_HALF + 1.22, BENCH_SURFACE));
-  const fence = TRACK.samples.map(p => atEdge(p, WALL_HALF + 0.04, p.y + 0.84));
-  const road = TRACK.samples.flatMap(p => [-1, 1].map(side => atEdge(p, side * (ROAD_HALF + 0.47), p.y + 0.14)));
+  const deck = TRACK.samples.map(p => atEdge(p, wallHalfAt(p.s, 1) + 1.4, BENCH_SURFACE));
+  const fence = TRACK.samples.flatMap(p => [-1, 1].map(side => atEdge(p, side * (wallHalfAt(p.s, side) + 0.04), p.y + 0.84)));
+  const road = TRACK.samples.flatMap(p => [-1, 1].map(side => atEdge(p, side * (roadHalfAt(p.s) + 0.47), p.y + 0.14)));
   const point = new THREE.Vector3();
   return (width: number, height: number) => {
     const qr = placardLayout(width, height);
@@ -52,13 +54,13 @@ function cameraFit(camera: THREE.PerspectiveCamera) {
     };
 
     let near = 20;
-    let far = Math.max(180, 175 / camera.aspect);
+    let far = Math.max(220, 230 / camera.aspect);
     for (let i = 0; i < 20; i++) {
       const distance = (near + far) / 2;
       position(distance);
       const clips = deck.some(bounds => {
         point.copy(bounds).project(camera);
-        return Math.abs(point.x) > (camera.aspect >= 1.5 ? 1.031 : 0.986) || point.y < -0.80;
+        return Math.abs(point.x) > 0.986 || point.y < -0.80;
       }) || fence.some(bounds => {
         point.copy(bounds).project(camera);
         return Math.abs(point.x) > 0.991 || point.y > 0.827;
@@ -83,7 +85,7 @@ function bootstrap() {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x211917);
-  const camera = new THREE.PerspectiveCamera(27, 1, 0.3, 400);
+  const camera = new THREE.PerspectiveCamera(27, 1, 0.3, 800);
   const fit = cameraFit(camera);
   const wood = plankMap();
   const workshop = new THREE.Group();
@@ -95,7 +97,7 @@ function bootstrap() {
   instanceStatic(circuit);
   scene.add(workshop, circuit);
   const infield = buildInfield(scene);
-  const { lightShot } = buildSceneLighting(scene, renderer, lowQuality);
+  const { lightShot, setNight } = buildSceneLighting(scene, renderer, lowQuality);
   if (!lowQuality) infield.captureReflections(renderer, scene);
   const cars = buildCars(scene);
   const signs = buildRaceSigns(scene);
@@ -103,13 +105,17 @@ function bootstrap() {
   const audioSettings = readAudioSettings();
   const audio = raceAudio(audioSettings);
   const controls = buildViewControls({ multiplayer: !pages, lowQuality, audio: audioSettings, onAudioChange: audio.setLevels });
+  const lobby = pages ? undefined : buildMultiplayerLobby();
   const renderViews = buildRaceViews(renderer, camera, placard, cameraFit, {
     wall: backWall,
     build: () => buildCollectorBackdrop(renderer),
   });
-  const replay = new ReplayHistory();
+  const replay = new ReplayHistory(false);
+  const results = buildRaceResults(replay);
   let replayShot: ReturnType<typeof buildReplayShot> | undefined;
   let replaying = false;
+  let replayClip = -1;
+  let night = false;
 
   let width = 1, height = 1;
   function resize() {
@@ -146,12 +152,20 @@ function bootstrap() {
     const snap = current.frame < 0 || snapshot.heat !== current.heat || snapshot.frame <= current.frame || now - received > 420;
     previous = snap ? snapshot : current;
     current = snapshot;
-    ownedSlots = snapshot.cars.flatMap((car, i) => car.owned ? [i] : []);
+    const nextNight = snapshot.config?.night === true;
+    if (night !== nextNight) {
+      night = nextNight;
+      setNight(night);
+      infield.setNight(night);
+      for (const car of cars) car.setNight(night);
+    }
+    ownedSlots = snapshot.cars.flatMap((car, i) => car.owned && car.active !== false ? [i] : []);
     controls.setPlayerCount(ownedSlots.length);
     interval = snap ? 50 : THREE.MathUtils.clamp(now - received, 28, 94);
     received = now;
     signs.board(snapshot);
     signs.lights(snapshot.lights);
+    results.update(snapshot);
   }
 
   let retry = 250;
@@ -169,6 +183,7 @@ function bootstrap() {
     socket.addEventListener('message', ({ data }) => {
       let message: DisplayMessage;
       try { message = JSON.parse(data); } catch { return; }
+      if (!message || lobby?.handle(message, socket)) return;
       if (message.type === 'hello' && typeof message.url === 'string') {
         placard.setUrl(message.url);
       } else if (message.type === 'state' && message.state?.cars?.length === cars.length) {
@@ -177,6 +192,7 @@ function bootstrap() {
     });
     socket.addEventListener('close', () => {
       connected = false;
+      lobby?.disconnect();
       updateAudioMute();
       setTimeout(connect, retry);
       retry = Math.min(5000, retry * 1.8);
@@ -210,19 +226,20 @@ function bootstrap() {
     const split = controls.split && ownedSlots.length > 1;
     const slot = ownedSlots[0] ?? current.order[0] ?? 0;
     const slots = split ? ownedSlots : [slot];
-    const moment = lowQuality || split || mode !== 'general' ? null : replay.sample(now);
+    const moment = replay.sample(now);
+    results.showReplay(moment);
     const progress = moment?.alpha ?? THREE.MathUtils.clamp((now - received) / interval, 0, 1);
     const toState = moment?.to ?? current;
     const fromState = moment?.from ?? previous;
     const subject = moment ? toState.cars[moment.slot] : undefined;
-    const partnerSlot = moment ? replayCompanion(toState.cars, moment.slot) : -1;
+    const partnerSlot = moment ? moment.rival ?? replayCompanion(toState.cars, moment.slot) : -1;
     let focus: CarView | undefined;
     let partner: CarView | undefined;
     toState.cars.forEach((car, i) => {
       const from = fromState.cars[i];
       const dx = car.x - from.x;
       const dz = car.z - from.z;
-      const jump = dx * dx + dz * dz > 4.4;
+      const jump = dx * dx + dz * dz > 4.4 || car.active !== from.active;
       const alpha = jump ? 1 : progress;
       const turn = Math.atan2(Math.sin(car.yaw - from.yaw), Math.cos(car.yaw - from.yaw));
       const yaw = from.yaw + turn * alpha;
@@ -254,6 +271,13 @@ function bootstrap() {
             : selected.rev,
         };
       }
+      if (car.suspension && from.suspension) {
+        view.suspension = {
+          pitch: THREE.MathUtils.lerp(from.suspension.pitch, car.suspension.pitch, alpha),
+          roll: THREE.MathUtils.lerp(from.suspension.roll, car.suspension.roll, alpha),
+          heave: THREE.MathUtils.lerp(from.suspension.heave, car.suspension.heave, alpha),
+        };
+      }
       let slope = 0;
       if (view.y > 0.005) {
         const road = TRACK.locate(view.x, view.z);
@@ -270,15 +294,18 @@ function bootstrap() {
     });
     signs.flag(toState.flag, now / 1000);
     let listener: THREE.Camera;
-    if (focus) {
+    if (focus && moment) {
       if (!replaying) lightShot(true);
       replaying = true;
       placard.setGrounded(false);
       replayShot ??= buildReplayShot(renderer);
-      listener = replayShot.render(scene, focus, partner, width, height, dt, placard);
+      if (replayClip !== moment.clip) replayShot.stop();
+      replayClip = moment.clip;
+      listener = replayShot.render(scene, focus, partner, width, height, dt, placard, moment.kind, lowQuality);
     } else {
       if (replaying) {
         replaying = false;
+        replayClip = -1;
         lightShot(false);
         replayShot?.stop();
         placard.resize(camera, width, height);

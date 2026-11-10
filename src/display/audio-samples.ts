@@ -250,6 +250,11 @@ export function buildAudioSamples(context: BaseAudioContext) {
       strike(samples, second, 741 + i * 43, 420, 3150, 0.62, 171);
       ring(samples, second, 480 + 45 * i, 0.23, 141);
     }),
+    deckJoint: variants(context, [0.115, 0.126, 0.14], 0.61, (samples, i) => {
+      strike(samples, 0, 453 + i * 37, 125, 1800, 0.76, 100);
+      ring(samples, 0, 212 + 18 * i, 0.63, 74, -170);
+      ring(samples, 0.014, 338 + 22 * i, 0.28, 94);
+    }),
     car: variants(context, [0.146, 0.168, 0.153, 0.182], 0.78, (samples, i) => {
       const echo = 0.018 + 0.004 * i;
       strike(samples, 0, 914 + 37 * i, 600, 7100, 0.99, 142);

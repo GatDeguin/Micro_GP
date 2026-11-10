@@ -1,8 +1,14 @@
-import { CAR_SPECS, type DriveInput } from "../shared/protocol.ts";
+import { CAR_SPECS, type DriveInput, type Livery } from "../shared/protocol.ts";
+import type { ControllerLobbyPacket } from "../shared/lobby.ts";
 
-export type LinkStatus = "connecting" | "reconnecting" | "connected" | "full" | "invalid" | "replaced";
+export type LinkStatus = "connecting" | "reconnecting" | "connected" | "full" | "in-progress" | "invalid" | "replaced";
 
-export function controllerLink(room: string, onStatus: (status: LinkStatus, slot?: number) => void) {
+export function controllerLink(
+  room: string,
+  onStatus: (status: LinkStatus, slot?: number) => void,
+  onLobby: (state: ControllerLobbyPacket) => void,
+  onError: (message: string) => void,
+) {
   const url = new URL(`/live/${room}`, location.href);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const storageKey = `microgp:mando:${room}`;
@@ -65,7 +71,7 @@ export function controllerLink(room: string, onStatus: (status: LinkStatus, slot
       return;
     }
     if (socket) {
-      if (socket.readyState === WebSocket.OPEN && status === "full" && deadline === undefined) requestSlot(socket);
+      if (socket.readyState === WebSocket.OPEN && (status === "full" || status === "in-progress") && deadline === undefined) requestSlot(socket);
       return;
     }
 
@@ -95,9 +101,13 @@ export function controllerLink(room: string, onStatus: (status: LinkStatus, slot
         setStatus("connected", message.slot);
       } else if (message?.type === "pulse" && status === "connected") {
         startDeadline(4200);
-      } else if (message?.type === "full") {
+      } else if (message?.type === "lobby" && status === "connected" && message.lobby && CAR_SPECS[message.car]) {
+        onLobby(message as ControllerLobbyPacket);
+      } else if (message?.type === "error" && typeof message.message === "string") {
+        onError(message.message);
+      } else if (message?.type === "full" || message?.type === "in-progress") {
         clearDeadline();
-        setStatus("full");
+        setStatus(message.type);
         retryAfter(2000);
       } else if (message?.type === "invalid") {
         setStatus("invalid");
@@ -121,11 +131,18 @@ export function controllerLink(room: string, onStatus: (status: LinkStatus, slot
     });
   }
 
-  function send(input: DriveInput) {
+  function sendCommand(command: object) {
     if (status !== "connected" || socket?.readyState !== WebSocket.OPEN) return;
     if (socket.bufferedAmount > 1024) return;
-    socket.send(JSON.stringify({ type: "input", seq: ++seq, ...input }));
+    socket.send(JSON.stringify(command));
   }
 
-  return { connect, close, send };
+  return {
+    connect,
+    close,
+    send(input: DriveInput) { sendCommand({ type: "input", seq: ++seq, ...input }); },
+    heartbeat() { sendCommand({ type: "heartbeat" }); },
+    select(car: number, livery: Livery) { sendCommand({ type: "select", car, livery }); },
+    ready(ready: boolean) { sendCommand({ type: "ready", ready }); },
+  };
 }

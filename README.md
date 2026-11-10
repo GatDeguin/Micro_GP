@@ -4,13 +4,16 @@ Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la
 
 ## Jugar en GitHub Pages
 
-Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para correr contra tres bots. Usá las flechas o WASD para manejar y las teclas 1, 2 y 3 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar. Para usar celulares como mandos por QR y jugar en multijugador, iniciá el servidor local.
+Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1, 2 y 3 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
+
+El circuito de 162 unidades tiene una horquilla ancha, una recta de fondo y el puente sobre el arroyo. En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas.
 
 ## Jugar en Windows
 
 1. Abrí **Jugar.cmd** o entrá en **http://127.0.0.1:4173/** si el servidor ya está activo.
-2. Conectá el celular a la misma red que la PC y escaneá la placa QR de abajo a la derecha con la cámara.
-3. Mirá el color y el dorsal que te asignó el mando. Mové la palanca a los lados para girar y mantené **GAS** para acelerar. **FRENO** tiene prioridad. Una vez detenido, soltalo y presionalo de nuevo para dar marcha atrás.
+2. Conectá el celular a la misma red que la PC y escaneá la placa QR de abajo a la derecha. Elegí un auto libre y marcá **Listo** en el mando.
+3. En la pantalla anfitriona de la PC, configurá la partida y pulsá **Confirmar salida** cuando todos estén listos.
+4. Mové la palanca a los lados para girar y mantené **GAS** para acelerar. **FRENO** tiene prioridad. Una vez detenido, soltalo y presionalo de nuevo para dar marcha atrás.
 
 Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
 
@@ -22,7 +25,9 @@ Los cuatro autitos tienen caja automática de cuatro marchas. El tablero de la m
 
 El motor de cada auto combina bucles de bajas, medias y altas revoluciones, con un timbre al acelerar y otro al soltar el gas. Micro GP genera esos bucles con Web Audio. El diseño toma como referencia la [guía de audio vehicular de Wreckfest](https://www.audiokinetic.com/media/blog/LoopBasedCarEngineDesign/vehicle_audio_modding_guide_for_wreckfest-Wwise2019_2_9.pdf).
 
-Hay cuatro plazas. Los bots conducen los autos libres y retoman el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
+Hay cuatro plazas. Los bots pueden cubrir los lugares libres, adelantar y retomar el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
+
+Al terminar, el tablero muestra la clasificación, los tiempos, las diferencias y la mejor vuelta de cada piloto. **Ver resumen** reproduce las maniobras registradas y **Resultados** abre los tiempos en pantalla. Podés volver a la sala o a exhibición cuando termines de revisarlos.
 
 En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución y **3** para ver a ras de pista. **M** activa o desactiva la pantalla dividida. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
 

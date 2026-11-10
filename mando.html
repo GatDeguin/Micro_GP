@@ -31,7 +31,15 @@
         </div>
       </header>
 
-      <div class="deck">
+      <section class="garage" aria-labelledby="garage-title">
+        <h2 id="garage-title">Elegí tu auto</h2>
+        <div id="garage-cars" class="garage-cars" role="group" aria-labelledby="garage-title"></div>
+        <label class="garage-livery">Librea <select id="garage-livery" disabled></select></label>
+        <p id="garage-status" role="status">Esperando conexión con la sala.</p>
+        <button id="garage-ready" class="garage-ready" type="button" aria-pressed="false" disabled>Estoy listo</button>
+      </section>
+
+      <div class="deck" hidden>
         <div class="control">
           <div class="steering" id="steering" tabindex="-1" role="slider" aria-label="Giro"
             aria-orientation="horizontal" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"
@@ -58,7 +66,8 @@
       </div>
 
       <footer class="panel-footer">
-        Mirá la pista compartida
+        <span id="mando-instruction">Mirá la pista compartida</span>
+        <button id="mando-pit" class="garage-pit" type="button" hidden>Cambiar auto en boxes</button>
       </footer>
     </main>
     <script type="module" src="/src/controller/main.ts"></script>

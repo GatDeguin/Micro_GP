@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TRACK, WALL_HALF } from '../shared/track';
+import { TRACK, wallHalfAt } from '../shared/track';
 import { BENCH_SURFACE } from './materials';
 
 function panelFalloff() {
@@ -67,7 +67,7 @@ function prefilterWorkshop(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 
 function shadowPoints() {
   const bounds = TRACK.samples.flatMap(p => [-1, 1].flatMap(side => {
-    const offset = side * (WALL_HALF + 1.47);
+    const offset = side * (wallHalfAt(p.s, side) + 1.47);
     const x = p.x - p.dz * offset;
     const z = p.z + p.dx * offset;
     return [new THREE.Vector3(x, BENCH_SURFACE, z), new THREE.Vector3(x, p.y + 1.3, z)];
@@ -119,22 +119,50 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   toolLight.target.position.set(-4.9, BENCH_SURFACE, -16.7);
   scene.add(key, key.target, fill, bounce, benchLight, benchLight.target, toolLight, toolLight.target);
   const points = shadowPoints();
-  let current: boolean | undefined;
+  const trackLamps: { light: THREE.SpotLight; day: number }[] = [];
+  scene.traverse(object => {
+    if (object instanceof THREE.SpotLight && object.name === 'Foco de pista') {
+      trackLamps.push({ light: object, day: object.intensity });
+    }
+  });
+  const dayBackground = scene.background;
+  const dayBackgroundIntensity = scene.backgroundIntensity;
+  const nightBackground = new THREE.Color(0x101521);
+  let close = false;
+  let night = false;
 
-  function lightShot(close: boolean) {
-    if (current === close) return;
-    current = close;
+  function applyLighting() {
     // A single shadow-casting key is shared by all views of a given frame.
-    key.position.set(close ? -19.1 : -17.7, close ? 16.7 : 24.8, close ? 13.0 : -8.2);
-    key.color.setHex(close ? 0xffd1a4 : 0xffd8b9);
-    key.intensity = close ? 3.10 : 2.94;
+    if (night) key.position.set(-12.0, 24.0, -17.0);
+    else key.position.set(close ? -19.1 : -17.7, close ? 16.7 : 24.8, close ? 13.0 : -8.2);
+    key.color.setHex(night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9);
+    key.intensity = night ? 0.78 : close ? 3.10 : 2.94;
     fill.position.set(20.8, 11.5, close ? -7.2 : 13.7);
-    fill.intensity = close ? 0.49 : 0.66;
-    bounce.intensity = close ? 0.23 : 0.42;
-    scene.environmentIntensity = close ? 0.42 : 0.38;
-    renderer.toneMappingExposure = close ? 1.015 : 1.075;
+    fill.color.setHex(night ? 0x819ed4 : 0xe1eaff);
+    fill.intensity = night ? 0.28 : close ? 0.49 : 0.66;
+    bounce.color.setHex(night ? 0x94acd3 : 0xffe9d7);
+    bounce.groundColor.setHex(night ? 0x5a4045 : 0x4d4d54);
+    bounce.intensity = night ? 0.24 : close ? 0.23 : 0.42;
+    benchLight.intensity = night ? 187 : 277;
+    toolLight.intensity = night ? 164 : 254;
+    for (const { light, day } of trackLamps) light.intensity = day * (night ? 3.8 : 1);
+    scene.environmentIntensity = night ? 0.19 : close ? 0.42 : 0.38;
+    renderer.toneMappingExposure = night ? 1.01 : close ? 1.015 : 1.075;
     if (!lowQuality) fitShadow(key, points, close);
   }
-  lightShot(false);
-  return { lightShot };
+  applyLighting();
+  return {
+    lightShot(next: boolean) {
+      if (close === next) return;
+      close = next;
+      applyLighting();
+    },
+    setNight(enabled: boolean) {
+      if (night === enabled) return;
+      night = enabled;
+      scene.background = night ? nightBackground : dayBackground;
+      scene.backgroundIntensity = dayBackgroundIntensity * (night ? 0.64 : 1);
+      applyLighting();
+    },
+  };
 }

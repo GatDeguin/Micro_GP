@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { ROAD_HALF, TRACK, WALL_HALF } from '../shared/track';
+import { ROAD_HALF, TRACK, roadHalfAt, wallHalfAt } from '../shared/track';
 import { buildDioramaStation } from './diorama-station';
 import { makeAdjustableWrench, populateToolCup } from './hand-tool-models';
 import { BENCH_SURFACE, benchMap, box, canvas2d, horizontalShadow, noiseField, random, standard, texture } from './materials';
@@ -162,7 +162,7 @@ function buildBench(parent: THREE.Object3D) {
 
 function buildWestBench(parent: THREE.Object3D, contacts: Contact[]) {
   const casework = new THREE.Group();
-  casework.position.set(-35.45, BENCH_SURFACE, 6.1);
+  casework.position.set(-41.55, BENCH_SURFACE, 7.9);
   casework.rotation.y = 1.48;
   parent.add(casework);
   contacts.push([casework.position.x, BENCH_SURFACE, casework.position.z, 11.2, 5.9, casework.rotation.y]);
@@ -221,7 +221,7 @@ function buildWrench(parent: THREE.Object3D, contacts: Contact[]) {
 
 function buildChest(parent: THREE.Object3D, contacts: Contact[]) {
   const chest = new THREE.Group();
-  chest.position.set(26.6, BENCH_SURFACE, -18.2);
+  chest.position.set(31.55, BENCH_SURFACE, -19.3);
   chest.rotation.y = 0.022;
   chest.scale.set(1.53, 1.89, 1.22);
   parent.add(chest);
@@ -411,7 +411,7 @@ function bakeLightPools(parent: THREE.Object3D, pools: LightPool[]) {
       const p = samples[(step + samples.length) % samples.length];
       const first = positions.length / 3;
       for (const side of [-1, 1]) {
-        const offset = side * (ROAD_HALF - 0.035);
+        const offset = side * (roadHalfAt(p.s) - 0.035);
         const px = p.x - p.dz * offset;
         const pz = p.z + p.dx * offset;
         positions.push(px, p.y + 0.004, pz);
@@ -446,14 +446,15 @@ function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const outward = (s: number, margin: number, height: number, aim = s + 0.65) => {
     const p = TRACK.sampleAt(s);
-    const offset = WALL_HALF + margin;
+    const offset = wallHalfAt(p.s, 1) + margin;
     return { x: p.x - p.dz * offset, z: p.z + p.dx * offset, height: height + p.y, aim, footYaw: Math.atan2(-p.dz, p.dx) };
   };
+  const mark = TRACK.anchors;
   const towers: Floodlight[] = [
-    { ...outward(87.22, 0.34, 4.03), faceYaw: 0.44 },
-    { ...outward(75.31, 0.74, 2.91), faceYaw: -0.13 },
-    { ...outward(46.83, 0.57, 3.96), faceYaw: -0.52 },
-    { ...outward(35.47, 0.64, 4.36), faceYaw: -0.83 },
+    { ...outward(mark.backStraight + 8.8, 0.37, 3.37), faceYaw: 0.44 },
+    { ...outward(mark.crest - 11.4, 0.73, 2.66), faceYaw: -0.13 },
+    { ...outward(mark.hairpinApex + 1.6, 0.57, 3.45), faceYaw: -0.72 },
+    { ...outward(mark.essesMid - 2.0, 0.65, 4.15), faceYaw: -0.83 },
     ...FRONT_TOWERS.map(({ s, margin, height, aim }) => ({ ...outward(s, margin, height, aim), aimOffset: ROAD_HALF - 0.30 })),
     { x: -18.88, z: 2.52, height: 4.86, aim: TRACK.length - 13.1, faceYaw: 0.31 },
     { x: 8.34, z: 1.36, height: 3.53, aim: 15.5, faceYaw: -0.63 },
@@ -502,8 +503,9 @@ function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
     flare.position.set(0, 0, 0.209);
     flare.scale.set(0.88, 0.64, 1);
     head.add(flare);
-    if (index === 0 || index === 3 || index === 7) {
-      const beam = new THREE.SpotLight(0xffb773, index < 6 ? 27 : 37, 10.5, 0.60, 0.78, 2);
+    if (index !== 3 && index !== 5 && index !== 6) {
+      const beam = new THREE.SpotLight(0xffb773, index < 6 ? 26 : 36, 13.4, 0.60, 0.78, 2);
+      beam.name = 'Foco de pista';
       beam.position.set(x, BOARD_SURFACE + height, z);
       beam.target.position.set(aimX, p.y, aimZ);
       parent.add(beam, beam.target);
@@ -519,7 +521,7 @@ function wireFrontLights(parent: THREE.Object3D) {
   const points = Array.from({ length: 23 }, (_, i) => {
     const progress = i / 22;
     const p = TRACK.sampleAt(THREE.MathUtils.lerp(left.s, right.s, progress));
-    const offset = WALL_HALF + THREE.MathUtils.lerp(left.margin, right.margin, progress) + 0.16 * Math.sin(Math.PI * progress);
+    const offset = wallHalfAt(p.s, 1) + THREE.MathUtils.lerp(left.margin, right.margin, progress) + 0.16 * Math.sin(Math.PI * progress);
     return new THREE.Vector3(p.x - p.dz * offset, BOARD_SURFACE + 0.043, p.z + p.dx * offset);
   });
   const cable = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 72, 0.035, 6, false), rubber);
@@ -683,14 +685,15 @@ function buildTires(parent: THREE.Object3D, contacts: Contact[]) {
   const tireProfile = profile.map(([r, y]) => new THREE.Vector2(r, y));
   const tire = new THREE.LatheGeometry(tireProfile, 16);
   const detailedTire = new THREE.LatheGeometry(tireProfile, 24);
+  const mark = TRACK.anchors;
   const piles = [
-    { s: 18, side: -1, heights: [2, 4, 3], near: true },
-    { s: 31, side: 1, heights: [3, 3, 2, 2], near: false },
-    { s: 43, side: 1, heights: [2, 3], near: false },
-    { s: 63, side: -1, heights: [3, 2, 3], near: false },
-    { s: 73, side: -1, heights: [2, 2], near: false },
-    { s: 98, side: 1, heights: [4, 2, 3], near: true },
-    { s: 108, side: -1, heights: [3, 4, 3], near: true },
+    { s: mark.esses - 0.9, side: -1, heights: [2, 4, 3], near: true },
+    { s: mark.hairpinApex - 3.5, side: 1, heights: [3, 3, 2, 2], near: false },
+    { s: mark.bridgeApproach - 1.5, side: 1, heights: [2, 3], near: false },
+    { s: mark.rearLink + 1.6, side: -1, heights: [3, 2, 3], near: false },
+    { s: mark.rearBend + 2.1, side: -1, heights: [2, 2], near: false },
+    { s: mark.sweepApex - 5.1, side: 1, heights: [4, 2, 3], near: true },
+    { s: mark.front - 1.2, side: -1, heights: [3, 4, 3], near: true },
     { s: TRACK.length - 12.15, side: 1, heights: [4, 3, 4], near: true },
     { s: TRACK.length - 10.30, side: 1, heights: [5, 4], near: true },
     { s: TRACK.length - 7.0, side: -1, heights: [4, 5, 4], near: true },
@@ -698,7 +701,7 @@ function buildTires(parent: THREE.Object3D, contacts: Contact[]) {
   for (const { s, side, heights, near } of piles) {
     for (const [i, height] of heights.entries()) {
       const p = TRACK.sampleAt(s + i * 0.55);
-      const offset = (WALL_HALF + 0.49 + (rng() - 0.5) * 0.11) * side;
+      const offset = (wallHalfAt(p.s, side) + 0.49 + (rng() - 0.5) * 0.11) * side;
       const x = p.x - p.dz * offset;
       const z = p.z + p.dx * offset;
       contacts.push([x, BOARD_SURFACE, z, 0.82, 0.75]);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { BENCH_SURFACE, box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
+import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
 
 const forged = standard(0xa49b8c, 0.46, 0.62);
 const machined = standard(0xc4bcb0, 0.28, 0.75);
@@ -326,8 +326,9 @@ export function buildViseStation(parent: THREE.Object3D) {
   finishSteel();
   const table = new THREE.Group();
   table.name = 'Banco de morsa';
-  table.position.set(-33.8, BENCH_SURFACE, -0.45);
+  table.position.set(-25.45, -0.141, -0.91);
   table.rotation.y = Math.PI * 0.43;
+  table.scale.setScalar(0.78);
   parent.add(table);
   const base = standard(0x4d5045, 0.72, 0.30);
   const floorShadow = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.86, 0.76), horizontalShadow(), 4);

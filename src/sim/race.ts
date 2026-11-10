@@ -1,15 +1,19 @@
-import { CAR_SPECS, type CarSound, type DriveInput, type Driver, type RaceImpact, type RaceSnapshot } from '../shared/protocol.ts';
+import {
+  CAR_SPECS, NEUTRAL, defaultRaceConfig, normalizeRaceConfig, type CarSound, type DriveInput,
+  type Driver, type Livery, type RaceConfig, type RaceImpact, type RaceSnapshot,
+} from '../shared/protocol.ts';
 import { CAR_DIMENSIONS, GRID_LANE_OFFSET, type CarDimensions } from '../shared/car-dimensions.ts';
-import { CURB_WIDTH, GRID_ROWS, ROAD_HALF, TRACK, WALL_HALF, type TrackLocation } from '../shared/track.ts';
+import { CURB_WIDTH, GRID_ROWS, PIT_LANE, TRACK, isPitLane, roadHalfAt, wallHalfAt, type TrackLocation } from '../shared/track.ts';
+import { angleDifference, botDrive, type BotPlan } from './bot.ts';
 import { capsule, contactBetween } from './contact.ts';
+import { BASE_TOP_SPEED, HANDLING, loadSuspension, settledSuspension, type Handling, type Suspension } from './handling.ts';
 import { LapProgress } from './progress.ts';
+import { RaceTiming } from './timing.ts';
 import { AutomaticTransmission } from './transmission.ts';
 
-const LAPS = 3;
 const GRID_TIME = 3;
 const FINISH_WINDOW = 15;
 const RESULTS_TIME = 6;
-const MAX_SPEED = 8.05;
 const EPSILON = 1e-8;
 const IMPACT_MEMORY_FRAMES = 24;
 const IMPACT_COOLDOWN_FRAMES = 12;
@@ -17,8 +21,7 @@ const CONTACT_GAP_FRAMES = 4;
 const MIN_AUDIBLE_IMPULSE = 0.46;
 const FULL_STRENGTH_IMPULSE = 7.2;
 
-const demoDistances = [6, 34, 62, 94];
-const botPace = [6.23, 6.17, 6.30, 6.12];
+const demoDistances = [6, TRACK.anchors.hairpin, TRACK.anchors.crest, TRACK.anchors.sweep];
 const laneFor = (index: number) => index % 2 === 0 ? GRID_LANE_OFFSET : -GRID_LANE_OFFSET;
 
 interface Car {
@@ -26,15 +29,23 @@ interface Car {
   z: number;
   yaw: number;
   dimensions: CarDimensions;
+  handling: Handling;
+  suspension: Suspension;
+  exitLoad: number;
   motionYaw: number;
   speed: number;
   road: TrackLocation;
   progress: LapProgress;
+  timing: RaceTiming;
+  bot: BotPlan;
   steer: number;
   throttle: number;
   transmission: AutomaticTransmission;
   surfaceSound: Pick<CarSound, 'curb' | 'runoff' | 'scrape'>;
+  active: boolean;
   owned: boolean;
+  registeredDriver: boolean;
+  livery: Livery;
   human: boolean;
   braking: boolean;
   reverseReady: boolean;
@@ -60,12 +71,6 @@ function approach(value: number, target: number, amount: number) {
   return value + clamp(target - value, -amount, amount);
 }
 
-function angleDifference(angle: number) {
-  if (angle > Math.PI) return angle - Math.PI * 2;
-  if (angle < -Math.PI) return angle + Math.PI * 2;
-  return angle;
-}
-
 function place(car: Car, s: number, offset: number, speed: number) {
   const point = TRACK.sampleAt(s);
   car.x = point.x - point.dz * offset;
@@ -76,66 +81,33 @@ function place(car: Car, s: number, offset: number, speed: number) {
   car.road = TRACK.locate(car.x, car.z);
 }
 
-function spawn(s: number, index: number, speed: number): Car {
+function spawn(s: number, index: number, speed: number, offset = laneFor(index),
+  transmission = new AutomaticTransmission(speed)): Car {
   const car: Car = {
     x: 0, z: 0, yaw: 0, dimensions: CAR_DIMENSIONS[index], motionYaw: 0, speed: 0, steer: 0, throttle: 0,
-    road: { ...TRACK.sampleAt(s), offset: 0 }, progress: new LapProgress(s),
-    transmission: new AutomaticTransmission(speed),
+    handling: HANDLING[index], suspension: settledSuspension(), exitLoad: 0,
+    road: { ...TRACK.sampleAt(s), offset: 0 }, progress: new LapProgress(s > 0 ? s - TRACK.length : s),
+    timing: new RaceTiming(), bot: { lane: laneFor(index), time: 0, wrongWay: 0 },
+    transmission,
     surfaceSound: { curb: 0, runoff: 0, scrape: 0 },
-    owned: false, human: false, braking: false, reverseReady: false, reversing: false,
+    active: true, owned: false, registeredDriver: false, livery: 'original',
+    human: false, braking: false, reverseReady: false, reversing: false,
     stalled: 0, protection: 0,
   };
-  place(car, s, laneFor(index), speed);
+  place(car, s, offset, speed);
   return car;
 }
 
-function botDrive(cars: readonly Car[], index: number, coolingDown: boolean): DriveInput {
-  const car = cars[index];
-  const lane = laneFor(index);
-  function clearance(offset: number) {
-    let gap = 7.5;
-    let trafficSpeed = 0;
-    for (const other of cars) {
-      if (other === car || Math.abs(other.road.offset - offset) > car.dimensions.halfWidth + other.dimensions.halfWidth - 0.025) continue;
-      const behind = car.dimensions.rear + other.dimensions.front;
-      const ahead = (other.road.s - car.road.s + TRACK.length + behind) % TRACK.length - behind;
-      const open = Math.max(0, ahead - car.dimensions.front - other.dimensions.rear);
-      if (open < gap) {
-        gap = open;
-        trafficSpeed = ahead > 0 ? Math.max(0, other.speed) : 0;
-      }
-    }
-    return { gap, trafficSpeed };
-  }
+function inGarage(car: Car) {
+  const { s, offset } = car.road;
+  return Math.abs(car.speed) <= 0.15 && Math.abs(offset - PIT_LANE.offset) <= 0.60
+    && PIT_LANE.stalls.some(stall => Math.abs(stall - s) <= 1.15);
+}
 
-  let offset = lane;
-  let clear = clearance(offset);
-  let best = clear.gap + 0.35 * clear.trafficSpeed - 0.68 * Math.abs(offset - car.road.offset);
-  for (const alternative of [-lane, Math.sign(lane) * 2.50, Math.sign(-lane) * 2.50]) {
-    const space = clearance(alternative);
-    const shoulderPenalty = Math.abs(alternative) > ROAD_HALF ? 1.72 : 0.67;
-    const score = space.gap + 0.35 * space.trafficSpeed - 0.68 * Math.abs(alternative - car.road.offset) - shoulderPenalty;
-    if (score > best) {
-      offset = alternative;
-      clear = space;
-      best = score;
-    }
-  }
-
-  const look = TRACK.sampleAt(car.road.s + 1.8 + Math.max(0, car.speed) * 0.34);
-  const aimX = look.x - look.dz * offset - car.x;
-  const aimZ = look.z + look.dx * offset - car.z;
-  const steering = angleDifference(car.yaw - Math.atan2(aimX, aimZ));
-  const turn = Math.abs(angleDifference(Math.atan2(look.dx, look.dz) - Math.atan2(car.road.dx, car.road.dz)));
-  const desired = Math.min(
-    (coolingDown ? 4.7 : botPace[index]) - turn * 0.8,
-    Math.max(0.85, clear.trafficSpeed * 0.94 + clear.gap * 2.1),
-  );
-  return {
-    x: clamp(steering * 1.85, -1, 1),
-    gas: car.speed < desired,
-    brake: car.speed > desired + 0.35,
-  };
+function modelAtPose(model: number, previous: Car, pose: Car) {
+  const car = spawn(pose.road.s, model, pose.speed, pose.road.offset, previous.transmission.relocate(pose.speed));
+  Object.assign(car, { x: pose.x, z: pose.z, yaw: pose.yaw, motionYaw: pose.motionYaw, road: pose.road });
+  return car;
 }
 
 function move(car: Car, input: DriveInput, human: boolean, dt: number) {
@@ -145,12 +117,16 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   const across = forwardZ * car.road.dx - forwardX * car.road.dz;
   const axleOffset = car.dimensions.axle * across;
   const wheelOffset = car.dimensions.tireOffset * along;
+  const roadWidth = roadHalfAt(car.road.s);
+  const inPit = isPitLane(car.road.s, car.road.offset);
   let curb = 0;
   let loose = 0;
   // Blend the load at all four contact patches as each tire crosses a surface seam.
   for (const axle of [-axleOffset, axleOffset]) {
     for (const side of [-wheelOffset, wheelOffset]) {
-      const edge = Math.abs(car.road.offset + axle + side) - ROAD_HALF;
+      const offset = car.road.offset + axle + side;
+      if (isPitLane(car.road.s, offset)) continue;
+      const edge = Math.abs(offset) - roadWidth;
       curb += clamp((edge + 0.08) / 0.20, 0, 1) / 4;
       loose += clamp((edge - CURB_WIDTH + 0.08) / 0.22, 0, 1) / 4;
     }
@@ -160,23 +136,30 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   car.surfaceSound.curb = Math.max(0, curb - loose);
   car.surfaceSound.runoff = loose;
   car.surfaceSound.scrape = Math.max(0, car.surfaceSound.scrape - dt * 4.8);
-  const grip = 1 - 0.22 * curb - 0.36 * loose;
+  const grip = 1 - 0.22 * curb - 0.36 * loose - 0.4 * Math.max(0, car.suspension.heave);
   const grade = (TRACK.sampleAt(car.road.s + 0.6).y - TRACK.sampleAt(car.road.s - 0.6).y) / 1.2;
   const uphill = 9.8 * grade * along;
 
   if (car.human !== human) {
     car.human = human;
+    car.bot.wrongWay = 0;
     car.throttle = 0;
     car.braking = false;
     car.reverseReady = false;
     car.reversing = false;
   }
-  car.steer = approach(car.steer, clamp(input.x, -1, 1), dt * 12);
+  const style = car.handling;
+  car.steer = approach(car.steer, clamp(input.x, -1, 1), dt * style.steerRate);
   const fullPower = input.gas && !input.brake;
   car.throttle = approach(car.throttle, fullPower ? 1 : 0, dt * (fullPower ? 18 : 28));
-  const speedRatio = clamp(Math.abs(car.speed) / MAX_SPEED, 0, 1);
-  const cornerLoad = (car.steer * speedRatio) ** 2;
-  const speedLimit = MAX_SPEED - 1.6 * curb - 4.15 * loose - 0.9 * cornerLoad;
+  const speedRatio = clamp(Math.abs(car.speed) / BASE_TOP_SPEED, 0, 1);
+  const steerLoad = Math.abs(car.steer) * speedRatio;
+  const cornerLoad = steerLoad ** 2;
+  car.exitLoad = Math.max(steerLoad, car.exitLoad - dt * 1.25);
+  const exitTraction = 1 + (car.exitLoad - steerLoad) * style.exitTraction;
+  const top = BASE_TOP_SPEED + style.straightBonus * (1 - Math.min(1, steerLoad * 3.2));
+  const limit = top - 1.6 * curb - 4.15 * loose - style.cornerDrag * cornerLoad;
+  const speedLimit = inPit ? Math.min(PIT_LANE.speedLimit, limit) : limit;
 
   if (input.brake) {
     if (human && !car.braking && car.reverseReady && car.speed === 0) car.reversing = true;
@@ -195,7 +178,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
       : approach(car.speed, 0, braking * dt);
   } else if (input.gas) {
     car.reverseReady = false;
-    const engine = (8.6 - 4.95 * speedRatio ** 1.22) * car.throttle * grip * traction;
+    const engine = (8.6 - 4.95 * speedRatio ** 1.22) * car.throttle * grip * traction * exitTraction;
     const acceleration = car.speed > speedLimit
       ? 5 + 4 * loose + 2.4 * cornerLoad + uphill
       : Math.max(0, engine - uphill - 1.35 * cornerLoad);
@@ -208,13 +191,14 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
 
   const speed = Math.abs(car.speed);
   const turning = (0.52 + 2.22 * Math.min(1, speed / 3.8)) * (1 - 0.30 * speedRatio ** 2);
-  const yawChange = car.steer * turning * (0.60 + 0.40 * grip) * Math.sign(car.speed) * dt;
+  const yawChange = car.steer * turning * (0.60 + 0.40 * grip) * Math.sign(car.speed) * dt * style.yawGain;
   car.yaw = angleDifference(car.yaw - yawChange);
   const alignment = 1 - Math.exp(-dt * (17 - 6.4 * cornerLoad) * grip);
   car.motionYaw = angleDifference(car.motionYaw + angleDifference(car.yaw - car.motionYaw) * alignment);
   car.x += Math.sin(car.motionYaw) * car.speed * dt;
   car.z += Math.cos(car.motionYaw) * car.speed * dt;
   car.protection = Math.max(0, car.protection - dt);
+  if (loose > 0.36 || car.reversing || inPit) car.timing.dirty();
 }
 
 function velocity(car: Car) {
@@ -230,10 +214,10 @@ function setVelocity(car: Car, x: number, z: number) {
 function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
   for (let i = 0; i < cars.length; i++) {
     const a = cars[i];
-    if (a.protection > 0) continue;
+    if (!a.active || a.protection > 0) continue;
     for (let j = i + 1; j < cars.length; j++) {
       const b = cars[j];
-      if (b.protection > 0) continue;
+      if (!b.active || b.protection > 0) continue;
       const contact = contactBetween(capsule(a), capsule(b));
       if (!contact) continue;
       const { nx, nz, depth } = contact;
@@ -252,6 +236,10 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
         source: `car:${i}:${j}`, kind: 'car', impulse,
         x: (a.x + b.x) / 2, y: (a.road.y + b.road.y) / 2 + 0.22, z: (a.z + b.z) / 2,
       });
+      if (impulse >= MIN_AUDIBLE_IMPULSE) {
+        a.timing.dirty();
+        b.timing.dirty();
+      }
       if (closing <= 0) continue;
       const tx = -nz, tz = nx;
       const tangent = (va.x - vb.x) * tx + (va.z - vb.z) * tz;
@@ -273,20 +261,22 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
 function constrain(car: Car, index: number, observe: ContactObserver) {
   if (!Number.isFinite(car.x + car.z)) return false;
   car.road = TRACK.locate(car.x, car.z);
-  if (Math.abs(car.road.offset) > WALL_HALF + 0.9) return false;
+  const overflow = (point: TrackLocation) => Math.abs(point.offset) - wallHalfAt(point.s, Math.sign(point.offset));
+  if (overflow(car.road) > 0.9) return false;
 
   for (let i = 0; i < 3; i++) {
     const { ax, az, bx, bz, radius } = capsule(car);
     const rear = TRACK.locate(ax, az);
     const nose = TRACK.locate(bx, bz);
     let boundary = car.road;
-    if (Math.abs(rear.offset) > Math.abs(boundary.offset)) boundary = rear;
-    if (Math.abs(nose.offset) > Math.abs(boundary.offset)) boundary = nose;
+    if (overflow(rear) > overflow(boundary)) boundary = rear;
+    if (overflow(nose) > overflow(boundary)) boundary = nose;
     const { offset, dx, dz } = boundary;
-    const penetration = Math.abs(offset) + radius - WALL_HALF;
+    const penetration = overflow(boundary) + radius;
     if (penetration <= EPSILON) break;
 
     const side = Math.sign(offset);
+    const wall = wallHalfAt(boundary.s, side);
     const nx = -dz * side;
     const nz = dx * side;
     car.x -= nx * (penetration + 0.002);
@@ -301,6 +291,7 @@ function constrain(car: Car, index: number, observe: ContactObserver) {
       const slide = along * 0.96;
       const rebound = outward * (0.10 + 0.16 * clamp(outward / 5, 0, 1));
       impulse = outward + rebound;
+      if (impulse >= MIN_AUDIBLE_IMPULSE) car.timing.dirty();
       setVelocity(car, dx * slide - nx * rebound, dz * slide - nz * rebound);
       // Turn the nose toward an exit so held throttle does not drive back into the wall.
       const travel = along < -EPSILON ? -1 : 1;
@@ -313,7 +304,7 @@ function constrain(car: Car, index: number, observe: ContactObserver) {
     const kickboard = side < 0 && (boundary.s >= TRACK.length - 14.19 || boundary.s <= 0.19);
     observe({
       source: `barrier:${index}:${side}`, kind: kickboard ? 'wall' : 'fence', impulse,
-      x: boundary.x + nx * WALL_HALF, y: boundary.y + 0.18, z: boundary.z + nz * WALL_HALF,
+      x: boundary.x + nx * wall, y: boundary.y + 0.18, z: boundary.z + nz * wall,
     });
     car.road = TRACK.locate(car.x, car.z);
   }
@@ -327,6 +318,11 @@ function recover(car: Car, index: number, previousS: number, racing: boolean) {
   car.throttle = 0;
   car.transmission.neutralize();
   car.surfaceSound = { curb: 0, runoff: 0, scrape: 0 };
+  car.suspension = settledSuspension();
+  car.exitLoad = 0;
+  car.bot.wrongWay = 0;
+  car.bot.time = 0;
+  car.timing.dirty();
   car.stalled = 0;
   car.protection = 0.86;
   car.reversing = false;
@@ -335,15 +331,58 @@ function recover(car: Car, index: number, previousS: number, racing: boolean) {
 
 export class Race {
   private cars = CAR_SPECS.map((_, index) => spawn(demoDistances[index], index, 5.3));
+  private config = { ...defaultRaceConfig };
+  private readonly manual: boolean;
+  private startRequested = false;
   private frame = 0;
   private heat = 0;
   private elapsed = 0;
+  private clock = 0;
   private phase: RaceSnapshot['phase'] = 'demo';
   private finishOrder: number[] = [];
   private firstFinishAt: number | null = null;
   private impactSequence = 0;
   private impacts: RaceImpact[] = [];
   private contactSounds = new Map<string, { seen: number; hit: number; latched: boolean }>();
+
+  constructor({ manual = false } = {}) {
+    this.manual = manual;
+  }
+
+  configure(config: RaceConfig) {
+    if (this.phase !== 'demo' || this.startRequested) return false;
+    this.config = normalizeRaceConfig(config);
+    return true;
+  }
+
+  launch() {
+    if (this.phase !== 'demo' || this.startRequested) return false;
+    this.startRequested = true;
+    return true;
+  }
+
+  returnToDemo() {
+    this.phase = 'demo';
+    this.startRequested = false;
+    this.resetTiming();
+    this.cars = CAR_SPECS.map((_, index) => spawn(demoDistances[index], index, 5.3));
+  }
+
+  swapPracticeCar(fromSlot: number, toSlot: number) {
+    if (this.phase !== 'practice' || fromSlot === toSlot) return false;
+    const from = this.cars[fromSlot];
+    const to = this.cars[toSlot];
+    if (!from?.active || !from.owned || !to || to.owned || !inGarage(from)) return false;
+
+    const replacement = modelAtPose(toSlot, to, from);
+    replacement.owned = true;
+    replacement.registeredDriver = true;
+    const displaced = modelAtPose(fromSlot, from, to);
+    displaced.active = to.active;
+    this.cars[toSlot] = replacement;
+    this.cars[fromSlot] = displaced;
+    return true;
+  }
 
   private readonly observeContact: ContactObserver = ({ source, kind, impulse, x, y, z }) => {
     const previous = this.contactSounds.get(source);
@@ -359,31 +398,64 @@ export class Race {
     });
   };
 
-  private startGrid() {
-    this.phase = 'grid';
-    this.heat++;
+  private resetTiming() {
     this.elapsed = 0;
+    this.clock = 0;
     this.finishOrder = [];
     this.firstFinishAt = null;
     this.impacts = [];
     this.contactSounds.clear();
-    this.cars = CAR_SPECS.map((_, index) => spawn(GRID_ROWS[Math.floor(index / 2)], index, 0));
+  }
+
+  private startHeat(drivers: readonly (Driver | undefined)[]) {
+    this.startRequested = false;
+    const humans = CAR_SPECS.map((_, i) => drivers[i]?.owned === true);
+    if (!humans.some(Boolean) && this.config.bots === 0) return;
+    this.phase = this.config.mode === 'practice' ? 'practice' : 'grid';
+    this.heat++;
+    this.resetTiming();
+    let freeBots = this.config.bots;
+    let nextStall = 0;
+    this.cars = CAR_SPECS.map((_, index) => {
+      const owned = humans[index];
+      const active = owned || freeBots > 0;
+      if (active && !owned) freeBots--;
+      const row = GRID_ROWS[Math.floor(index / 2)];
+      let car = spawn(row, index, 0);
+      if (this.phase === 'practice' && active) {
+        const stall = owned ? PIT_LANE.stalls[nextStall++] : undefined;
+        if (stall !== undefined) car = spawn(stall, index, 0, PIT_LANE.offset);
+        else if (!owned) car = spawn(demoDistances[index], index, 5.3);
+      }
+      car.active = active;
+      return car;
+    });
   }
 
   step(dt: number, drivers: readonly (Driver | undefined)[]) {
     this.frame++;
     while (this.impacts.length && this.frame - this.impacts[0].frame >= IMPACT_MEMORY_FRAMES) this.impacts.shift();
+    const hasDrivers = drivers.some(driver => driver?.owned);
     if (this.phase === 'demo') {
-      if (drivers.some(driver => driver?.owned && driver.input !== null)) this.startGrid();
-    } else if (!drivers.some(driver => driver?.owned)) {
-      this.phase = 'demo';
-      this.finishOrder = [];
-      this.firstFinishAt = null;
-    } else if (this.phase === 'results' && this.elapsed + dt + EPSILON >= RESULTS_TIME) {
-      this.startGrid();
+      if (this.startRequested || (!this.manual && drivers.some(driver => driver?.owned && driver.input !== null))) {
+        this.startHeat(drivers);
+      }
+    } else if (!this.manual) {
+      if (!hasDrivers) this.returnToDemo();
+      else if (this.phase === 'results' && this.elapsed + dt + EPSILON >= RESULTS_TIME) this.startHeat(drivers);
     }
 
-    for (let i = 0; i < this.cars.length; i++) this.cars[i].owned = drivers[i]?.owned ?? false;
+    for (let i = 0; i < this.cars.length; i++) {
+      const car = this.cars[i];
+      const driver = drivers[i];
+      car.owned = car.active && driver?.owned === true;
+      if (car.owned) {
+        car.livery = driver?.livery ?? 'original';
+        if (this.phase !== 'demo') car.registeredDriver = true;
+      } else if (!this.manual || this.phase === 'demo') {
+        car.livery = 'original';
+      }
+    }
     this.elapsed += dt;
     if (this.phase === 'grid') {
       if (this.elapsed + EPSILON >= GRID_TIME) {
@@ -393,46 +465,75 @@ export class Race {
       return;
     }
 
-    const previous = this.cars.map(car => ({ x: car.x, z: car.z, s: car.road.s }));
+    const racing = this.phase === 'race';
+    const practice = this.phase === 'practice';
+    if (racing || practice) this.clock += dt;
+    const previous = this.cars.map(car => ({
+      x: car.x, z: car.z, s: car.road.s, speed: car.speed, motionYaw: car.motionYaw, progress: car.progress.distance,
+    }));
     const commands = this.cars.map((car, i) => {
-      const cooling = this.phase === 'results' || (this.phase === 'race' && car.progress.lap >= LAPS);
-      const human = this.phase === 'race' && !cooling && car.owned ? drivers[i]?.input : null;
-      return { input: human ?? botDrive(this.cars, i, cooling), human: Boolean(human) };
+      if (!car.active) return null;
+      const cooling = this.phase === 'results' || car.timing.finishTime !== null;
+      const human = (racing || practice) && !cooling && car.owned ? drivers[i]?.input : null;
+      const input = human ?? (practice && car.owned && inGarage(car) ? NEUTRAL
+        : botDrive(this.cars, i, laneFor(i), this.config.difficulty, cooling, dt));
+      return { input, human: Boolean(human) };
     });
-    commands.forEach(({ input, human }, i) => move(this.cars[i], input, human, dt));
+    commands.forEach((command, i) => {
+      if (command) move(this.cars[i], command.input, command.human, dt);
+    });
     resolveContacts(this.cars, this.observeContact);
 
     const finishedThisTick: { index: number; fraction: number }[] = [];
     for (let i = 0; i < this.cars.length; i++) {
+      const command = commands[i];
+      if (!command) continue;
       const car = this.cars[i];
-      const racing = this.phase === 'race' && car.progress.lap < LAPS;
+      const timed = (racing || practice) && car.timing.finishTime === null;
       const from = previous[i];
       if (!constrain(car, i, this.observeContact)) {
-        recover(car, i, from.s, racing);
+        recover(car, i, from.s, timed);
         continue;
       }
 
       const moving = Math.hypot(car.x - from.x, car.z - from.z) > 0.45 * dt;
-      const { gas, brake } = commands[i].input;
+      const { gas, brake } = command.input;
       const wantsForward = gas && !brake;
       car.stalled = wantsForward && !moving ? car.stalled + dt : 0;
-      if (car.stalled + EPSILON >= 2.5) {
-        recover(car, i, from.s, racing);
+      if (car.stalled + EPSILON >= 2.5 || (!command.human && car.bot.wrongWay > 1.6)) {
+        recover(car, i, from.s, timed);
         continue;
       }
-      if (racing) {
+
+      const road = car.road;
+      const curvature = (TRACK.sampleAt(road.s - 0.95).y + TRACK.sampleAt(road.s + 0.95).y - 2 * road.y) / 0.95 ** 2;
+      const lateral = angleDifference(car.motionYaw - from.motionYaw) * car.speed / dt;
+      loadSuspension(car.suspension, car.handling, (car.speed - from.speed) / dt, lateral,
+        curvature * car.speed ** 2, car.surfaceSound.curb, dt);
+
+      if (timed) {
+        if (car.registeredDriver && !command.human && moving) car.timing.assisted();
         const fraction = car.progress.advance(from, { x: car.x, z: car.z, s: car.road.s }, car.speed > 0);
-        if (fraction !== null && car.progress.lap === LAPS) finishedThisTick.push({ index: i, fraction });
+        if (racing) car.timing.recordProgress(from.progress, car.progress.distance, this.clock, dt);
+        if (fraction !== null) {
+          const time = this.clock - dt + fraction * dt;
+          car.timing.crossed(car.progress.checkpoint, time);
+          if (racing && car.progress.lap >= this.config.laps) {
+            car.timing.finishTime = time;
+            finishedThisTick.push({ index: i, fraction });
+          }
+        }
       }
     }
 
     finishedThisTick.sort((a, b) => a.fraction - b.fraction);
     if (finishedThisTick.length > 0) {
-      this.firstFinishAt ??= this.elapsed - dt + finishedThisTick[0].fraction * dt;
+      this.firstFinishAt ??= this.clock - dt + finishedThisTick[0].fraction * dt;
       this.finishOrder.push(...finishedThisTick.map(finish => finish.index));
     }
     if (this.firstFinishAt !== null && this.phase === 'race' && (
-      this.finishOrder.length === this.cars.length || this.elapsed + EPSILON >= this.firstFinishAt + FINISH_WINDOW
+      this.finishOrder.length === this.cars.filter(car => car.active).length
+      || this.clock + EPSILON >= this.firstFinishAt + FINISH_WINDOW
     )) {
       this.phase = 'results';
       this.elapsed = 0;
@@ -441,22 +542,48 @@ export class Race {
 
   snapshot(): RaceSnapshot {
     const demo = this.phase === 'demo';
-    const remaining = this.cars.map((_, i) => i).filter(i => !this.finishOrder.includes(i));
+    const remaining = this.cars.map((_, i) => i).filter(i => this.cars[i].active && !this.finishOrder.includes(i));
     remaining.sort((a, b) => demo
       ? this.cars[b].road.s - this.cars[a].road.s
       : this.cars[b].progress.distance - this.cars[a].progress.distance);
+    const order = [...this.finishOrder, ...remaining];
+    const leader = this.cars[order[0]];
+    const hasGaps = this.phase === 'race' || this.phase === 'results';
+    function gapFor(car: Car, time: number) {
+      if (!leader || !hasGaps || !car.active) return null;
+      if (leader === car) return 0;
+      const ownFinish = car.timing.finishTime;
+      const leaderFinish = leader.timing.finishTime;
+      if (ownFinish !== null && leaderFinish !== null) return ownFinish - leaderFinish;
+      const arrival = leader.timing.arrivalAt(car.progress.distance);
+      return arrival === null ? null : Math.max(0, time - arrival);
+    }
     return {
       frame: this.frame,
       heat: this.heat,
       phase: this.phase,
       lights: this.phase === 'grid' ? Math.min(3, Math.floor(this.elapsed / 0.65)) : 0,
       flag: this.firstFinishAt !== null,
-      order: [...this.finishOrder, ...remaining],
+      order,
+      config: { ...this.config },
+      time: this.clock,
+      results: this.phase === 'results' ? order.map(slot => ({
+        slot, time: this.cars[slot].timing.finishTime, bestLap: this.cars[slot].timing.bestLap,
+      })) : undefined,
       impacts: this.impacts.length ? this.impacts.map(impact => ({ ...impact })) : undefined,
       cars: this.cars.map(car => ({
         x: car.x, y: car.road.y, z: car.z, yaw: car.yaw, speed: car.speed,
         lap: demo ? 0 : car.progress.lap, owned: car.owned, steer: car.steer, braking: car.braking,
         blink: car.protection > 0 && Math.floor(car.protection * 8) % 2 === 0,
+        active: car.active,
+        livery: car.livery,
+        suspension: { ...car.suspension },
+        pitReady: this.phase === 'practice' && car.owned && inGarage(car),
+        bestLap: car.timing.bestLap,
+        lastLap: car.timing.lastLap,
+        cleanLap: car.timing.cleanLap,
+        sectorTimes: [...car.timing.sectorTimes],
+        gap: gapFor(car, this.clock),
         transmission: car.transmission.view(car.speed),
         sound: {
           ...car.surfaceSound, throttle: car.throttle,

@@ -1,21 +1,21 @@
 import * as THREE from 'three';
-import { TRACK, WALL_HALF } from '../shared/track';
+import { PIT_LANE, TRACK, wallHalfAt } from '../shared/track';
 import { instanceStatic } from './batches';
 import { pondMaterials, streamRocks, waterline as WATER_Y } from './infield-water';
 import { canvas2d, noiseField, random, standard, texture } from './materials';
 
 const GRASS_Y = -0.141;
 const BED_Y = -0.218;
-const FRAME = { left: -29, right: 29, top: -16, bottom: 8 };
+const FRAME = { left: -38, right: 42, top: -17.4, bottom: 9 };
 
 const waterBanks: [number, number][] = [
-  [1.3, -13.32], [0.95, -12.95], [1.03, -11.87], [1.46, -10.91], [2.04, -9.96],
+  [1.56, -14.61], [1.16, -14.33], [0.96, -13.52], [0.95, -12.95], [1.03, -11.87], [1.46, -10.91], [2.04, -9.96],
   [2.47, -8.67], [2.88, -7.57], [3.17, -6.48], [3.10, -5.54], [2.75, -4.64], [2.54, -3.67],
   [2.27, -2.88], [1.22, -2.55], [0.50, -1.65], [0.52, -0.72], [1.19, 0.23],
   [2.51, 1.04], [4.49, 1.35], [6.26, 1.16], [7.88, 0.73], [9.13, 0.08],
   [9.37, -0.74], [8.93, -1.62], [7.89, -2.43], [6.31, -2.79], [5.02, -3.10],
   [4.54, -3.99], [4.66, -4.95], [4.76, -5.84], [4.73, -6.70], [4.36, -7.76],
-  [3.94, -8.83], [3.38, -9.94], [2.92, -10.87], [2.78, -11.75], [2.41, -12.61], [2.07, -13.22],
+  [3.94, -8.83], [3.38, -9.94], [2.92, -10.87], [2.78, -11.75], [2.41, -12.61], [2.38, -13.58], [2.21, -14.27], [1.97, -14.61],
 ];
 
 function u(x: number) { return (x - FRAME.left) / (FRAME.right - FRAME.left); }
@@ -67,7 +67,7 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
   }
   grass.context.putImageData(pixels, 0, 0);
   const outline = TRACK.samples.map(p => {
-    const offset = -WALL_HALF - 0.88 - 0.10 * Math.sin(p.s / TRACK.length * Math.PI * 12);
+    const offset = -wallHalfAt(p.s, -1) - 0.49 - 0.055 * Math.sin(p.s / TRACK.length * Math.PI * 12);
     return new THREE.Vector3(p.x - p.dz * offset, 0, p.z + p.dx * offset);
   });
   grass.context.save();
@@ -81,7 +81,7 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
   grass.context.restore();
 
   // Bridge contact stays visible on the turf even in the lightweight renderer.
-  for (const [offset, lineWidth, opacity] of [[-3.62, 63, 0.12], [-3.68, 39, 0.13], [-3.75, 22, 0.17]]) {
+  for (const [margin, lineWidth, opacity] of [[0.27, 48, 0.12], [0.34, 31, 0.13], [0.41, 17, 0.17]]) {
     grass.context.lineWidth = lineWidth;
     grass.context.lineCap = 'round';
     grass.context.strokeStyle = `rgba(16,22,12,${opacity})`;
@@ -89,6 +89,7 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
     grass.context.beginPath();
     for (const p of TRACK.samples) {
       if (p.y < 0.58) { moving = false; continue; }
+      const offset = -wallHalfAt(p.s, -1) - margin;
       const x = u(p.x - p.dz * offset) * width;
       const y = (1 - v(p.z + p.dx * offset)) * height;
       if (moving) grass.context.lineTo(x, y);
@@ -100,7 +101,9 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
   grass.context.globalCompositeOperation = 'destination-out';
   drawMask(grass.context, water);
   grass.context.fill();
-  for (const [left, right, near, far] of [[-17.20, -10.13, 0.13, 3.14], [1.58, 10.09, 1.56, 4.68]]) {
+  const lane = TRACK.sampleAt(PIT_LANE.stalls[1]);
+  const stationZ = lane.z + PIT_LANE.stationOffset;
+  for (const [left, right, near, far] of [[-17.20, -10.13, 0.13, 3.14], [lane.x - 3.82, lane.x + 4.69, stationZ - 1.49, stationZ + 1.63]]) {
     const x = u(left) * width;
     const y = (1 - v(far)) * height;
     grass.context.beginPath();
@@ -149,7 +152,7 @@ function riverbed(outline: readonly THREE.Vector3[]) {
   }
   for (let i = 0; i < 1300; i++) {
     const x = u(0.4 + rng() * 9.05) * width;
-    const y = (1 - v(-13.5 + rng() * 15.0)) * height;
+    const y = (1 - v(-14.8 + rng() * 16.3)) * height;
     const radius = 0.2 + 1.28 * rng() ** 2;
     bed.context.fillStyle = i % 3 === 0 ? 'rgba(177,151,104,.28)' : 'rgba(32,57,44,.27)';
     bed.context.beginPath();
@@ -410,6 +413,7 @@ export function buildInfield(parent: THREE.Object3D) {
     captureReflections(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
       materials.capture(renderer, scene, water);
     },
+    setNight(enabled: boolean) { materials.setNight(enabled); },
     update(now: number) {
       const time = now / 1000;
       materials.update(time);

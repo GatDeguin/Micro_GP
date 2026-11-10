@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { CarView } from '../shared/protocol';
-import { TRACK } from '../shared/track';
+import { TRACK, wallHalfAt } from '../shared/track';
 import type { buildPlacard } from './signs';
 
 export type ViewMode = 'general' | 'chase' | 'trackside';
@@ -34,7 +34,8 @@ function followCamera() {
       target.set(car.x + (ahead.x - road.x) * 0.44, car.y + 0.46, car.z + (ahead.z - road.z) * 0.44);
     } else {
       const ahead = TRACK.sampleAt(road.s + direction * 4.3);
-      const shoulder = THREE.MathUtils.clamp(road.offset + side * 3.3, -3, 3);
+      const shoulder = THREE.MathUtils.clamp(road.offset + side * 3.3,
+        -wallHalfAt(ahead.s, -1) + 0.35, wallHalfAt(ahead.s, 1) - 0.35);
       position.set(ahead.x - ahead.dz * shoulder, ahead.y + 0.75, ahead.z + ahead.dx * shoulder);
       target.set(car.x, car.y + 0.36, car.z);
     }

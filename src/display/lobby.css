@@ -1,0 +1,65 @@
+.lan-lobby, .lan-lobby-return {
+  --lobby-edge: #8e765c;
+  --lobby-gold: #eac48c;
+  position: fixed;
+  z-index: 1;
+  left: max(12px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  border: 1px solid var(--lobby-edge);
+  border-radius: .55rem;
+  background: #231c18f5;
+  color: #f3e6d2;
+  font: 500 .875rem/1.35 system-ui, sans-serif;
+  box-shadow: 0 .5rem 1.6rem #100b08a8;
+}
+
+.lan-lobby {
+  --lobby-top: max(66px, calc(env(safe-area-inset-top) + 54px));
+  top: var(--lobby-top);
+  width: min(31rem, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--lobby-top) - var(--lobby-reserved, 16px));
+  padding: clamp(.7rem, 2vw, 1.1rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.lan-lobby[hidden], .lan-lobby-return[hidden], .lan-lobby [hidden] { display: none; }
+.lan-lobby-header h2 { margin: .15rem 0 .75rem; font-size: clamp(1.35rem, 2.5vw, 1.85rem); line-height: 1.08; }
+.lan-lobby-kicker, .lan-lobby-config legend { margin: 0; color: var(--lobby-gold); font: 700 .72rem/1.2 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.lan-lobby-kicker span { color: #a49078; }
+.lan-lobby-content { display: grid; grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr); gap: .8rem; align-items: start; }
+.lan-lobby-invite { padding: .45rem; border-left: 2px solid #a68a6d; background: #2e2520; }
+.lan-lobby-invite strong { color: var(--lobby-gold); font-size: .8rem; }
+.lan-lobby-invite a { display: inline-block; margin-top: .35rem; color: var(--lobby-gold); }
+.lan-lobby-invite p { margin: .22rem 0 0; color: #d4c4af; font-size: .75rem; }
+.lan-lobby-config { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem .55rem; min-width: 0; margin: 0; padding: .4rem 0 0; border: 0; }
+.lan-lobby-config label { display: grid; gap: .15rem; color: #e0d1bf; font-size: .75rem; }
+.lan-lobby :is(button, select), .lan-lobby-return button { min-height: 40px; border: 1px solid var(--lobby-edge); border-radius: .28rem; padding: .25rem .45rem; background: #3a2c23; color: inherit; font: 650 .8rem/1.2 system-ui, sans-serif; }
+.lan-lobby :is(a, button, select, input):focus-visible, .lan-lobby-return button:focus-visible { outline: 2px solid var(--lobby-gold); outline-offset: 2px; }
+.lan-lobby-config select { width: 100%; }
+.lan-lobby-config .lan-lobby-night { display: flex; grid-column: 1 / -1; align-items: center; gap: .3rem; min-height: 32px; }
+.lan-lobby-night input { accent-color: var(--lobby-gold); }
+.lan-lobby-slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .35rem; padding: 0; margin: .75rem 0; list-style: none; }
+.lan-lobby-slots li { min-width: 0; padding: .3rem .4rem; border: 1px solid #675444; border-radius: .28rem; background: #2e2520; }
+.lan-lobby-slots strong { display: block; color: var(--lobby-car); font: 800 1.05rem/1.15 ui-monospace, monospace; }
+.lan-lobby-slots span { font-weight: 650; }
+.lan-lobby-slots small { display: block; color: #d5c2ab; font-size: .7rem; overflow-wrap: anywhere; }
+.lan-lobby-slots [data-status="ready"] { border-color: #7eaa76; }
+.lan-lobby-slots [data-status="ready"] small { color: #c3e8b9; }
+.lan-lobby-slots [data-status="reserved"] small { color: #f0c48b; }
+.lan-lobby-footer, .lan-lobby-return { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.lan-lobby-footer p { margin: 0; color: #e0d0bc; font-size: .78rem; }
+.lan-lobby :is(button, select):not(:disabled), .lan-lobby-return button:not(:disabled) { cursor: pointer; }
+.lan-lobby :is(button, select):disabled, .lan-lobby-return button:disabled { opacity: .62; }
+.lan-lobby button:not(:disabled), .lan-lobby-return button:not(:disabled) { border-color: #eac48c; background: #eac48c; color: #21150e; }
+.lan-lobby-return { bottom: max(12px, env(safe-area-inset-bottom)); padding: .35rem; }
+.lan-lobby-return span:empty { display: none; }
+
+@media (max-width: 440px) {
+  .lan-lobby-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lan-lobby-content { grid-template-columns: 5.5rem minmax(0, 1fr); gap: .6rem; }
+}
+
+@media (max-width: 320px) {
+  .lan-lobby-return { top: 66px; right: 12px; bottom: auto; left: auto; }
+}

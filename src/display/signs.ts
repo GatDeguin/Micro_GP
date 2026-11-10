@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { raceTime } from './results';
 import qrcode from 'qrcode-generator';
 import { CAR_SPECS, type RaceSnapshot } from '../shared/protocol';
 import { TRACK, WALL_HALF } from '../shared/track';
@@ -89,7 +90,8 @@ function raceBoard(parent: THREE.Object3D) {
 
   return (state: RaceSnapshot) => {
     const leader = state.order[0] ?? 0;
-    const lap = Math.min(3, Math.max(0, state.cars[leader]?.lap ?? 0));
+    const totalLaps = state.config?.laps ?? 3;
+    const lap = Math.min(totalLaps, Math.max(0, state.cars[leader]?.lap ?? 0));
     const player = state.cars.findIndex(car => car.owned);
     const solo = state.phase !== 'demo' && player >= 0 && !state.cars.some((car, slot) => slot !== player && car.owned);
     const gearSlot = solo ? player : leader;
@@ -99,7 +101,10 @@ function raceBoard(parent: THREE.Object3D) {
     const gearSpec = CAR_SPECS[gearSlot];
     const results = state.phase === 'results';
     const gearKey = gearLabel && gearSpec ? `${gearSlot}/${gearLabel}` : '';
-    const key = `${state.phase}:${lap}:${results ? state.order.join() : leader}:${gearKey}`;
+    const practice = state.phase === 'practice';
+    const entries = state.results ?? state.order.map(slot => ({ slot, time: null, bestLap: null }));
+    const timing = results ? entries.map(row => `${row.slot}/${row.time}/${row.bestLap}`).join() : leader;
+    const key = `${state.phase}:${lap}:${totalLaps}:${timing}:${gearKey}:${practice ? Math.floor(state.time ?? 0) : ''}`;
     if (key === previous) return;
     previous = key;
 
@@ -119,35 +124,41 @@ function raceBoard(parent: THREE.Object3D) {
 
     if (results) {
       context.fillStyle = '#f0e0c3';
-      context.font = '900 62px system-ui, sans-serif';
-      context.fillText('LLEGADA', 34, 164);
-      state.order.forEach((slot, position) => {
+      context.font = '900 35px system-ui, sans-serif';
+      context.fillText('RESULTADOS', 33, 119);
+      context.fillStyle = '#bda78d';
+      context.font = '700 24px ui-monospace, monospace';
+      for (const [label, x] of [['POS.', 38], ['AUTO', 135], ['TIEMPO', 404], ['DIF.', 605], ['MEJOR VUELTA', 788]] as const) {
+        context.fillText(label, x, 157);
+      }
+      entries.forEach(({ slot, time, bestLap }, position) => {
         const spec = CAR_SPECS[slot];
         if (!spec) return;
-        const x = 35 + (position % 2) * 490;
-        const y = 189 + Math.floor(position / 2) * 73;
-        context.fillStyle = '#323330';
-        context.fillRect(x, y, 452, 61);
-        context.fillStyle = '#c5b69d';
-        context.font = '700 35px ui-monospace, monospace';
-        context.fillText(`${position + 1}º`, x + 17, y + 44);
+        const y = 165 + position * 45;
+        context.fillStyle = position === 0 ? '#3e3930' : '#2b2e2a';
+        context.fillRect(32, y, 958, 42);
         context.fillStyle = spec.color;
-        context.fillRect(x + 109, y + 10, 104, 42);
-        context.fillStyle = '#202421';
-        context.font = '900 38px system-ui, sans-serif';
-        context.fillText(spec.number, x + 134, y + 43);
+        context.fillRect(134, y + 6, 50, 30);
+        context.fillStyle = '#222724';
+        context.font = '900 25px system-ui, sans-serif';
+        context.fillText(spec.number, 144, y + 30);
         context.fillStyle = '#e4d8be';
-        context.font = '700 29px system-ui, sans-serif';
-        context.fillText(spec.name, x + 230, y + 41);
+        context.font = '700 27px ui-monospace, monospace';
+        context.fillText(`${position + 1}º`, 42, y + 30);
+        context.fillText(spec.name, 201, y + 30);
+        context.fillText(time === null ? 'NO TERMINÓ' : raceTime(time), 404, y + 30);
+        const winner = entries[0]?.time;
+        context.fillText(time != null && winner != null ? `+${Math.max(0, time - winner).toFixed(3)}` : '—', 605, y + 30);
+        context.fillText(raceTime(bestLap), 788, y + 30);
       });
     } else {
-      const headline = state.phase === 'grid' ? 'PARRILLA' : state.phase === 'demo' ? 'EXHIBICIÓN' : 'VUELTAS';
+      const headline = state.phase === 'grid' ? 'PARRILLA' : state.phase === 'demo' ? 'EXHIBICIÓN' : practice ? 'PRÁCTICA' : 'VUELTAS';
       context.fillStyle = '#e5cda7';
       context.font = 'bold 40px ui-monospace, monospace';
       context.fillText(headline, 38, 142);
-      context.font = '900 155px ui-monospace, monospace';
+      context.font = `900 ${practice || totalLaps >= 10 ? 106 : 145}px ui-monospace, monospace`;
       context.fillStyle = '#f0e0c3';
-      context.fillText(`${lap} / 3`, 35, 298);
+      context.fillText(practice ? raceTime(Math.floor(state.time ?? 0)).slice(0, -4) : `${lap} / ${totalLaps}`, 35, 298);
       context.fillStyle = '#c7b192';
       context.font = 'bold 33px ui-monospace, monospace';
       context.fillText('LÍDER', 755, 156);
@@ -157,7 +168,7 @@ function raceBoard(parent: THREE.Object3D) {
       context.font = '900 94px system-ui, sans-serif';
       context.fillText(CAR_SPECS[leader].number, 796, 270);
     }
-    if (gearLabel && gearSpec) drawGear(context, gearLabel, gearSpec, results ? 773 : 532, results ? 92 : 181);
+    if (gearLabel && gearSpec && !results) drawGear(context, gearLabel, gearSpec, 532, 181);
     map.needsUpdate = true;
   };
 }

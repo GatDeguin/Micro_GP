@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PIT_LANE, TRACK } from '../shared/track';
 import { box, canvas2d, random, standard, texture } from './materials.ts';
 
 const TOP = 0.72;
@@ -251,8 +252,9 @@ function spareRack(parent: THREE.Object3D) {
 
 export function buildServiceStation(parent: THREE.Object3D) {
   const station = new THREE.Group();
-  station.name = 'Puesto de puesta a punto';
-  station.position.set(5.4, -0.23, 3.05);
+  station.name = 'Taller de boxes y puesta a punto';
+  const lane = TRACK.sampleAt(PIT_LANE.stalls[1]);
+  station.position.set(lane.x - lane.dz * PIT_LANE.stationOffset, -0.23, lane.z + lane.dx * PIT_LANE.stationOffset);
   parent.add(station);
   workshopStains(station);
   const bench = makeBench(station);
