@@ -1,3 +1,10 @@
+.race-qr {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
 .view-tools {
   --settings-text: #f1e4cf;
   --settings-accent: #e4bb82;

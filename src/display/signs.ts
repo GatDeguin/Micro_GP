@@ -300,6 +300,14 @@ export function buildPlacard(parent: THREE.Object3D, enabled = true) {
   parent.add(contact);
   const bottomRay = new THREE.Vector3();
   const support = new THREE.Vector3();
+  const codeFace = enabled ? canvas2d(1, 1) : undefined;
+  if (codeFace) {
+    codeFace.canvas.className = 'race-qr';
+    codeFace.canvas.hidden = true;
+    codeFace.canvas.setAttribute('role', 'img');
+    codeFace.canvas.setAttribute('aria-label', 'Código QR del mando');
+    document.body.append(codeFace.canvas);
+  }
 
   const label = canvas2d(512, 59);
   label.context.fillStyle = '#2e2d2a';
@@ -314,18 +322,20 @@ export function buildPlacard(parent: THREE.Object3D, enabled = true) {
   plaque.add(panel);
 
   let encoded = '';
+  let codeLayout = '';
   return {
     object: plaque,
     setGrounded(grounded: boolean) { contact.visible = enabled && grounded; },
     setUrl(url: string) {
-      if (url === encoded) return;
+      if (!codeFace || url === encoded) return;
       const code = qrcode(0, 'M');
       code.addData(url);
       code.make();
       const modules = code.getModuleCount();
       const cell = 8;
       const size = (modules + 8) * cell;
-      const { canvas, context } = canvas2d(size, size);
+      const { canvas, context } = codeFace;
+      canvas.width = canvas.height = size;
       context.fillStyle = '#fff';
       context.fillRect(0, 0, size, size);
       context.fillStyle = '#000';
@@ -334,14 +344,8 @@ export function buildPlacard(parent: THREE.Object3D, enabled = true) {
           if (code.isDark(row, column)) context.fillRect((column + 4) * cell, (row + 4) * cell, cell, cell);
         }
       }
-      const map = texture(canvas);
-      map.anisotropy = 1;
-      map.generateMipmaps = false;
-      map.magFilter = map.minFilter = THREE.NearestFilter;
-      square.material.map?.dispose();
-      square.material.map = map;
       square.material.color.set(0xffffff);
-      square.material.needsUpdate = true;
+      canvas.hidden = false;
       panel.visible = true;
       encoded = url;
     },
@@ -359,6 +363,21 @@ export function buildPlacard(parent: THREE.Object3D, enabled = true) {
       plaque.scale.setScalar(scale * size);
       contact.scale.set(1.4 * scale * size, 0.63 * scale * size, 1);
       contact.rotation.z = -camera.rotation.z;
+      if (codeFace) {
+        // The plaque faces the camera. Project its front plane in CSS pixels so the code stays sharp at any render scale.
+        const magnification = distance / (distance - scale * size * square.position.z);
+        const left = Math.round(width / 2 + (x - width / 2 - size / 2) * magnification);
+        const top = Math.round(height / 2 + (y - height / 2 - size * (0.5 + square.position.y)) * magnification);
+        const span = Math.round(size * magnification);
+        const layout = `${left},${top},${span}`;
+        if (layout !== codeLayout) {
+          const { style } = codeFace.canvas;
+          style.left = `${left}px`;
+          style.top = `${top}px`;
+          style.width = style.height = `${span}px`;
+          codeLayout = layout;
+        }
+      }
     },
   };
 }
