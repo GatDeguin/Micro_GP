@@ -1,4 +1,4 @@
-import { CAR_SPECS, type DriveInput, type Driver, type RaceSnapshot } from '../shared/protocol.ts';
+import { CAR_SPECS, type CarSound, type DriveInput, type Driver, type RaceImpact, type RaceSnapshot } from '../shared/protocol.ts';
 import { CAR_DIMENSIONS, GRID_LANE_OFFSET, type CarDimensions } from '../shared/car-dimensions.ts';
 import { CURB_WIDTH, GRID_ROWS, ROAD_HALF, TRACK, WALL_HALF, type TrackLocation } from '../shared/track.ts';
 import { capsule, contactBetween } from './contact.ts';
@@ -10,6 +10,11 @@ const FINISH_WINDOW = 15;
 const RESULTS_TIME = 6;
 const MAX_SPEED = 8.05;
 const EPSILON = 1e-8;
+const IMPACT_MEMORY_FRAMES = 24;
+const IMPACT_COOLDOWN_FRAMES = 12;
+const CONTACT_GAP_FRAMES = 4;
+const MIN_AUDIBLE_IMPULSE = 0.46;
+const FULL_STRENGTH_IMPULSE = 7.2;
 
 const demoDistances = [6, 34, 62, 94];
 const botPace = [6.23, 6.17, 6.30, 6.12];
@@ -26,6 +31,7 @@ interface Car {
   progress: LapProgress;
   steer: number;
   throttle: number;
+  surfaceSound: Pick<CarSound, 'curb' | 'runoff' | 'scrape'>;
   owned: boolean;
   human: boolean;
   braking: boolean;
@@ -34,6 +40,15 @@ interface Car {
   stalled: number;
   protection: number;
 }
+
+type ContactObserver = (contact: {
+  source: string;
+  kind: RaceImpact['kind'];
+  impulse: number;
+  x: number;
+  y: number;
+  z: number;
+}) => void;
 
 function clamp(value: number, low: number, high: number) {
   return Math.max(low, Math.min(high, value));
@@ -63,6 +78,7 @@ function spawn(s: number, index: number, speed: number): Car {
   const car: Car = {
     x: 0, z: 0, yaw: 0, dimensions: CAR_DIMENSIONS[index], motionYaw: 0, speed: 0, steer: 0, throttle: 0,
     road: { ...TRACK.sampleAt(s), offset: 0 }, progress: new LapProgress(s),
+    surfaceSound: { curb: 0, runoff: 0, scrape: 0 },
     owned: false, human: false, braking: false, reverseReady: false, reversing: false,
     stalled: 0, protection: 0,
   };
@@ -138,6 +154,9 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   }
   curb *= 1.6 - 0.6 * curb;
   loose *= 1.6 - 0.6 * loose;
+  car.surfaceSound.curb = Math.max(0, curb - loose);
+  car.surfaceSound.runoff = loose;
+  car.surfaceSound.scrape = Math.max(0, car.surfaceSound.scrape - dt * 4.8);
   const grip = 1 - 0.22 * curb - 0.36 * loose;
   const grade = (TRACK.sampleAt(car.road.s + 0.6).y - TRACK.sampleAt(car.road.s - 0.6).y) / 1.2;
   const uphill = 9.8 * grade * along;
@@ -202,7 +221,7 @@ function setVelocity(car: Car, x: number, z: number) {
   if (Math.abs(car.speed) > EPSILON) car.motionYaw = Math.atan2(x * direction, z * direction);
 }
 
-function resolveContacts(cars: readonly Car[]) {
+function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
   for (let i = 0; i < cars.length; i++) {
     const a = cars[i];
     if (a.protection > 0) continue;
@@ -222,8 +241,12 @@ function resolveContacts(cars: readonly Car[]) {
       const approachA = va.x * nx + va.z * nz;
       const approachB = vb.x * nx + vb.z * nz;
       const closing = approachA - approachB;
+      const impulse = closing > 0 ? closing * (0.54 + 0.07 * clamp(closing / 5, 0, 1)) : 0;
+      observe({
+        source: `car:${i}:${j}`, kind: 'car', impulse,
+        x: (a.x + b.x) / 2, y: (a.road.y + b.road.y) / 2 + 0.22, z: (a.z + b.z) / 2,
+      });
       if (closing <= 0) continue;
-      const impulse = closing * (0.54 + 0.07 * clamp(closing / 5, 0, 1));
       const tx = -nz, tz = nx;
       const tangent = (va.x - vb.x) * tx + (va.z - vb.z) * tz;
       const friction = clamp(tangent * 0.18, -impulse * 0.23, impulse * 0.23);
@@ -241,7 +264,7 @@ function resolveContacts(cars: readonly Car[]) {
   }
 }
 
-function constrain(car: Car) {
+function constrain(car: Car, index: number, observe: ContactObserver) {
   if (!Number.isFinite(car.x + car.z)) return false;
   car.road = TRACK.locate(car.x, car.z);
   if (Math.abs(car.road.offset) > WALL_HALF + 0.9) return false;
@@ -264,10 +287,14 @@ function constrain(car: Car) {
     car.z -= nz * (penetration + 0.002);
     const v = velocity(car);
     const outward = v.x * nx + v.z * nz;
+    const along = v.x * dx + v.z * dz;
+    const scrape = clamp(Math.abs(along) / 6.5, 0, 1) * clamp(0.34 + penetration * 15, 0, 1);
+    car.surfaceSound.scrape = Math.max(car.surfaceSound.scrape, scrape);
+    let impulse = 0;
     if (outward > 0) {
-      const along = v.x * dx + v.z * dz;
       const slide = along * 0.96;
       const rebound = outward * (0.10 + 0.16 * clamp(outward / 5, 0, 1));
+      impulse = outward + rebound;
       setVelocity(car, dx * slide - nx * rebound, dz * slide - nz * rebound);
       // Turn the nose toward an exit so held throttle does not drive back into the wall.
       const travel = along < -EPSILON ? -1 : 1;
@@ -276,6 +303,12 @@ function constrain(car: Car) {
       const turn = 0.04 + Math.min(0.24, outward * 0.10);
       car.yaw = angleDifference(car.yaw + clamp(angleDifference(exit - car.yaw), -turn, turn));
     }
+    // The wooden kickboard in the display spans s = -14.19 through 0.19 on the inside.
+    const kickboard = side < 0 && (boundary.s >= TRACK.length - 14.19 || boundary.s <= 0.19);
+    observe({
+      source: `barrier:${index}:${side}`, kind: kickboard ? 'wall' : 'fence', impulse,
+      x: boundary.x + nx * WALL_HALF, y: boundary.y + 0.18, z: boundary.z + nz * WALL_HALF,
+    });
     car.road = TRACK.locate(car.x, car.z);
   }
   return true;
@@ -286,6 +319,7 @@ function recover(car: Car, index: number, previousS: number, racing: boolean) {
   place(car, s, laneFor(index), 0);
   car.steer = 0;
   car.throttle = 0;
+  car.surfaceSound = { curb: 0, runoff: 0, scrape: 0 };
   car.stalled = 0;
   car.protection = 0.86;
   car.reversing = false;
@@ -300,6 +334,23 @@ export class Race {
   private phase: RaceSnapshot['phase'] = 'demo';
   private finishOrder: number[] = [];
   private firstFinishAt: number | null = null;
+  private impactSequence = 0;
+  private impacts: RaceImpact[] = [];
+  private contactSounds = new Map<string, { seen: number; hit: number; latched: boolean }>();
+
+  private readonly observeContact: ContactObserver = ({ source, kind, impulse, x, y, z }) => {
+    const previous = this.contactSounds.get(source);
+    const latched = previous?.latched === true && this.frame - previous.seen <= CONTACT_GAP_FRAMES;
+    const lastHit = previous?.hit ?? -Infinity;
+    // Solver corrections can lose contact for a few ticks while the same surfaces keep rubbing.
+    const strike = !latched && this.frame - lastHit >= IMPACT_COOLDOWN_FRAMES && impulse >= MIN_AUDIBLE_IMPULSE;
+    this.contactSounds.set(source, { seen: this.frame, hit: strike ? this.frame : lastHit, latched: latched || strike });
+    if (!strike) return;
+
+    this.impacts.push({
+      id: ++this.impactSequence, frame: this.frame, kind, x, y, z, strength: clamp(impulse / FULL_STRENGTH_IMPULSE, 0, 1),
+    });
+  };
 
   private startGrid() {
     this.phase = 'grid';
@@ -307,11 +358,14 @@ export class Race {
     this.elapsed = 0;
     this.finishOrder = [];
     this.firstFinishAt = null;
+    this.impacts = [];
+    this.contactSounds.clear();
     this.cars = CAR_SPECS.map((_, index) => spawn(GRID_ROWS[Math.floor(index / 2)], index, 0));
   }
 
   step(dt: number, drivers: readonly (Driver | undefined)[]) {
     this.frame++;
+    while (this.impacts.length && this.frame - this.impacts[0].frame >= IMPACT_MEMORY_FRAMES) this.impacts.shift();
     if (this.phase === 'demo') {
       if (drivers.some(driver => driver?.owned && driver.input !== null)) this.startGrid();
     } else if (!drivers.some(driver => driver?.owned)) {
@@ -339,14 +393,14 @@ export class Race {
       return { input: human ?? botDrive(this.cars, i, cooling), human: Boolean(human) };
     });
     commands.forEach(({ input, human }, i) => move(this.cars[i], input, human, dt));
-    resolveContacts(this.cars);
+    resolveContacts(this.cars, this.observeContact);
 
     const finishedThisTick: { index: number; fraction: number }[] = [];
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       const racing = this.phase === 'race' && car.progress.lap < LAPS;
       const from = previous[i];
-      if (!constrain(car)) {
+      if (!constrain(car, i, this.observeContact)) {
         recover(car, i, from.s, racing);
         continue;
       }
@@ -391,10 +445,15 @@ export class Race {
       lights: this.phase === 'grid' ? Math.min(3, Math.floor(this.elapsed / 0.65)) : 0,
       flag: this.firstFinishAt !== null,
       order: [...this.finishOrder, ...remaining],
+      impacts: this.impacts.length ? this.impacts.map(impact => ({ ...impact })) : undefined,
       cars: this.cars.map(car => ({
         x: car.x, y: car.road.y, z: car.z, yaw: car.yaw, speed: car.speed,
         lap: demo ? 0 : car.progress.lap, owned: car.owned, steer: car.steer, braking: car.braking,
         blink: car.protection > 0 && Math.floor(car.protection * 8) % 2 === 0,
+        sound: {
+          ...car.surfaceSound, throttle: car.throttle,
+          slip: clamp((Math.abs(car.speed * Math.sin(car.motionYaw - car.yaw)) - 0.09) / 1.65, 0, 1),
+        },
       })),
     };
   }

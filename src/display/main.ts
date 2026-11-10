@@ -150,15 +150,20 @@ function bootstrap() {
     received = now;
     signs.board(snapshot);
     signs.lights(snapshot.lights);
-    audio.update(snapshot);
   }
 
   let retry = 250;
+  let connected = pages;
+  const updateAudioMute = () => audio.mute(!connected || document.hidden || lostContext);
   function connect() {
     const endpoint = new URL('/live', location.href);
     endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(endpoint);
-    socket.addEventListener('open', () => { retry = 250; });
+    socket.addEventListener('open', () => {
+      retry = 250;
+      connected = true;
+      updateAudioMute();
+    });
     socket.addEventListener('message', ({ data }) => {
       let message: DisplayMessage;
       try { message = JSON.parse(data); } catch { return; }
@@ -169,22 +174,28 @@ function bootstrap() {
       }
     });
     socket.addEventListener('close', () => {
-      audio.mute(true);
+      connected = false;
+      updateAudioMute();
       setTimeout(connect, retry);
       retry = Math.min(5000, retry * 1.8);
     });
-    socket.addEventListener('open', () => audio.mute(document.hidden));
   }
   const solo = pages ? startSolo(updateState) : undefined;
+  updateAudioMute();
   if (!pages) connect();
 
   for (const event of ['pointerdown', 'keydown']) addEventListener(event, audio.unlock, { passive: true });
-  document.addEventListener('visibilitychange', () => audio.mute(document.hidden));
+  document.addEventListener('visibilitychange', updateAudioMute);
   canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault();
     lostContext = true;
+    updateAudioMute();
   });
-  canvas.addEventListener('webglcontextrestored', () => { lostContext = false; resize(); });
+  canvas.addEventListener('webglcontextrestored', () => {
+    lostContext = false;
+    updateAudioMute();
+    resize();
+  });
 
   function frame(now: number) {
     requestAnimationFrame(frame);
@@ -222,6 +233,15 @@ function bootstrap() {
         speed: THREE.MathUtils.lerp(from.speed, car.speed, alpha),
         steer: THREE.MathUtils.lerp(from.steer, car.steer, alpha),
       };
+      if (car.sound && from.sound) {
+        view.sound = {
+          throttle: THREE.MathUtils.lerp(from.sound.throttle, car.sound.throttle, alpha),
+          curb: THREE.MathUtils.lerp(from.sound.curb, car.sound.curb, alpha),
+          runoff: THREE.MathUtils.lerp(from.sound.runoff, car.sound.runoff, alpha),
+          slip: THREE.MathUtils.lerp(from.sound.slip, car.sound.slip, alpha),
+          scrape: THREE.MathUtils.lerp(from.sound.scrape, car.sound.scrape, alpha),
+        };
+      }
       let slope = 0;
       if (view.y > 0.005) {
         const road = TRACK.locate(view.x, view.z);
@@ -237,12 +257,13 @@ function bootstrap() {
       if (partnerSlot === i) partner = view;
     });
     signs.flag(toState.flag, now / 1000);
+    let listener: THREE.Camera;
     if (focus) {
       if (!replaying) lightShot(true);
       replaying = true;
       placard.setGrounded(false);
       replayShot ??= buildReplayShot(renderer);
-      replayShot.render(scene, focus, partner, width, height, dt, placard);
+      listener = replayShot.render(scene, focus, partner, width, height, dt, placard);
     } else {
       if (replaying) {
         replaying = false;
@@ -250,8 +271,17 @@ function bootstrap() {
         replayShot?.stop();
         placard.resize(camera, width, height);
       }
-      renderViews(scene, mode, interpolated, slots, width, height, dt);
+      listener = renderViews(scene, mode, interpolated, slots, width, height, dt);
     }
+    audio.update({
+      state: moment?.from ?? current,
+      cars: interpolated,
+      camera: listener,
+      view: focus ? 'replay' : split ? 'general' : mode,
+      focus: moment?.slot ?? slot,
+      tick: THREE.MathUtils.lerp(fromState.frame, toState.frame, progress),
+      dt,
+    });
   }
   requestAnimationFrame(frame);
 }

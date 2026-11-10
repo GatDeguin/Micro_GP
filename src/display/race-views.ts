@@ -91,7 +91,7 @@ export function buildRaceViews(
     if (!split && mode === 'general') {
       placard.setGrounded(true);
       renderer.render(scene, overhead);
-      return;
+      return overhead;
     }
 
     const room = scene.background;
@@ -107,6 +107,7 @@ export function buildRaceViews(
 
     placard.setGrounded(false);
     plateScene.add(placard.object);
+    let listener = overhead;
     if (split) {
       const rows = slots.length > 2 || height > width ? 2 : 1;
       const columns = slots.length > 2 || width >= height ? 2 : 1;
@@ -146,7 +147,8 @@ export function buildRaceViews(
       renderer.setViewport(0, 0, width, height);
     } else {
       const slot = slots[0];
-      draw(followers[slot](mode, cars[slot], width, height, dt), true);
+      listener = followers[slot](mode, cars[slot], width, height, dt);
+      draw(listener, true);
     }
     scene.background = room;
     scene.backgroundBlurriness = roomBlur;
@@ -157,5 +159,6 @@ export function buildRaceViews(
     renderer.render(plateScene, overhead);
     renderer.autoClear = true;
     scene.add(placard.object);
+    return listener;
   };
 }

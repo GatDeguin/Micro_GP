@@ -243,6 +243,7 @@ test('a sharp steering input at full pace scrubs speed and turns progressively',
   assert.ok(after.z > before.z);
   assert.ok(before.yaw - after.yaw > 0.18 && before.yaw - after.yaw < 0.37);
   assert.ok(after.speed < before.speed - 0.25 && after.speed > 6);
+  assert.ok((after.sound?.slip ?? 0) > (before.sound?.slip ?? 0) + 0.1);
 });
 
 test('the run-off slows a car even when it has not struck the wall', async () => {
@@ -251,10 +252,15 @@ test('the run-off slows a car even when it has not struck the wall', async () =>
   const race = new Race();
   // Leave enough of the straight to stay on the run-off before the right entry.
   step(race, 240 * TICK, drive({ ...NEUTRAL, gas: true }));
-  const initialSpeed = race.snapshot().cars[0].speed;
+  const initial = race.snapshot().cars[0];
+  assert.equal(initial.sound?.throttle, 1);
+  assert.equal(initial.sound?.curb, 0);
+  assert.equal(initial.sound?.runoff, 0);
+  let crossedCurb = false;
 
   for (let i = 0; i < 120; i++) {
     const car = race.snapshot().cars[0];
+    crossedCurb ||= (car.sound?.curb ?? 0) > 0.2 && (car.sound?.runoff ?? 0) < 0.1;
     const location = TRACK.locate(car.x, car.z);
     assert.ok(Math.abs(location.offset) < 2.65, 'the tires must stay clear of the barrier');
     const look = TRACK.sampleAt(location.s + 4.1);
@@ -266,7 +272,9 @@ test('the run-off slows a car even when it has not struck the wall', async () =>
   const car = race.snapshot().cars[0];
   const location = TRACK.locate(car.x, car.z);
   assert.ok(location.offset > 2.36 && location.offset < 2.65);
-  assert.ok(car.speed > 2 && car.speed < initialSpeed - 0.9);
+  assert.ok(car.speed > 2 && car.speed < initial.speed - 0.9);
+  assert.ok(crossedCurb, 'the tire crossed the piano before reaching run-off');
+  assert.ok((car.sound?.runoff ?? 0) > 0.3);
 });
 
 test('FRENO overrides GAS and reverse needs a fresh press after stopping', async () => {
@@ -317,7 +325,10 @@ test('a car driven into the wall can keep moving without a reset or a free lap',
     assert.ok(edge <= WALL_HALF + 0.02, 'the front and rear must stay inside the barrier');
     return race.snapshot().phase === 'race' && Math.abs(car.yaw - Math.PI / 2) > 0.08;
   });
-  const impact = race.snapshot().cars[0];
+  const contact = race.snapshot();
+  const impact = contact.cars[0];
+  assert.ok(contact.impacts?.some(event => event.kind === 'fence' && event.frame >= contact.frame - 3));
+  assert.ok((impact.sound?.scrape ?? 0) > 0);
   step(race, 0.85, gas);
   const after = race.snapshot().cars[0];
   assert.ok(Math.hypot(after.x - impact.x, after.z - impact.z) > 1, 'the car should roll away from impact');
@@ -338,4 +349,28 @@ test('a rear-end impact rolls the stopped car forward and leaves room for both c
   assert.ok(ahead.speed > 0.55, 'impact should transfer momentum to the stopped car');
   assert.ok(ahead.x > initial + 0.12);
   assert.ok(ahead.x - behind.x >= 3.24, 'the visual bumpers must stay separated');
+});
+
+test('a bumper strike survives snapshot gaps without retriggering while the cars touch', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = { owned: true, input: NEUTRAL };
+  const accelerating = { owned: true, input: { ...NEUTRAL, gas: true } };
+  const drivers = [stopped, stopped, accelerating, stopped];
+  step(race, 3, [stopped, stopped, stopped, stopped]);
+  runUntil(race, 1.2, drivers, () => Boolean(race.snapshot().impacts?.length));
+  const hit = race.snapshot();
+  const strike = hit.impacts?.[0];
+  assert.ok(strike);
+  assert.equal(strike.kind, 'car');
+  assert.equal(strike.frame, hit.frame);
+  assert.ok(strike.strength > 0 && strike.strength <= 1);
+  assert.ok(strike.x > hit.cars[2].x && strike.x < hit.cars[0].x);
+
+  step(race, 3 * TICK, drivers);
+  assert.deepEqual(race.snapshot().impacts, [strike]);
+  step(race, 0.22, drivers);
+  assert.deepEqual(race.snapshot().impacts, [strike]);
+  step(race, 0.43, [stopped, stopped, stopped, stopped]);
+  assert.equal(race.snapshot().impacts?.some(event => event.id === strike.id) ?? false, false);
 });

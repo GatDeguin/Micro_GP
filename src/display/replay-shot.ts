@@ -141,6 +141,7 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
       renderer.render(plateScene, plateCamera);
       renderer.autoClear = true;
       scene.add(plate);
+      return camera;
     },
   };
 }

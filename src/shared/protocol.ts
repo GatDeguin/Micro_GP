@@ -18,6 +18,26 @@ export interface Driver {
   owned: boolean;
 }
 
+/** Normalized continuous audio inputs derived from the simulation. */
+export interface CarSound {
+  throttle: number;
+  curb: number;
+  runoff: number;
+  slip: number;
+  scrape: number;
+}
+
+/** A one-shot contact cue. The same id may appear in successive snapshots. */
+export interface RaceImpact {
+  id: number;
+  frame: number;
+  kind: "car" | "wall" | "fence";
+  x: number;
+  y: number;
+  z: number;
+  strength: number;
+}
+
 export interface CarView {
   x: number;
   y: number;
@@ -29,6 +49,7 @@ export interface CarView {
   blink: boolean;
   braking: boolean;
   steer: number;
+  sound?: CarSound;
 }
 
 export interface RaceSnapshot {
@@ -39,4 +60,5 @@ export interface RaceSnapshot {
   flag: boolean;
   order: number[];
   cars: CarView[];
+  impacts?: RaceImpact[];
 }
