@@ -430,6 +430,7 @@ function bakeLightPools(parent: THREE.Object3D, pools: LightPool[]) {
 
 function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
   const bulb = new THREE.MeshStandardMaterial({ color: 0xffe2b8, emissive: 0xffb86e, emissiveIntensity: 2.18, roughness: 0.25 });
+  bulb.name = 'Difusor de foco de pista';
   const core = new THREE.MeshBasicMaterial({ color: 0xfff4de, toneMapped: false });
   const bezel = standard(0xb09169, 0.29, 0.63);
   const fixtureGeometry = new RoundedBoxGeometry(0.91, 0.57, 0.29, 2, 0.035);
@@ -444,19 +445,23 @@ function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
   bloom.context.fillRect(0, 0, 64, 64);
   const haloMaterial = new THREE.SpriteMaterial({ map: texture(bloom.canvas), color: 0xffffff,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  haloMaterial.name = 'Halo de foco de pista';
   const outward = (s: number, margin: number, height: number, aim = s + 0.65) => {
     const p = TRACK.sampleAt(s);
     const offset = wallHalfAt(p.s, 1) + margin;
     return { x: p.x - p.dz * offset, z: p.z + p.dx * offset, height: height + p.y, aim, footYaw: Math.atan2(-p.dz, p.dx) };
   };
   const mark = TRACK.anchors;
+  const standLamp = TRACK.sampleAt(-10.55);
+  const standLampOffset = wallHalfAt(standLamp.s, -1) + 0.48;
   const towers: Floodlight[] = [
     { ...outward(mark.backStraight + 8.8, 0.37, 3.37), faceYaw: 0.44 },
     { ...outward(mark.crest - 11.4, 0.73, 2.66), faceYaw: -0.13 },
     { ...outward(mark.hairpinApex + 1.6, 0.57, 3.45), faceYaw: -0.72 },
     { ...outward(mark.essesMid - 2.0, 0.65, 4.15), faceYaw: -0.83 },
     ...FRONT_TOWERS.map(({ s, margin, height, aim }) => ({ ...outward(s, margin, height, aim), aimOffset: ROAD_HALF - 0.30 })),
-    { x: -9.65, z: 2.65, height: 4.62, aim: TRACK.length - 10.8, faceYaw: 0.31 },
+    { x: standLamp.x + standLamp.dz * standLampOffset, z: standLamp.z - standLamp.dx * standLampOffset,
+      height: 4.62, aim: -10.8, faceYaw: 0.31 },
     { x: 8.34, z: 1.36, height: 3.53, aim: 15.5, faceYaw: -0.63 },
   ];
   const pools: LightPool[] = [];
@@ -503,9 +508,12 @@ function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
     flare.position.set(0, 0, 0.209);
     flare.scale.set(0.88, 0.64, 1);
     head.add(flare);
-    if (index !== 3 && index !== 5 && index !== 6) {
-      const beam = new THREE.SpotLight(0xffb773, index < 6 ? 26 : 36, 13.4, 0.60, 0.78, 2);
+    if (index !== 3 && index !== 6) {
+      const finish = index === 5;
+      const beam = new THREE.SpotLight(finish ? 0xffdca9 : 0xffb773, finish ? 23 : index < 6 ? 26 : 36,
+        finish ? 17.5 : 13.4, finish ? 0.54 : 0.60, 0.78, 2);
       beam.name = 'Foco de pista';
+      beam.userData.finishFloodlight = finish;
       beam.position.set(x, BOARD_SURFACE + height, z);
       beam.target.position.set(aimX, p.y, aimZ);
       parent.add(beam, beam.target);

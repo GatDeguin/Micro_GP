@@ -4,8 +4,8 @@ const GEARS = [
   { up: 2.75, down: 0, redline: 3.42, torque: 1.13 },
   { up: 4.67, down: 2.11, redline: 5.58, torque: 1.11 },
   { up: 6.43, down: 3.80, redline: 7.72, torque: 1.07 },
-  { up: 8.22, down: 5.48, redline: 9.20, torque: 1.00 },
-  { up: Infinity, down: 7.28, redline: 11.20, torque: 0.97 },
+  { up: 8.84, down: 5.48, redline: 10.10, torque: 1.00 },
+  { up: Infinity, down: 7.96, redline: 12.80, torque: 0.98 },
 ] as const;
 const SHIFT_SECONDS = 0.066;
 const IDLE = 0.15;

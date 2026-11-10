@@ -52,6 +52,8 @@ export interface CarSound {
   throttle: number;
   curb: number;
   runoff: number;
+  gravel?: number;
+  grass?: number;
   slip: number;
   scrape: number;
 }
@@ -65,6 +67,8 @@ export interface RaceImpact {
   y: number;
   z: number;
   strength: number;
+  distance?: number;
+  side?: -1 | 1;
 }
 
 export interface TransmissionView {

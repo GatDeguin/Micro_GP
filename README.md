@@ -4,7 +4,7 @@ Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la
 
 ## Jugar en GitHub Pages
 
-Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1, 2 y 3 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
+Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1 a 4 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
 
 El circuito forma un ocho con un cruce a dos alturas. El túnel del ramal inferior desemboca bajo el tablero del puente, y la grada queda frente a la línea de meta. En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas.
 
@@ -21,7 +21,7 @@ Los temas de `Musica` suenan en orden y vuelven a empezar al terminar. La músic
 
 Abrí **Configuración** arriba a la izquierda o con **C**. Podés ajustar el volumen general, la música, los motores y los efectos por separado, o silenciar todo. Los niveles se aplican en vivo y se guardan en ese navegador. Para cambiar la calidad gráfica, elegí un modo y pulsá **Aplicar y recargar**.
 
-Los cuatro autitos tienen caja automática de cinco marchas. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir. Cada faro ilumina su lado de la pista en la sesión nocturna y al acercarse al tramo cubierto.
+Los cuatro autitos tienen caja automática de cinco marchas. La quinta aprovecha la velocidad punta de cada modelo, con el Bólido como el más rápido en recta. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir. Cada faro ilumina su lado de la pista en la sesión nocturna y al acercarse al tramo cubierto.
 
 El motor de cada auto combina bucles de bajas, medias y altas revoluciones, con un timbre al acelerar y otro al soltar el gas. Micro GP genera esos bucles con Web Audio. El diseño toma como referencia la [guía de audio vehicular de Wreckfest](https://www.audiokinetic.com/media/blog/LoopBasedCarEngineDesign/vehicle_audio_modding_guide_for_wreckfest-Wwise2019_2_9.pdf).
 
@@ -29,7 +29,9 @@ Hay cuatro plazas. Los bots pueden cubrir los lugares libres, adelantar y retoma
 
 Al terminar, el tablero muestra la clasificación, los tiempos, las diferencias y la mejor vuelta de cada piloto. **Ver resumen** reproduce las maniobras registradas y **Resultados** abre los tiempos en pantalla. Podés volver a la sala o a exhibición cuando termines de revisarlos.
 
-En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución y **3** para ver a ras de pista. **M** activa o desactiva la pantalla dividida. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
+En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución, **3** para ver a ras de pista y **4** para las cámaras fijas del circuito con seguimiento. **M** activa o desactiva la pantalla dividida. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
+
+La chicana antes del puente y las curvas peraltadas permiten elegir distintas trayectorias. El asfalto de escape, la grava y el césped cambian el agarre. Los frenajes fuertes dejan goma y las protecciones absorben los golpes antes de recuperar su forma.
 
 ## Ejecutar desde la terminal
 

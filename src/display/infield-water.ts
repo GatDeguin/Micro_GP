@@ -32,7 +32,9 @@ const waves = /* glsl */`
     vec2 stream = vec2(0.071, 0.044) * cos(left) + vec2(-0.043, 0.055) * cos(right);
     vec2 lagoon = vec2(0.036, 0.024) * cos(dot(p, vec2(2.4, 3.6)) - tide * 1.63)
       + vec2(-0.022, 0.031) * cos(dot(p, vec2(-4.9, 2.7)) + tide * 1.09);
-    return mix(lagoon, stream, currentStrength(p));
+    float wind = 0.54 + 0.46 * sin(0.48 * tide + dot(p, vec2(0.37, 0.31)));
+    vec2 ripple = wind * vec2(0.014, 0.023) * cos(dot(p, vec2(7.8, 12.6)) - tide * 3.6);
+    return mix(lagoon, stream, currentStrength(p)) + ripple;
   }
 `;
 
@@ -108,15 +110,16 @@ export function pondMaterials(bedMap: THREE.Texture) {
 
   bed.onBeforeCompile = shader => {
     shader.uniforms.pondTime = time;
+    shader.uniforms.waterLight = light;
     shader.vertexShader = 'varying vec3 vPondPosition;\n' + shader.vertexShader.replace('#include <worldpos_vertex>', pondVertex);
-    shader.fragmentShader = waves + shader.fragmentShader.replace('#include <opaque_fragment>', /* glsl */`
+    shader.fragmentShader = 'uniform float waterLight;\n' + waves + shader.fragmentShader.replace('#include <opaque_fragment>', /* glsl */`
       vec2 q = channelPoint(vPondPosition.xz);
       float drift = mix(0.32, 1.18, currentStrength(vPondPosition.xz)) * pondTime;
       float ridge = abs(sin(q.x * 6.0 + q.y * 2.9 - drift * 2.9
         + 0.73 * sin(q.y * 4.3 - drift * 4.3)));
       float ripple = abs(sin(q.x * 3.7 - q.y * 7.2 + drift * 7.2));
       float caustic = pow(1.0 - ridge * ripple, 7.0);
-      outgoingLight *= 1.0 + caustic * vec3(0.23, 0.31, 0.28);
+      outgoingLight *= 1.0 + waterLight * caustic * vec3(0.23, 0.31, 0.28);
       #include <opaque_fragment>
     `);
   };
@@ -146,6 +149,7 @@ export function pondMaterials(bedMap: THREE.Texture) {
         float fresnel = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
         diffuseColor.a = min(0.85, diffuseColor.a + 0.54 * fresnel + 0.48 * foam);
         outgoingLight = mix(outgoingLight, waterLight * vec3(0.76, 0.85, 0.74), foam * 0.78);
+        outgoingLight += (1.0 - waterLight) * fresnel * vec3(0.025, 0.046, 0.079);
         #include <opaque_fragment>
       `);
   };

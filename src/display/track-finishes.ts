@@ -50,7 +50,9 @@ export function asphaltMaps() {
     [mark.hairpinApex + 0.5, 6.9, -1.01, 0.42], [mark.hairpinApex + 1.3, 7.8, 1.18, -0.44],
     [mark.rearLink - 1.6, 5.4, -0.73, 0.19], [mark.rearBend - 4.0, 4.8, 0.83, -0.38],
     [mark.crest - 8.2, 5.3, -0.34, -0.55], [mark.sweep - 3.1, 5.9, -0.98, 0.31],
-    [mark.sweepApex - 6.8, 6.5, -0.72, 0.53],
+    [mark.chicaneEntry - 1.7, 4.7, -0.87, 0.63], [mark.chicaneApexIn + 0.45, 5.4, 0.72, -0.83],
+    [mark.chicaneApexOut - 1.26, 6.0, -0.77, 0.64], [mark.sweepApex - 6.8, 6.5, -0.72, 0.53],
+    [mark.sweepApex - 1.55, 7.6, 0.92, -0.44],
   ];
   for (const [start, span, offset, drift] of clusters) {
     for (let pass = 0; pass < 5; pass++) {
@@ -78,6 +80,30 @@ export function asphaltMaps() {
             begin + (end - begin) * 0.63, toY(tire + drift * 0.70, from + length * 0.63), end, toY(tire + drift, from + length));
           context.stroke();
         }
+      }
+    }
+  }
+
+  for (const [s, offset, length, turn] of [[mark.esses + 1.7, 0.69, 1.84, -0.36],
+    [mark.chicaneApexIn - 1.66, -0.94, 1.55, 0.62], [mark.chicaneApexOut + 1.24, 1.22, 1.29, -0.45],
+    [mark.sweepApex - 5.16, -1.37, 2.20, 0.64]]) {
+    const x = toX(s);
+    const end = toX(s + length);
+    for (const [context, strength] of [[road.context, 0.29], [relief.context, 0.17]] as const) {
+      const fade = context.createLinearGradient(x, 0, end, 0);
+      fade.addColorStop(0, 'rgba(32,29,28,0)');
+      fade.addColorStop(0.32, `rgba(32,29,28,${strength})`);
+      fade.addColorStop(1, 'rgba(32,29,28,0)');
+      context.strokeStyle = fade;
+      context.lineWidth = 0.72;
+      context.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const shift = (i - 1) * 0.052;
+        context.beginPath();
+        context.moveTo(x + i * 0.66, toY(offset + shift, s));
+        context.quadraticCurveTo(x + (end - x) * 0.56, toY(offset + turn * 0.12 + shift, s + length * 0.56),
+          end - i * 0.54, toY(offset + turn + shift, s + length));
+        context.stroke();
       }
     }
   }
@@ -148,9 +174,9 @@ export function kerbPaintMap() {
   return map;
 }
 
-export function runoffMap() {
-  const { canvas, context } = canvas2d(1536, 64);
-  const rng = random(831);
+export function runoffMap(kind: 'grass' | 'escape' | 'gravel' = 'grass') {
+  const { canvas, context } = canvas2d(1536, 72);
+  const rng = random(kind === 'grass' ? 831 : kind === 'gravel' ? 3167 : 6501);
   const paint = noiseField(48, 5, rng);
   const abrasion = noiseField(163, 24, rng);
   const pixels = context.createImageData(canvas.width, canvas.height);
@@ -158,13 +184,28 @@ export function runoffMap() {
     for (let x = 0; x < canvas.width; x++) {
       const u = x / canvas.width;
       const v = y / canvas.height;
-      const flake = Math.max(0, (abrasion(u, v) - 0.70) * 2.12) * (0.43 + 0.57 * rng());
+      const grain = abrasion(u, v);
+      const flake = Math.max(0, (grain - 0.70) * 2.12) * (0.43 + 0.57 * rng());
       const roller = 0.5 + 0.5 * Math.sin(v * 9.0 + 1.3 * paint(u, v));
       const worn = paint(u, v) * 25 + 12 * roller + 9 * (rng() - 0.5);
       const i = (y * canvas.width + x) * 4;
-      pixels.data[i] = 49 + worn + 67 * flake;
-      pixels.data[i + 1] = 103 + worn + 29 * flake;
-      pixels.data[i + 2] = 39 + worn * 0.68 + 22 * flake;
+      if (kind === 'grass') {
+        pixels.data[i] = 49 + worn + 67 * flake;
+        pixels.data[i + 1] = 103 + worn + 29 * flake;
+        pixels.data[i + 2] = 39 + worn * 0.68 + 22 * flake;
+      } else if (kind === 'gravel') {
+        const stone = (grain - 0.5) * 57 + 22 * (rng() - 0.5) + 45 * flake + 0.44 * worn;
+        pixels.data[i] = 146 + stone;
+        pixels.data[i + 1] = 125 + stone;
+        pixels.data[i + 2] = 91 + stone * 0.81;
+      } else {
+        const edge = Math.min(y, canvas.height - 1 - y);
+        const dashes = edge >= 4 && edge < 7 && x % 15 < 8 ? 29 : 0;
+        const aggregate = (grain - 0.5) * 24 + worn * 0.64 + dashes;
+        pixels.data[i] = 87 + aggregate;
+        pixels.data[i + 1] = 92 + aggregate;
+        pixels.data[i + 2] = 89 + aggregate;
+      }
       pixels.data[i + 3] = 255;
     }
   }

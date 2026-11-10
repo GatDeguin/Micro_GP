@@ -250,6 +250,49 @@ function spareRack(parent: THREE.Object3D) {
   }
 }
 
+function inspectionTools(bench: THREE.Object3D) {
+  const caliper = new THREE.Group();
+  caliper.position.set(-0.98, TOP + 0.023, -0.62);
+  caliper.rotation.y = 0.12;
+  bench.add(caliper);
+  box(caliper, bareMetal, 0, 0.018, 0, 1.19, 0.037, 0.087);
+  for (const x of [-0.52, 0.06]) {
+    box(caliper, steel, x, 0.016, 0.104, 0.075, 0.046, 0.28);
+    box(caliper, bareMetal, x + (x < 0 ? 0.022 : -0.022), 0.016, 0.251, 0.039, 0.033, 0.06, false);
+  }
+  box(caliper, graphite, 0.15, 0.036, 0, 0.28, 0.063, 0.158);
+  box(caliper, standard(0x8fa879, 0.49), 0.144, 0.072, 0.016, 0.176, 0.009, 0.075, false);
+  for (let i = 0; i < 13; i++) {
+    const x = -0.452 + i * 0.069;
+    box(caliper, graphite, x, 0.039, -0.029, 0.008, 0.004, i % 4 === 0 ? 0.047 : 0.027, false);
+  }
+
+  const sheet = canvas2d(188, 228);
+  const ctx = sheet.context;
+  ctx.fillStyle = '#e3cea1'; ctx.fillRect(0, 0, 188, 228);
+  ctx.strokeStyle = '#a48458'; ctx.lineWidth = 2;
+  for (let y = 54; y <= 206; y += 23) { ctx.beginPath(); ctx.moveTo(13, y); ctx.lineTo(175, y); ctx.stroke(); }
+  ctx.fillStyle = '#3c574c'; ctx.font = '900 22px Arial'; ctx.fillText('PUESTA A PUNTO', 12, 32, 163);
+  ctx.font = '700 16px monospace';
+  ['EJE       2,38', 'ALINEA.   0,04', 'NEUM.       07', 'LISTO        ✓'].forEach((label, i) => ctx.fillText(label, 14, 72 + i * 23));
+  const pad = new THREE.Group();
+  pad.position.set(0.57, TOP + 0.016, -0.57);
+  pad.rotation.y = -0.17;
+  bench.add(pad);
+  box(pad, graphite, 0, 0, 0, 0.61, 0.036, 0.72, false);
+  const page = new THREE.Mesh(new THREE.PlaneGeometry(0.54, 0.65), new THREE.MeshStandardMaterial({ map: texture(sheet.canvas), roughness: 0.94 }));
+  page.rotation.x = -Math.PI / 2;
+  page.position.y = 0.020;
+  pad.add(page);
+  box(pad, steel, 0, 0.04, -0.306, 0.26, 0.032, 0.074, false);
+
+  const tape = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.038, 8, 22), standard(0xc7a559, 0.84));
+  tape.rotation.x = -Math.PI / 2;
+  tape.position.set(1.59, TOP + 0.041, 0.42);
+  bench.add(tape);
+  box(bench, steel, 2.03, TOP + 0.021, 0.58, 0.42, 0.037, 0.088, false).rotation.y = 0.48;
+}
+
 export function buildServiceStation(parent: THREE.Object3D) {
   const station = new THREE.Group();
   station.name = 'Taller de boxes y puesta a punto';
@@ -260,5 +303,6 @@ export function buildServiceStation(parent: THREE.Object3D) {
   const bench = makeBench(station);
   repairInProgress(bench);
   partsAndCloth(bench);
+  inspectionTools(bench);
   spareRack(station);
 }

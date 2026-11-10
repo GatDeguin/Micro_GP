@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BRIDGE_DECK_DEPTH, CURB_WIDTH, PIT_LANE, ROAD_HALF, TRACK, pitRoadHalfAt, roadHalfAt, wallHalfAt } from '../shared/track';
+import { BRIDGE_DECK_DEPTH, CURB_WIDTH, PIT_LANE, ROAD_HALF, TRACK, bankAt, pitRoadHalfAt, roadHalfAt, surfaceBandsAt, wallHalfAt } from '../shared/track';
+import { buildBridgeTruss } from './circuit-bridge';
 import { buildTunnel } from './circuit-tunnel';
 import { BENCH_SURFACE, box, canvas2d, gritMap, horizontalShadow, random, standard, texture } from './materials';
 import { alongTrack, asphaltMaps, asphaltRelief, gridMap, kerbPaintMap, runoffMap } from './track-finishes';
@@ -9,6 +10,10 @@ type Sample = (typeof TRACK.samples)[number];
 
 function edge(sample: Sample, offset: number, height: number) {
   return new THREE.Vector3(sample.x - sample.dz * offset, height, sample.z + sample.dx * offset);
+}
+
+function surfaceEdge(sample: Sample, offset: number, lift = 0) {
+  return edge(sample, offset, sample.y + bankAt(sample.s) * offset + lift);
 }
 
 function trackSection(from: number, to: number) {
@@ -56,8 +61,8 @@ function ribbon(parent: THREE.Object3D, side: number, from: number, to: number, 
   const second = side < 0 ? from : to;
   const surface = new THREE.Mesh(stripGeometry(
     TRACK.samples,
-    p => edge(p, offset(p, first), p.y + lift),
-    p => edge(p, offset(p, second), p.y + lift),
+    p => surfaceEdge(p, offset(p, first), lift),
+    p => surfaceEdge(p, offset(p, second), lift),
     true,
   ), material);
   surface.receiveShadow = true;
@@ -252,12 +257,15 @@ function buildDeck(parent: THREE.Object3D, wood: THREE.Texture) {
   }
   supportStations.sort((a, b) => a - b).forEach((s, span) => {
     const p = TRACK.sampleAt(s);
-    if (p.y < 0.27) return;
-    const legTop = p.y - rampDepth(p) + 0.037;
+    const bank = bankAt(p.s);
+    if (p.y + Math.abs(bank) * wallHalfAt(p.s, Math.sign(bank)) < 0.27) return;
+    const timberTop = p.y - rampDepth(p) + 0.037;
     const rotation = Math.atan2(p.dx, p.dz);
     const crossingPier = s >= upperFrom - 0.45 && s <= upperTo + 0.45;
     for (const side of [-1, 1]) {
       const offset = side * (wallHalfAt(p.s, side) - (span % 2 === 0 ? 0.49 : 0.36));
+      const legTop = timberTop + bank * offset;
+      if (legTop < DECK_TOP + 0.11) continue;
       const at = edge(p, offset, (DECK_TOP + legTop) / 2);
       footLocations.push({ x: at.x, z: at.z, rotation });
       box(parent, crossingPier ? iron : timber, at.x, at.y, at.z, crossingPier ? 0.54 : span % 2 ? 0.44 : 0.40,
@@ -272,7 +280,7 @@ function buildDeck(parent: THREE.Object3D, wood: THREE.Texture) {
         const base = edge(p, offset, DECK_TOP + 0.12);
         const bridgeBrace = Math.abs(s - TRACK.bridge.crest) < 3.1;
         const jointSample = TRACK.sampleAt(bridgeBrace ? TRACK.bridge.crest : s + (span % 2 === 0 ? 1.37 : -1.33));
-        const joint = edge(jointSample, offset, jointSample.y - rampDepth(jointSample) + 0.013);
+        const joint = surfaceEdge(jointSample, offset, -rampDepth(jointSample) + 0.013);
         const direction = joint.clone().sub(base);
         brace.position.copy(base).lerp(joint, 0.5);
         brace.scale.y = direction.length();
@@ -282,7 +290,8 @@ function buildDeck(parent: THREE.Object3D, wood: THREE.Texture) {
       }
     }
     const width = wallHalfAt(p.s, -1) + wallHalfAt(p.s, 1) - 0.09;
-    box(parent, crossingPier ? iron : timber, p.x, legTop + 0.023, p.z, width, 0.18, crossingPier ? 0.48 : 0.35).rotation.y = rotation;
+    const beam = box(parent, crossingPier ? iron : timber, p.x, timberTop + 0.023, p.z, width, 0.18, crossingPier ? 0.48 : 0.35);
+    beam.rotation.set(0, rotation, -Math.atan(bank), 'YXZ');
   });
   const footprintGeometry = new THREE.PlaneGeometry(1.12, 0.97).rotateX(-Math.PI / 2);
   const footprints = new THREE.InstancedMesh(footprintGeometry, horizontalShadow(), footLocations.length);
@@ -299,7 +308,7 @@ function buildDeck(parent: THREE.Object3D, wood: THREE.Texture) {
 
 function kerbStations(side: number) {
   const samples = TRACK.samples;
-  const rim = samples.map(p => edge(p, side * (roadHalfAt(p.s) + CURB_WIDTH * 0.50), p.y));
+  const rim = samples.map(p => surfaceEdge(p, side * (roadHalfAt(p.s) + CURB_WIDTH * 0.50)));
   const cumulative = [0];
   for (let i = 0; i < rim.length; i++) {
     cumulative.push(cumulative[i] + rim[i].distanceTo(rim[(i + 1) % rim.length]));
@@ -333,6 +342,10 @@ function buildKerbs(parent: THREE.Object3D) {
   const screwCenters: { x: number; y: number; z: number; angle: number }[] = [];
   for (const side of [-1, 1]) {
     const stations = kerbStations(side);
+    if (side === PIT_LANE.side) {
+      stations.push(PIT_LANE.entry, PIT_LANE.exit);
+      stations.sort((a, b) => a - b);
+    }
     for (let i = 0; i < stations.length - 1; i++) {
       const begin = stations[i];
       const step = stations[i + 1] - begin;
@@ -350,7 +363,7 @@ function buildKerbs(parent: THREE.Object3D) {
         for (let k = 0; k < widths.length; k++) {
           const index = side < 0 ? widths.length - 1 - k : k;
           const offset = side * (roadHalfAt(p.s) + widths[index] * CURB_WIDTH);
-          const point = edge(p, offset, p.y + heights[index] * (end ? 0.58 : 1) * (1 - 0.68 * straight));
+          const point = surfaceEdge(p, offset, heights[index] * (end ? 0.58 : 1) * (1 - 0.68 * straight));
           positions.push(point.x, point.y, point.z);
           const shade = (end ? 0.85 : 1) * (0.963 + 0.037 * wear());
           colors.push(color.r * shade, color.g * shade, color.b * shade);
@@ -365,7 +378,7 @@ function buildKerbs(parent: THREE.Object3D) {
       }
       if ((i + (side < 0 ? 2 : 0)) % 5 === 0 && straight < 0.14) {
         const sample = TRACK.sampleAt(midpoint);
-        const { x, y, z } = edge(sample, side * (roadHalfAt(sample.s) + CURB_WIDTH * 0.53), sample.y + 0.056 * (1 - 0.68 * straight));
+        const { x, y, z } = surfaceEdge(sample, side * (roadHalfAt(sample.s) + CURB_WIDTH * 0.53), 0.056 * (1 - 0.68 * straight));
         screwCenters.push({ x, y, z, angle: wear() * Math.PI });
       }
     }
@@ -453,7 +466,8 @@ function buildFences(parent: THREE.Object3D) {
     const offsetAt = (p: Sample) => side * (wallHalfAt(p.s, side) - 0.02);
     const lineAt = (p: Sample, level: number) => {
       const [height, bend] = railLevels[level];
-      return edge(p, offsetAt(p) - side * bend, p.y + height);
+      const ground = offsetAt(p);
+      return edge(p, ground - side * bend, p.y + bankAt(p.s) * ground + height);
     };
     const panels = netSections.flatMap(section => [0, 1].map(level => {
       const panel = stripGeometry(section, p => lineAt(p, level), p => lineAt(p, level + 1), false, false);
@@ -474,16 +488,17 @@ function buildFences(parent: THREE.Object3D) {
       const next = TRACK.sampleAt(stations[i + 1] ?? TRACK.length);
       const offset = offsetAt(p);
       transform.rotation.set(0, Math.atan2(p.dx, p.dz), 0);
-      transform.position.copy(edge(p, offset, p.y + 0.322));
+      transform.position.copy(surfaceEdge(p, offset, 0.322));
       transform.scale.set(0.076, 0.683, 0.079);
       transform.updateMatrix();
       uprights.setMatrixAt(slot * 2, transform.matrix);
-      transform.position.copy(edge(p, offset, p.y + 0.030));
+      transform.position.copy(surfaceEdge(p, offset, 0.030));
+      transform.rotation.z = -Math.atan(bankAt(p.s));
       transform.scale.set(0.209, 0.095, 0.185);
       transform.updateMatrix();
       plates.setMatrixAt(slot, transform.matrix);
       for (const [bolt, shift] of [-0.064, 0.064].entries()) {
-        transform.position.copy(edge(p, offset + shift, p.y + 0.080));
+        transform.position.copy(surfaceEdge(p, offset + shift, 0.080));
         transform.scale.setScalar(1);
         transform.updateMatrix();
         bolts.setMatrixAt(slot * 2 + bolt, transform.matrix);
@@ -529,15 +544,7 @@ function buildMarkings(parent: THREE.Object3D) {
 }
 
 function apronExtent(p: Sample, side: number) {
-  const mark = TRACK.anchors;
-  const apices = side < 0
-    ? [[mark.essesMid, 4.3, 0.24], [mark.hairpinApex, 5.8, 0.35], [mark.rearBend, 5.9, 0.22], [mark.sweepApex, 8.8, 0.29]]
-    : [[mark.hairpin - 1.8, 5.4, 0.27], [mark.bridgeApproach, 6.5, 0.20], [mark.crest - 5.6, 5.3, 0.23], [mark.sweepApex, 8.5, 0.26]];
-  const expansion = apices.reduce((width, [s, radius, amount]) => {
-    const distance = (p.s - s) / radius;
-    return width + amount * Math.max(0, 1 - distance * distance) ** 2;
-  }, 0);
-  return wallHalfAt(p.s, side) - 0.055 + expansion;
+  return wallHalfAt(p.s, side) - 0.02;
 }
 
 function fitRampJoints(parent: THREE.Object3D) {
@@ -549,7 +556,7 @@ function fitRampJoints(parent: THREE.Object3D) {
     const rotation = Math.atan2(p.dx, p.dz);
     for (const side of [-1, 1]) {
       const outer = side * (apronExtent(p, side) + 0.202);
-      const at = edge(p, outer, p.y - 0.175);
+      const at = surfaceEdge(p, outer, -0.175);
       box(parent, bracket, at.x, at.y, at.z, 0.043, 0.191, 0.53, false).rotation.y = rotation;
       for (const along of [-0.166, 0.166]) {
         const bolt = new THREE.Mesh(boltGeometry, pins);
@@ -596,9 +603,9 @@ function fenceKickboard(parent: THREE.Object3D, wood: THREE.Texture) {
 }
 
 function trackBoard(parent: THREE.Object3D, s: number, side: number, title: string, caption: string,
-  color: string, width: number, yaw?: number) {
+  color: string, width: number, yaw?: number, lift = 0) {
   const p = TRACK.sampleAt(s);
-  const at = edge(p, side * (wallHalfAt(s, side) + 0.038), p.y);
+  const at = surfaceEdge(p, side * (wallHalfAt(s, side) + 0.038));
   const board = new THREE.Group();
   board.position.copy(at);
   board.rotation.y = yaw ?? Math.atan2(-p.dx, -p.dz);
@@ -618,10 +625,10 @@ function trackBoard(parent: THREE.Object3D, s: number, side: number, title: stri
   context.fillText(caption, 128, 98, 213);
   const plate = standard(0xffffff, 0.72);
   plate.map = texture(canvas);
-  box(board, steel, 0, 0.45, 0, 0.064, 0.92, 0.062);
-  box(board, steel, 0, 1.16, 0, width + 0.035, 0.54, 0.047);
+  box(board, steel, 0, 0.45 + lift / 2, 0, 0.064, 0.92 + lift, 0.062);
+  box(board, steel, 0, 1.16 + lift, 0, width + 0.035, 0.54, 0.047);
   const face = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.505), plate);
-  face.position.set(0, 1.16, 0.026);
+  face.position.set(0, 1.16 + lift, 0.026);
   face.receiveShadow = true;
   board.add(face);
 }
@@ -713,8 +720,10 @@ export function buildCircuit(parent: THREE.Object3D, wood: THREE.Texture) {
   const road = asphaltMaps();
   const asphalt = new THREE.MeshPhysicalMaterial({ color: 0x474850, map: road.color, roughnessMap: road.rough, bumpMap: asphaltRelief(),
     bumpScale: 0.049, roughness: 0.97, clearcoat: 0.10, clearcoatRoughness: 0.63 });
-  const runoff = new THREE.MeshPhysicalMaterial({ map: runoffMap(), roughness: 0.64,
+  const grass = new THREE.MeshPhysicalMaterial({ map: runoffMap(), roughness: 0.76,
     bumpMap: micro, bumpScale: 0.040, clearcoat: 0.27, clearcoatRoughness: 0.49 });
+  const gravel = new THREE.MeshStandardMaterial({ map: runoffMap('gravel'), roughness: 0.94, bumpMap: micro, bumpScale: 0.082 });
+  const escape = new THREE.MeshStandardMaterial({ map: runoffMap('escape'), roughness: 0.84, bumpMap: micro, bumpScale: 0.030 });
   const shoulderGrain = wood.clone();
   shoulderGrain.repeat.set(0.07, 0.23);
   const shoulder = new THREE.MeshStandardMaterial({ color: 0xc69c68, map: shoulderGrain, roughness: 0.76 });
@@ -725,31 +734,36 @@ export function buildCircuit(parent: THREE.Object3D, wood: THREE.Texture) {
   const joint = standard(0x37312c, 0.89);
 
   parent.add(surfaceWithGrit(stripGeometry(TRACK.samples,
-    p => edge(p, -roadHalfAt(p.s), p.y), p => edge(p, roadHalfAt(p.s), p.y), false), asphalt));
+    p => surfaceEdge(p, -roadHalfAt(p.s)), p => surfaceEdge(p, roadHalfAt(p.s)), false), asphalt));
   const underside = new THREE.Mesh(stripGeometry(TRACK.samples,
-    p => edge(p, apronExtent(p, 1) + 0.15, p.y - rampDepth(p) + 0.003),
-    p => edge(p, -apronExtent(p, -1) - 0.15, p.y - rampDepth(p) + 0.003), false), standard(0x65442d, 0.89));
+    p => surfaceEdge(p, apronExtent(p, 1) + 0.15, -rampDepth(p) + 0.003),
+    p => surfaceEdge(p, -apronExtent(p, -1) - 0.15, -rampDepth(p) + 0.003), false), standard(0x65442d, 0.89));
   underside.castShadow = underside.receiveShadow = true;
   parent.add(underside);
   for (const side of [-1, 1]) {
-    const inner = (p: Sample) => edge(p, side * roadHalfAt(p.s), p.y - 0.014);
-    const outer = (p: Sample) => edge(p, side * apronExtent(p, side), p.y - 0.014);
-    parent.add(surfaceWithGrit(stripGeometry(TRACK.samples, side < 0 ? outer : inner, side < 0 ? inner : outer, false), runoff));
-    const shoulderInside = (p: Sample) => edge(p, side * (apronExtent(p, side) - 0.013), p.y - 0.009);
-    const shoulderOutside = (p: Sample) => edge(p, side * (apronExtent(p, side) + 0.156), p.y - 0.009);
+    const limits = new Map(TRACK.samples.map(p => [p, surfaceBandsAt(p.s, side)]));
+    for (const [from, to, material] of [['asphalt', 'curb', joint], ['curb', 'escape', escape],
+      ['escape', 'gravel', gravel], ['gravel', 'wall', grass]] as const) {
+      const first = side < 0 ? to : from;
+      const second = side < 0 ? from : to;
+      parent.add(surfaceWithGrit(stripGeometry(TRACK.samples,
+        p => surfaceEdge(p, side * limits.get(p)![first], -0.011),
+        p => surfaceEdge(p, side * limits.get(p)![second], -0.011), false), material));
+    }
+    const shoulderInside = (p: Sample) => surfaceEdge(p, side * (apronExtent(p, side) - 0.013), -0.009);
+    const shoulderOutside = (p: Sample) => surfaceEdge(p, side * (apronExtent(p, side) + 0.156), -0.009);
     const border = new THREE.Mesh(stripGeometry(TRACK.samples,
       side < 0 ? shoulderOutside : shoulderInside, side < 0 ? shoulderInside : shoulderOutside, true), shoulder);
     border.receiveShadow = true;
     parent.add(border);
 
-    ribbon(parent, side, 0, CURB_WIDTH, -0.007, joint);
     ribbon(parent, side, -0.05, 0, 0.008, paint);
 
     plywoodEdge(parent, endGrain, rampPly, (p, level) => {
       const bulge = 0.047 * Math.sin(Math.PI * level / rampPly.length);
       const depth = rampDepth(p);
-      const height = p.y - depth + (depth - 0.009) * level / rampPly.length;
-      return edge(p, side * (apronExtent(p, side) + 0.156 + bulge), height);
+      const lift = -depth + (depth - 0.009) * level / rampPly.length;
+      return surfaceEdge(p, side * (apronExtent(p, side) + 0.156 + bulge), lift);
     });
   }
   buildKerbs(parent);
@@ -760,7 +774,9 @@ export function buildCircuit(parent: THREE.Object3D, wood: THREE.Texture) {
   buildPitLane(parent, asphalt);
   underpassShade(parent);
   buildTunnel(parent);
+  buildBridgeTruss(parent);
   trackBoard(parent, TRACK.bridge.crest - 8.6, 1, 'FRENÁ', 'CRESTA', '#e8bb55', 1.48);
   trackBoard(parent, TRACK.bridge.crest - 4.3, -1, 'FRENO', 'PUENTE', '#e7c278', 1.08);
   trackBoard(parent, TRACK.crossing.upper - 6.9, 1, 'PUENTE', 'NIVEL ALTO', '#e1bb67', 1.33);
+  trackBoard(parent, TRACK.chicane.from - 1.1, -1, 'CHICANA', 'DOS GIROS', '#e7c278', 1.38, undefined, 0.26);
 }

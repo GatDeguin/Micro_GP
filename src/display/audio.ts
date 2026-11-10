@@ -7,7 +7,7 @@ import { buildAudioSamples, buildEngineSamples } from './audio-samples';
 import { defaultAudioSettings, type AudioSettings } from './settings';
 import { coverClearance } from './track-cover';
 
-type View = 'general' | 'chase' | 'trackside' | 'replay';
+type View = 'general' | 'chase' | 'trackside' | 'broadcast' | 'replay';
 
 interface RaceMix {
   state: RaceSnapshot;
@@ -31,6 +31,7 @@ const roadTones: Record<SectorId, { frequency: number; gain: number }> = {
   straight: { frequency: 760, gain: 1 }, esses: { frequency: 1020, gain: 0.96 },
   hairpin: { frequency: 830, gain: 1.18 }, bridge: { frequency: 580, gain: 1.08 },
   'back-straight': { frequency: 820, gain: 0.88 }, sweep: { frequency: 930, gain: 1 },
+  chicane: { frequency: 970, gain: 1.06 },
   pit: { frequency: 520, gain: 0.81 }, underpass: { frequency: 700, gain: 1.04 },
   tunnel: { frequency: 665, gain: 1.08 },
 };
@@ -284,6 +285,7 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
       const throttle = limit(car.sound?.throttle ?? (car.braking ? 0 : motion * 0.8));
       const curb = limit(car.sound?.curb ?? 0);
       const runoff = limit(car.sound?.runoff ?? 0);
+      const gravel = limit(car.sound?.gravel ?? 0);
       const slip = limit(car.sound?.slip ?? 0);
       const scrape = limit(car.sound?.scrape ?? 0);
       const transmission = car.transmission;
@@ -384,8 +386,8 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
       target(voice.asphaltFilter.frequency, (tone.frequency + motion * 570 - bridge * 210) * (covered ? 0.80 : 1), 0.11);
       target(voice.bridge.gain, surfaceLevel * bridge * 0.29);
       target(voice.road.playbackRate, 0.55 + 0.90 * motion);
-      target(voice.runoff.gain, surfaceLevel * runoff * 0.20);
-      target(voice.grass.playbackRate, 0.69 + motion * 0.67);
+      target(voice.runoff.gain, surfaceLevel * (runoff * 0.20 + gravel * 0.046));
+      target(voice.grass.playbackRate, 0.69 + motion * 0.67 + gravel * 0.34);
       target(voice.skidFilter.frequency, 1000 + motion * 1550, 0.045);
       target(voice.skid.gain, (slip * 0.25 + Number(car.braking && car.speed > 0) * motion * 0.07)
         * (1 - runoff * 0.45) * settings.effects, 0.05);

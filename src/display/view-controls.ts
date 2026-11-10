@@ -46,6 +46,8 @@ export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChang
           <span>Persecución</span><kbd aria-hidden="true">2</kbd></label>
         <label><input type="radio" name="camera-view" value="trackside" aria-keyshortcuts="3">
           <span>A ras</span><kbd aria-hidden="true">3</kbd></label>
+        <label><input type="radio" name="camera-view" value="broadcast" aria-keyshortcuts="4">
+          <span>Cámaras del circuito</span><kbd aria-hidden="true">4</kbd></label>
       </fieldset>
       ${multiplayer ? `<label class="view-tools-split"><input type="checkbox" data-split aria-keyshortcuts="M" aria-describedby="view-tools-status">
         <span>Pantalla dividida</span><kbd aria-hidden="true">M</kbd></label>
@@ -81,7 +83,9 @@ export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChang
     general: root.querySelector<HTMLInputElement>('input[value=general]')!,
     chase: root.querySelector<HTMLInputElement>('input[value=chase]')!,
     trackside: root.querySelector<HTMLInputElement>('input[value=trackside]')!,
+    broadcast: root.querySelector<HTMLInputElement>('input[value=broadcast]')!,
   };
+  const shortcuts: Record<string, ViewMode | undefined> = { '1': 'general', '2': 'chase', '3': 'trackside', '4': 'broadcast' };
   let currentMode: ViewMode = 'general';
   let playerCount = 0;
 
@@ -166,10 +170,9 @@ export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChang
       event.preventDefault();
       split.checked = !split.checked;
       updateStatus();
-    } else if (['1', '2', '3'].includes(key) && !(target instanceof HTMLInputElement && target.type === 'range')) {
+    } else if (shortcuts[key] && !(target instanceof HTMLInputElement && target.type === 'range')) {
       event.preventDefault();
-      const next = key === '1' ? 'general' : key === '2' ? 'chase' : 'trackside';
-      selectMode(next, !panel.hidden && target instanceof HTMLInputElement && target.type === 'radio');
+      selectMode(shortcuts[key], !panel.hidden && target instanceof HTMLInputElement && target.type === 'radio');
     }
   });
   updateStatus();

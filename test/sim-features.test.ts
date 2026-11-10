@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NEUTRAL, type CarView, type Driver, type RaceConfig } from '../src/shared/protocol.ts';
 import { PIT_LANE, ROAD_HALF, TRACK, type TrackLocation } from '../src/shared/track.ts';
+import { CAR_DIMENSIONS } from '../src/shared/car-dimensions.ts';
 import { Race } from '../src/sim/race.ts';
+import { slopeFor, tireLoad } from '../src/sim/road-contact.ts';
 
 const TICK = 1 / 60;
 const stopped: Driver = { owned: true, input: NEUTRAL };
@@ -156,18 +158,18 @@ test('the compact turns sooner while the bólido pulls ahead on a straight', () 
 
   const straightCompact = ready(0);
   const straightRacer = ready(2);
-  for (const setup of [straightCompact, straightRacer]) tick(setup.race, setup.inputs(gas), 2.5);
+  for (const setup of [straightCompact, straightRacer]) tick(setup.race, setup.inputs(gas), 3.05);
   assert.ok(straightRacer.race.snapshot().cars[2].speed > straightCompact.race.snapshot().cars[0].speed + 0.35);
 });
 
-test('each model reaches fifth gear and gains 15 to 20 percent straight-line speed', () => {
-  const priorTopSpeeds = [8.05, 8.05, 8.76, 8.09];
+test('each model reaches fifth gear and gains 12 to 17 percent straight-line speed', () => {
+  const priorTopSpeeds = [9.5, 9.5, 10.32, 9.56];
   const topSpeeds = priorTopSpeeds.map((previous, slot) => {
     const { race, inputs } = ready(slot);
-    tick(race, inputs(gas), 2.7);
+    tick(race, inputs(gas), 3.05);
     const car = race.snapshot().cars[slot];
     assert.equal(car.transmission?.gear, 5);
-    assert.ok(car.speed >= previous * 1.15 && car.speed <= previous * 1.20);
+    assert.ok(car.speed >= previous * 1.12 && car.speed <= previous * 1.17);
     return car.speed;
   });
   assert.ok(topSpeeds[2] > Math.max(topSpeeds[0], topSpeeds[1], topSpeeds[3]));
@@ -205,6 +207,55 @@ test('cornering rolls the body and braking pitches the nose down', () => {
   const brake = race.snapshot().cars[0].suspension;
   assert.ok(brake && brake.pitch > 0.025);
   assert.ok(Number.isFinite(brake.heave));
+});
+
+test('full braking builds pressure and stops a fifth-gear car within the braking zone', () => {
+  const { race, inputs } = ready(0);
+  tick(race, inputs(gas), 2.3);
+  const entry = race.snapshot().cars[0];
+  assert.equal(entry.transmission?.gear, 5);
+  const brake = inputs({ owned: true, input: { ...NEUTRAL, brake: true } });
+  race.step(TICK, brake);
+  const firstDrop = entry.speed - race.snapshot().cars[0].speed;
+  tick(race, brake, 0.10);
+  const before = race.snapshot().cars[0].speed;
+  race.step(TICK, brake);
+  const laterDrop = before - race.snapshot().cars[0].speed;
+  assert.ok(firstDrop > 0.1 && laterDrop > firstDrop + 0.04);
+  waitFor(race, brake, 0.64, () => race.snapshot().cars[0].speed === 0);
+  const stopped = race.snapshot().cars[0];
+  assert.ok(Math.hypot(stopped.x - entry.x, stopped.z - entry.z) < 3.95);
+});
+
+test('the tires blend seams and distinguish escape asphalt, gravel and grass', () => {
+  const compact = CAR_DIMENSIONS[0];
+  const sample = (s: number, offset: number) => tireLoad({ ...TRACK.sampleAt(s), offset }, compact, 1, 0);
+  const grassyStraight = 14;
+  const grassBands = TRACK.surfaceBandsAt(grassyStraight, 1);
+  const asphalt = sample(grassyStraight, 0);
+  const beforeCurb = sample(grassyStraight, grassBands.asphalt - compact.tireOffset - 0.08);
+  const ontoCurb = sample(grassyStraight, grassBands.asphalt - compact.tireOffset + 0.08);
+  const grass = sample(grassyStraight, (grassBands.gravel + grassBands.wall) / 2 - compact.tireOffset);
+  const gravelAt = TRACK.anchors.hairpinApex;
+  const gravelBands = TRACK.surfaceBandsAt(gravelAt, 1);
+  const gravel = sample(gravelAt, (gravelBands.escape + gravelBands.gravel) / 2 - compact.tireOffset);
+  const escapeAt = (TRACK.chicane.apexIn + TRACK.chicane.apexOut) / 2;
+  const escapeBands = TRACK.surfaceBandsAt(escapeAt, 1);
+  const escape = sample(escapeAt, (escapeBands.curb + escapeBands.escape) / 2 - compact.tireOffset);
+
+  assert.ok(beforeCurb.curb > 0 && ontoCurb.curb > beforeCurb.curb && ontoCurb.curb < 0.5);
+  assert.ok(escape.escape > 0.4 && gravel.gravel > 0.4 && grass.grass > 0.4);
+  assert.ok(asphalt.grip > escape.grip && escape.grip > gravel.grip && gravel.grip > grass.grip);
+  assert.ok(gravel.drag > grass.drag && grass.drag > escape.drag);
+});
+
+test('the two banked curves add opposite lateral forces on their slopes', () => {
+  const rightEnd = { ...TRACK.sampleAt(TRACK.anchors.hairpinApex), offset: 0.8 };
+  const leftEnd = { ...TRACK.sampleAt(TRACK.anchors.sweepApex), offset: 0.8 };
+  assert.ok(slopeFor(rightEnd, 1, 0).lateral > 1.3);
+  assert.ok(slopeFor(leftEnd, 1, 0).lateral < -1.2);
+  assert.ok(TRACK.heightAt(rightEnd.s, rightEnd.offset) > rightEnd.y + 0.10);
+  assert.ok(TRACK.heightAt(leftEnd.s, leftEnd.offset) < leftEnd.y - 0.10);
 });
 
 test('bot difficulty changes actual lap pace', () => {
@@ -248,7 +299,8 @@ test('a driven lap records clean sectors and bridge unload while bot assistance 
       const road = roadOf(car);
       if (Math.abs(road.s - TRACK.anchors.crest) < 7.5) crestHeave = Math.max(crestHeave, car.suspension!.heave);
       const fallback = assisted && i >= 240 && i < 300;
-      const driver = aimAt(car, road.s + 1.8 + car.speed * 0.34, 0.93, 6.15);
+      const pace = Math.abs(road.s - TRACK.anchors.crest) < 9 ? 7.45 : 6.15;
+      const driver = aimAt(car, road.s + 1.8 + car.speed * 0.34, 0.93, pace);
       race.step(TICK, fallback ? [] : inputs({ ...driver, livery: 'sector' }));
       if (fallback) keptPaint = race.snapshot().cars[0].livery === 'sector' && !race.snapshot().cars[0].owned;
     }
@@ -269,7 +321,7 @@ test('a driven lap records clean sectors and bridge unload while bot assistance 
   assert.ok(assisted.keptPaint);
 });
 
-test('every bot completes the upper and lower passes with continuous height and route progress', () => {
+test('every bot completes the chicane and both decks with continuous height and progress', () => {
   const race = new Race({ manual: true });
   const drivers = [{ owned: true, input: null }];
   race.configure({ ...config, bots: 3 });
@@ -286,6 +338,14 @@ test('every bot completes the upper and lower passes with continuous height and 
       const delta = Math.abs(distance - before[slot].distance!);
       assert.ok(Math.min(delta, TRACK.length - delta) < 0.85, 'a car jumped to a noncontiguous part of the route');
       assert.ok(Math.abs(car.y - before[slot].y) < 0.19, 'a car jumped to another deck');
+      if (Math.abs(distance - TRACK.chicane.apexIn) < 0.3) {
+        assert.ok(car.speed > 5);
+        crossed[slot].add('first apex');
+      }
+      if (Math.abs(distance - TRACK.chicane.apexOut) < 0.3) {
+        assert.ok(car.speed > 5);
+        crossed[slot].add('second apex');
+      }
       if (Math.abs(distance - TRACK.crossing.upper) < 0.3) {
         assert.ok(car.y > 2.95);
         crossed[slot].add('upper');
@@ -299,5 +359,5 @@ test('every bot completes the upper and lower passes with continuous height and 
     if (state.phase === 'results') break;
   }
   assert.equal(race.snapshot().phase, 'results');
-  assert.deepEqual(crossed.map(decks => decks.size), [2, 2, 2, 2]);
+  assert.deepEqual(crossed.map(zones => zones.size), [4, 4, 4, 4]);
 });

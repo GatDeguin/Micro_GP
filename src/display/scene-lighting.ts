@@ -120,11 +120,28 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   scene.add(key, key.target, fill, bounce, benchLight, benchLight.target, toolLight, toolLight.target);
   const points = shadowPoints();
   const trackLamps: { light: THREE.SpotLight; day: number }[] = [];
+  const diffusers = new Set<THREE.MeshStandardMaterial>();
+  const halos = new Set<THREE.SpriteMaterial>();
+  let finish: THREE.SpotLight | undefined;
   scene.traverse(object => {
     if (object instanceof THREE.SpotLight && object.name === 'Foco de pista') {
       trackLamps.push({ light: object, day: object.intensity });
+      if (object.userData.finishFloodlight) finish = object;
+    } else if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial
+      && object.material.name === 'Difusor de foco de pista') {
+      diffusers.add(object.material);
+    } else if (object instanceof THREE.Sprite && object.material.name === 'Halo de foco de pista') {
+      halos.add(object.material);
     }
   });
+  if (finish && !lowQuality) {
+    finish.shadow.mapSize.set(1024, 1024);
+    finish.shadow.camera.near = 0.44;
+    finish.shadow.normalBias = 0.011;
+    finish.shadow.bias = -0.00009;
+    finish.shadow.intensity = 0.73;
+    finish.shadow.radius = 1.9;
+  }
   const dayBackground = scene.background;
   const dayBackgroundIntensity = scene.backgroundIntensity;
   const nightBackground = new THREE.Color(0x101521);
@@ -146,9 +163,18 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     benchLight.intensity = night ? 187 : 277;
     toolLight.intensity = night ? 164 : 254;
     for (const { light, day } of trackLamps) light.intensity = day * (night ? 3.8 : 1);
+    if (finish) {
+      if (night) finish.intensity *= 1.30;
+      finish.castShadow = night && !lowQuality;
+    }
+    for (const material of diffusers) material.emissiveIntensity = night ? 3.65 : 2.18;
+    for (const material of halos) material.opacity = night ? 0.95 : 0.59;
     scene.environmentIntensity = night ? 0.19 : close ? 0.42 : 0.38;
     renderer.toneMappingExposure = night ? 1.01 : close ? 1.015 : 1.075;
-    if (!lowQuality) fitShadow(key, points, close);
+    if (!lowQuality) {
+      fitShadow(key, points, close);
+      if (night) key.shadow.intensity = 0.62;
+    }
   }
   applyLighting();
   return {

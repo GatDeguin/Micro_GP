@@ -59,7 +59,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot) => void) {
       <p class="solo-practice-note" data-unlock role="status" hidden></p>
       <button type="button" class="solo-prepare" aria-controls="solo-setup" aria-expanded="false">Preparar partida</button>
       <button type="button" class="solo-toggle">Jugar</button>
-      <p class="solo-hint">Flechas o WASD · Cámaras 1, 2 y 3</p>
+      <p class="solo-hint">Flechas o WASD · Cámaras 1 a 4</p>
     </div>
     <div class="solo-pedals" aria-label="Mandos táctiles" hidden>
       <div>

@@ -29,6 +29,8 @@ export interface TrackHint {
   y?: number;
 }
 
+export type TrackSurface = 'asphalt' | 'escape' | 'curb' | 'gravel' | 'grass';
+
 const start = [-3.75, 8.6875] as const;
 const crossingPoint = [-18.8, 2.30] as const;
 const crossingSlope = 8.15 / 13.4;
@@ -42,7 +44,8 @@ const plan = [
   ['rearLink', [24.60, -7.85], [28.65, -8.609], [27.35, -7.43]],
   ['rearBend', [12.95, -12.65], [20.90, -8.415], [17.18, -12.40]],
   ['crest', [2.65, -10.50], [8.73, -12.90], [7.08, -12.05]],
-  ['backStraight', [-5.40, -5.85], [0.02, -9.58], [-2.85, upperLineZ(-2.85)]],
+  ['chicaneEntry', [0.15, upperLineZ(0.15)], [1.62, -10.1404], [1.11, upperLineZ(1.11)]],
+  ['chicaneExit', [-12.95, upperLineZ(-12.95)]],
   ['upperCross', crossingPoint],
   ['upperExit', [-24.40, upperLineZ(-24.40)]],
   ['sweep', [-30.20, 8.10], [-26.43, upperLineZ(-26.43)], [-28.02, 8.30]],
@@ -62,6 +65,15 @@ function smoothstep(value: number, from: number, to: number) {
   return t * t * (3 - 2 * t);
 }
 
+function easedStep(value: number) {
+  const t = clamp01(value);
+  return t * t * t * (10 + t * (6 * t - 15));
+}
+
+function band(s: number, from: number, enter: number, leave: number, to: number) {
+  return smoothstep(s, from, enter) * (1 - smoothstep(s, leave, to));
+}
+
 function buildTrack() {
   const raw = [{ x: start[0], z: start[1], s: 0 }] as { x: number; z: number; s: number }[];
   function append(x: number, z: number) {
@@ -69,10 +81,21 @@ function buildTrack() {
     raw.push({ x, z, s: last.s + Math.hypot(x - last.x, z - last.z) });
   }
 
-  const anchors = {} as Record<(typeof plan)[number][0], number>;
+  const anchors = {} as Record<(typeof plan)[number][0] | 'chicaneApexIn' | 'chicaneApexOut' | 'backStraight', number>;
   for (const [key, [x, z], first, second] of plan) {
     const from = raw[raw.length - 1];
-    if (first && second) {
+    if (key === 'chicaneExit') {
+      const dx = x - from.x;
+      const dz = z - from.z;
+      const run = Math.hypot(dx, dz);
+      for (let i = 1; i <= 160; i++) {
+        const t = i / 160;
+        const shift = 1.51 * easedStep(2 * Math.min(t, 1 - t));
+        append(mix(from.x, x, t) - dz * shift / run, mix(from.z, z, t) + dx * shift / run);
+        if (i === 24) anchors.chicaneApexIn = raw[raw.length - 1].s;
+        if (i === 96) anchors.chicaneApexOut = raw[raw.length - 1].s;
+      }
+    } else if (first && second) {
       for (let i = 1; i <= 128; i++) {
         const t = i / 128;
         const u = 1 - t;
@@ -86,6 +109,7 @@ function buildTrack() {
     }
     anchors[key] = raw[raw.length - 1].s;
   }
+  anchors.backStraight = anchors.chicaneEntry;
 
   const length = anchors.end;
   const count = Math.ceil(length / 0.28);
@@ -97,9 +121,10 @@ function buildTrack() {
 
   function roadHalfAt(distance: number) {
     const s = wrap(distance);
-    const widen = smoothstep(s, anchors.hairpin - 5.3, anchors.hairpinApex - 3.3);
-    const narrow = 1 - smoothstep(s, anchors.hairpinApex + 4.0, anchors.bridgeApproach + 4.5);
-    return ROAD_HALF + (HAIRPIN_HALF - ROAD_HALF) * widen * narrow;
+    const wide = band(s, anchors.hairpin - 5.3, anchors.hairpinApex - 3.3, anchors.hairpinApex + 4.0, anchors.bridgeApproach + 4.5);
+    const raised = band(s, anchors.crest - 3.8, anchors.chicaneEntry + 1.7, anchors.upperExit, anchors.sweep - 1.0);
+    const hairpin = band(s, anchors.sweep + 1.8, anchors.sweepApex - 3.0, anchors.sweepApex + 3.2, anchors.westBack - 3.2);
+    return ROAD_HALF + (HAIRPIN_HALF - ROAD_HALF) * wide - 0.24 * raised + 0.28 * hairpin;
   }
 
   function pitOpening(distance: number) {
@@ -112,12 +137,50 @@ function buildTrack() {
   }
 
   function wallHalfAt(distance: number, side: number) {
-    const extra = side < 0 ? (6.05 - WALL_HALF) * pitOpening(distance) : 0;
-    return WALL_HALF + roadHalfAt(distance) - ROAD_HALF + extra;
+    const s = wrap(distance);
+    const outerRoom = side > 0
+      ? 0.53 * band(s, anchors.hairpin - 5.0, anchors.hairpinApex - 2.4, anchors.hairpinApex + 4.1, anchors.bridgeApproach + 6.7)
+      : 0.39 * band(s, anchors.sweep, anchors.sweepApex - 3.1, anchors.sweepApex + 3.7, anchors.westBack - 1.4);
+    const pit = side < 0 ? (6.05 - WALL_HALF) * pitOpening(s) : 0;
+    return WALL_HALF + Math.max(0, roadHalfAt(s) - ROAD_HALF) + outerRoom + pit;
   }
 
   function isPitLane(distance: number, offset: number) {
     return offset < -ROAD_HALF - 0.12 && offset >= -pitRoadHalfAt(distance);
+  }
+
+  function surfaceBandsAt(distance: number, side: number) {
+    const s = wrap(distance);
+    const wall = wallHalfAt(s, side);
+    const pit = side < 0 && s >= PIT_LANE.entry && s <= PIT_LANE.exit;
+    const asphalt = pit ? pitRoadHalfAt(s) : roadHalfAt(s);
+    const curb = pit ? asphalt : Math.min(wall, asphalt + CURB_WIDTH);
+    const room = wall - curb;
+    const paved = 0.72 * band(s, anchors.chicaneEntry - 2.2, anchors.chicaneEntry + 2.4, anchors.chicaneExit - 2.0, anchors.chicaneExit + 2.2)
+      + (side > 0 ? 0.78 * band(s, anchors.esses - 5.3, anchors.esses + 0.3, anchors.essesMid + 0.6, anchors.hairpin + 2.5) : 0);
+    const loose = side > 0
+      ? 0.91 * band(s, anchors.hairpin - 1.9, anchors.hairpinApex - 2.8, anchors.hairpinApex + 5.0, anchors.bridgeApproach + 6.8)
+      : 0.87 * band(s, anchors.sweep, anchors.sweepApex - 2.9, anchors.sweepApex + 4.2, anchors.westBack + 1.3);
+    const escape = curb + room * (pit ? 0 : paved);
+    const gravel = escape + (wall - escape) * (pit ? 0 : loose);
+    return { asphalt, curb, escape, gravel, wall };
+  }
+
+  function surfaceAt(distance: number, offset: number): TrackSurface {
+    const edge = Math.abs(offset);
+    const bands = surfaceBandsAt(distance, Math.sign(offset));
+    if (edge <= bands.asphalt) return 'asphalt';
+    if (edge <= bands.curb) return 'curb';
+    if (edge <= bands.escape) return 'escape';
+    if (edge <= bands.gravel) return 'gravel';
+    return 'grass';
+  }
+
+  function bankAt(distance: number) {
+    const s = wrap(distance);
+    if (s < anchors.esses + 2 || s > anchors.westBack + 2.9) return 0;
+    const edge = edgeAt(s);
+    return 0.165 * band(edge, ...rightBank) - 0.147 * band(edge, ...leftBank);
   }
 
   const samples: TrackPoint[] = [];
@@ -168,12 +231,20 @@ function buildTrack() {
     clearance: 2.50, archClearance: 2.58,
   };
   const bridge = {
-    from: anchors.essesMid - 0.8, crest: anchors.crest,
+    from: PIT_LANE.exit + 0.65, crest: anchors.crest,
     to: anchors.lowerLine - 0.55, height: BRIDGE_HEIGHT,
   };
-  function ramp(distance: number, from: number, to: number, blend: number) {
-    const low = edgeDistance[Math.round(from / spacing)];
-    const high = edgeDistance[Math.round(to / spacing)];
+  function edgeAt(s: number) {
+    const index = Math.floor(s / spacing);
+    return mix(edgeDistance[index], edgeDistance[index + 1], s / spacing - index);
+  }
+
+  const rightBank = [edgeAt(anchors.esses + 2.0), edgeAt(anchors.hairpinApex + 1.7),
+    edgeAt(anchors.bridgeApproach + 0.30), edgeAt(anchors.rearBend + 0.70)] as const;
+  const leftBank = [edgeAt(anchors.sweep - 5.4), edgeAt(anchors.sweepApex),
+    edgeAt(anchors.sweepApex + 1.8), edgeAt(anchors.westBack + 2.9)] as const;
+
+  function ramp(distance: number, low: number, high: number, blend: number) {
     const t = clamp01((distance - low) / (high - low));
     // Rounded ends keep wheels settled and leave most of the ramp at a steady grade.
     const eased = (end: number) => (end / 2 - blend * Math.sin(Math.PI * end / blend) / (2 * Math.PI)) / (1 - blend);
@@ -182,10 +253,14 @@ function buildTrack() {
     return (t - blend / 2) / (1 - blend);
   }
 
+  const climbStart = edgeAt(bridge.from);
+  const climbEnd = edgeAt(bridge.crest - 1.36);
+  const descentStart = edgeAt(crossing.upperTo - 0.34);
+  const descentEnd = edgeAt(bridge.to);
   for (let i = 0; i < count; i++) {
     const distance = edgeDistance[i];
-    samples[i].y = BRIDGE_HEIGHT * ramp(distance, bridge.from, bridge.crest - 1.36, 0.18)
-      * (1 - ramp(distance, crossing.upperTo + 0.18, bridge.to, 0.09));
+    samples[i].y = BRIDGE_HEIGHT * ramp(distance, climbStart, climbEnd, 0.22)
+      * (1 - ramp(distance, descentStart, descentEnd, 0.10));
   }
 
   function interpolate(index: number, t: number, s: number): TrackPoint {
@@ -205,6 +280,10 @@ function buildTrack() {
     const position = s / spacing;
     const index = Math.min(count - 1, Math.floor(position));
     return interpolate(index, position - index, s);
+  }
+
+  function heightAt(distance: number, offset: number) {
+    return sampleAt(distance).y + bankAt(distance) * offset;
   }
 
   const segments = samples.map((from, i) => {
@@ -264,14 +343,15 @@ function buildTrack() {
     return location();
   }
 
-  return { length, samples: samples as readonly TrackPoint[], anchors, bridge, crossing, tunnel, sampleAt, locate, wrap,
-    roadHalfAt, wallHalfAt, pitRoadHalfAt, isPitLane };
+  const chicane = { from: anchors.chicaneEntry, apexIn: anchors.chicaneApexIn, apexOut: anchors.chicaneApexOut, to: anchors.chicaneExit };
+  return { length, samples: samples as readonly TrackPoint[], anchors, bridge, crossing, tunnel, chicane, sampleAt, locate, wrap,
+    roadHalfAt, wallHalfAt, pitRoadHalfAt, isPitLane, bankAt, heightAt, surfaceAt, surfaceBandsAt };
 }
 
 export const TRACK = buildTrack();
-export const { roadHalfAt, wallHalfAt, pitRoadHalfAt, isPitLane } = TRACK;
+export const { roadHalfAt, wallHalfAt, pitRoadHalfAt, isPitLane, bankAt, heightAt, surfaceAt, surfaceBandsAt } = TRACK;
 
-export type SectorId = 'straight' | 'esses' | 'hairpin' | 'bridge' | 'back-straight' | 'sweep' | 'pit' | 'underpass' | 'tunnel';
+export type SectorId = 'straight' | 'esses' | 'hairpin' | 'bridge' | 'chicane' | 'back-straight' | 'sweep' | 'pit' | 'underpass' | 'tunnel';
 
 function sector(id: SectorId, name: string, from: number, to: number, at = (from + to) / 2, offset = 0) {
   const p = TRACK.sampleAt(at);
@@ -290,12 +370,14 @@ const circuitSectors = [
 const pitSector = sector('pit', 'Calle de boxes', PIT_LANE.entry, PIT_LANE.exit, PIT_LANE.stalls[1], PIT_LANE.offset);
 const underpass = sector('underpass', 'Paso bajo el puente', TRACK.crossing.lowerFrom, TRACK.crossing.lowerTo, TRACK.crossing.lower);
 const tunnelSector = sector('tunnel', 'Túnel del Taller', TRACK.tunnel.from, TRACK.tunnel.to);
-export const TRACK_SECTORS = [...circuitSectors, pitSector, underpass, tunnelSector] as const;
+const chicaneSector = sector('chicane', 'Chicana elevada', TRACK.chicane.from, TRACK.chicane.to, TRACK.chicane.apexOut);
+export const TRACK_SECTORS = [...circuitSectors, pitSector, underpass, tunnelSector, chicaneSector] as const;
 
 export function sectorAt(distance: number, offset = 0) {
   const s = TRACK.wrap(distance);
   if (isPitLane(s, offset)) return pitSector;
   if (s >= tunnelSector.from && s <= tunnelSector.to) return tunnelSector;
   if (s >= underpass.from && s <= underpass.to) return underpass;
+  if (s >= chicaneSector.from && s <= chicaneSector.to) return chicaneSector;
   return circuitSectors.find(candidate => s < candidate.to) ?? circuitSectors[0];
 }

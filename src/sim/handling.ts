@@ -1,11 +1,11 @@
-export const BASE_TOP_SPEED = 9.50;
+export const BASE_TOP_SPEED = 10.90;
 
 export const HANDLING = [
   // Compacto, Cupé, Bólido and Cuña in grid order.
   { steerRate: 14.8, yawGain: 1.045, straightBonus: 0, exitTraction: 0, cornerDrag: 0.94, compliance: 1.07 },
-  { steerRate: 11.8, yawGain: 0.99, straightBonus: 0, exitTraction: 0.62, cornerDrag: 0.90, compliance: 0.94 },
-  { steerRate: 10.4, yawGain: 0.92, straightBonus: 0.82, exitTraction: 0, cornerDrag: 1.22, compliance: 1.00 },
-  { steerRate: 12.0, yawGain: 1.01, straightBonus: 0.06, exitTraction: 0.10, cornerDrag: 0.47, compliance: 0.76 },
+  { steerRate: 11.8, yawGain: 0.99, straightBonus: 0.06, exitTraction: 0.62, cornerDrag: 0.90, compliance: 0.94 },
+  { steerRate: 10.4, yawGain: 0.92, straightBonus: 1.08, exitTraction: 0, cornerDrag: 1.22, compliance: 1.00 },
+  { steerRate: 12.0, yawGain: 1.01, straightBonus: 0.12, exitTraction: 0.10, cornerDrag: 0.47, compliance: 0.76 },
 ] as const;
 
 export type Handling = (typeof HANDLING)[number];

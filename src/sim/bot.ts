@@ -3,9 +3,10 @@ import type { Difficulty, DriveInput } from '../shared/protocol.ts';
 import { roadHalfAt, TRACK, wallHalfAt, type TrackLocation } from '../shared/track.ts';
 import { arcDelta } from './progress.ts';
 
-const pace = [7.40, 7.38, 7.59, 7.43];
+const pace = [7.92, 7.86, 8.08, 7.96];
 const cornering = [1, 1.015, 0.93, 1.10];
-const previewDistances = [2.2, 4.4, 6.6, 8.8];
+const previewStep = 1.8;
+const previewDistances = [1, 2, 3, 4, 5, 6].map(step => step * previewStep);
 const behavior = {
   rookie: { pace: 0.86, reaction: 0.30, precision: 1.66, prediction: 0.33, room: 0.17, lateral: 10.3 },
   club: { pace: 1.0, reaction: 0.16, precision: 1.85, prediction: 0.43, room: 0.10, lateral: 12.2 },
@@ -43,14 +44,16 @@ function curvePace(car: BotCar, top: number, lateral: number) {
   for (const distance of previewDistances) {
     const point = TRACK.sampleAt(car.road.s + distance);
     const heading = Math.atan2(point.dx, point.dz);
-    const curvature = angleDifference(heading - previousHeading) / previewDistances[0];
+    const curvature = angleDifference(heading - previousHeading) / previewStep;
     previousHeading = heading;
     if (Math.abs(curvature) < 0.01) continue;
     // The inside lane has a smaller turning radius. Start slowing before its braking point.
     const laneFactor = Math.max(0.55, 1 + curvature * car.bot.lane);
-    const cornerSpeedSquared = lateral * laneFactor / Math.abs(curvature);
+    const bank = TRACK.bankAt(point.s - previewStep * 0.5);
+    const bankSupport = 9.8 * bank * Math.sign(curvature) / Math.hypot(1, bank);
+    const cornerSpeedSquared = (lateral + bankSupport) * laneFactor / Math.abs(curvature);
     const brakingRoom = Math.max(0, distance - 3.2);
-    safeSpeed = Math.min(safeSpeed, Math.sqrt(cornerSpeedSquared + 2 * 4.2 * brakingRoom));
+    safeSpeed = Math.min(safeSpeed, Math.sqrt(cornerSpeedSquared + 2 * 4.5 * brakingRoom));
   }
   return safeSpeed;
 }
@@ -85,9 +88,10 @@ export function botDrive(cars: readonly BotCar[], index: number, preferred: numb
   coolingDown: boolean, dt: number): DriveInput {
   const car = cars[index];
   const settings = behavior[difficulty];
-  const look = TRACK.sampleAt(car.road.s + 1.8 + Math.max(0, car.speed) * 0.31);
-  const widest = (side: number) => side * Math.min(roadHalfAt(look.s) + 0.065,
-    wallHalfAt(look.s, side) - car.dimensions.halfWidth - 0.11);
+  const look = TRACK.sampleAt(car.road.s + 1.64 + Math.max(0, car.speed) * 0.29);
+  const entry = car.road.s + 1.2;
+  const widest = (side: number) => side * Math.min(Math.min(roadHalfAt(entry), roadHalfAt(look.s)) + 0.06,
+    Math.min(wallHalfAt(entry, side), wallHalfAt(look.s, side)) - car.dimensions.halfWidth - 0.18);
   const outer = widest(1);
   const inner = widest(-1);
   car.bot.lane = Math.max(inner, Math.min(outer, car.bot.lane));
@@ -126,9 +130,11 @@ export function botDrive(cars: readonly BotCar[], index: number, preferred: numb
   const target = following(clear);
   // Keep braking for traffic in the swept lane until the car has actually moved clear of it.
   const sweptLimit = changingLane && target > following(current) ? Math.max(0.42, following(current)) : Infinity;
+  const surface = TRACK.surfaceAt(car.road.s, car.road.offset);
+  const offRoadLimit = surface === 'grass' ? 4.6 : surface === 'gravel' ? 5.3 : Infinity;
   const desired = Math.min(
     curvePace(car, coolingDown ? 4.7 : pace[index] * settings.pace, settings.lateral * cornering[index]),
-    Math.max(0, target), sweptLimit,
+    Math.max(0, target), sweptLimit, offRoadLimit,
   );
   const brakingMargin = desired < 1.4 ? 0.045 : 0.35;
   car.bot.wrongWay = Math.cos(car.yaw - heading) < -0.35 ? car.bot.wrongWay + dt : 0;

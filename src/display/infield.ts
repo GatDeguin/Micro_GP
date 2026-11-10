@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { PIT_LANE, TRACK, wallHalfAt } from '../shared/track';
 import { instanceStatic } from './batches';
-import { buildGroundcover } from './infield-plants';
+import { grandstandSections } from './grandstands';
+import { buildGroundcover, plantWind } from './infield-plants';
 import { pondMaterials, streamRocks, waterline as WATER_Y } from './infield-water';
 import { canvas2d, noiseField, random, standard, texture } from './materials';
 
@@ -118,9 +119,8 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[], islands
   drawMask(grass.context, water);
   grass.context.fill();
   const lane = TRACK.sampleAt(PIT_LANE.stalls[1]);
-  const finish = TRACK.sampleAt(0);
   const stationZ = lane.z + PIT_LANE.stationOffset;
-  for (const [left, right, near, far] of [[finish.x - 3.55, finish.x + 3.55, 0.78, 3.79],
+  for (const [left, right, near, far] of [...grandstandSections.map(({ x, z }) => [x - 3.25, x + 3.25, z - 1.09, z + 1.09]),
     [lane.x - 3.82, lane.x + 4.69, stationZ - 1.49, stationZ + 1.63]]) {
     const x = u(left) * width;
     const y = (1 - v(far)) * height;
@@ -282,12 +282,13 @@ function reedBlade() {
   return geometry;
 }
 
-function pondPlants(parent: THREE.Object3D, bank: ReturnType<typeof shoreline>) {
+function pondPlants(parent: THREE.Object3D, bank: ReturnType<typeof shoreline>, time: { value: number }) {
   const roots = bank.filter(({ p }, i) => (i % 5 === 1 || i % 17 === 3) && p.z > -10.1 && p.z < 1.12);
   const pose = new THREE.Object3D();
   const rng = random(4027);
   const reedMaterial = standard(0x9da56b, 0.88);
   reedMaterial.side = THREE.DoubleSide;
+  plantWind(reedMaterial, time, 0.17);
   const reeds = new THREE.InstancedMesh(reedBlade(), reedMaterial, roots.length * 8);
   const stem = new THREE.CylinderGeometry(0.010, 0.016, 1, 5).translate(0, 0.5, 0);
   const seedHead = new THREE.CapsuleGeometry(0.044, 0.129, 3, 7);
@@ -415,7 +416,7 @@ export function buildInfield(parent: THREE.Object3D) {
     .getPoints(144).slice(0, -1);
   const islands = turfLoops();
   ground(garden, outline, islands);
-  buildGroundcover(garden, islands, outline, GRASS_Y);
+  const meadow = buildGroundcover(garden, islands, outline, GRASS_Y);
   const geometry = shapeFrom(outline);
   const materials = pondMaterials(riverbed(outline));
   const depth = new THREE.Mesh(geometry, materials.bed);
@@ -428,7 +429,7 @@ export function buildInfield(parent: THREE.Object3D) {
   water.renderOrder = 2;
   garden.add(water);
   const bank = shoreline(garden, outline);
-  pondPlants(garden, bank);
+  pondPlants(garden, bank, meadow.time);
   instanceStatic(garden);
   const swim = fish(garden);
   swim(0);
@@ -441,6 +442,7 @@ export function buildInfield(parent: THREE.Object3D) {
     update(now: number) {
       const time = now / 1000;
       materials.update(time);
+      meadow.update(time);
       swim(time);
     },
   };

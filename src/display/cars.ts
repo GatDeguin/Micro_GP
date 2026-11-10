@@ -656,7 +656,7 @@ export function buildCars(parent: THREE.Object3D) {
         detail.visible = close;
         glazing.material = close ? closeGlass : glass;
       },
-      update(view: CarView, delta: number, slope: number, now: number, covered = false) {
+      update(view: CarView, delta: number, slope: number, now: number, covered = false, bankRoll = 0) {
         root.visible = view.active !== false;
         if (!root.visible) return;
         if (lit !== (night || covered)) {
@@ -676,17 +676,19 @@ export function buildCars(parent: THREE.Object3D) {
         const roll = view.suspension?.roll ?? 0;
         const heave = view.suspension?.heave ?? 0;
         shadow.rotation.x = axles.rotation.x = pitch;
+        shadow.rotation.z = axles.rotation.z = bankRoll;
         chassis.rotation.x = pitch + (view.suspension?.pitch ?? 0);
-        chassis.rotation.z = roll;
+        chassis.rotation.z = bankRoll + roll;
         chassis.position.y = heave;
         angle = (angle + view.speed * delta / (WHEEL_RADIUS * scaleY)) % (Math.PI * 2);
         const road = detail.visible ? TRACK.locate(view.x, view.z, { s: view.distance, y: view.y }) : null;
         const settle = road !== null && Math.abs(road.offset) < wallHalfAt(road.s, Math.sign(road.offset))
-          && Math.abs(road.y - view.y) < 0.10;
+          && Math.abs(TRACK.heightAt(road.s, road.offset) - view.y) < 0.10;
         const sinYaw = Math.sin(view.yaw);
         const cosYaw = Math.cos(view.yaw);
         const sinPitch = Math.sin(pitch);
         const cosPitch = Math.cos(pitch);
+        const sinBank = Math.sin(bankRoll);
         wheels.forEach(({ spin, pivot }, index) => {
           spin.rotation.x = angle;
           pivot.rotation.y = index % 2 ? -view.steer * 0.31 : 0;
@@ -694,9 +696,11 @@ export function buildCars(parent: THREE.Object3D) {
           if (settle || settled) {
             const x = pivot.position.x * scaleX;
             const z = pivot.position.z * scaleZ;
-            const ground = settle ? TRACK.locate(view.x + cosYaw * x + sinYaw * z * cosPitch,
-              view.z - sinYaw * x + cosYaw * z * cosPitch, { s: road.s, y: view.y }).y : root.position.y - sinPitch * z;
-            correction = THREE.MathUtils.clamp(ground - root.position.y + sinPitch * z, -0.044, 0.044) / cosPitch;
+            const tyreRoad = settle ? TRACK.locate(view.x + cosYaw * x + sinYaw * z * cosPitch,
+              view.z - sinYaw * x + cosYaw * z * cosPitch, { s: road.s, y: view.y }) : null;
+            const hubFloor = root.position.y - sinPitch * z + cosPitch * sinBank * x;
+            const ground = tyreRoad ? TRACK.heightAt(tyreRoad.s, tyreRoad.offset) : hubFloor;
+            correction = THREE.MathUtils.clamp(ground - hubFloor, -0.044, 0.044) / cosPitch;
             for (let corner = 0; corner < 4; corner++) shadowVertices.setY(4 + index * 4 + corner, 0.002 + correction);
           }
           const lightSide = roll < 0 ? -1 : 1;
