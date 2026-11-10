@@ -184,7 +184,7 @@ function bootstrap() {
   updateAudioMute();
   if (!pages) connect();
 
-  for (const event of ['pointerdown', 'keydown']) addEventListener(event, audio.unlock, { passive: true });
+  for (const event of ['pointerdown', 'click', 'keydown']) addEventListener(event, audio.unlock, { passive: true });
   document.addEventListener('visibilitychange', updateAudioMute);
   canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault();

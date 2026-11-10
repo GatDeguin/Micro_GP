@@ -1,5 +1,7 @@
 import { Vector3, type Camera } from 'three';
 import type { CarView, RaceSnapshot } from '../shared/protocol';
+import firstTrack from '../../Musica/01.mp3?url';
+import secondTrack from '../../Musica/02.mp3?url';
 import { buildAudioSamples, buildEngineSamples } from './audio-samples';
 
 type View = 'general' | 'chase' | 'trackside' | 'replay';
@@ -363,9 +365,44 @@ function createMixer(context: AudioContext) {
   };
 }
 
+function createSoundtrack(context: AudioContext) {
+  const tracks = [firstTrack, secondTrack];
+  const track = new Audio();
+  track.preload = 'none';
+  track.src = tracks[0];
+  const volume = context.createGain();
+  volume.gain.value = 0;
+  context.createMediaElementSource(track).connect(volume).connect(context.destination);
+
+  let index = 0;
+  let enabled = false;
+  let target = 0;
+  function setPlaying(value: boolean) {
+    enabled = value;
+    if (!value) track.pause();
+    else if (track.paused) void track.play().catch(() => {});
+  }
+  track.addEventListener('ended', () => {
+    index = (index + 1) % tracks.length;
+    track.src = tracks[index];
+    setPlaying(enabled);
+  });
+  const levels = { demo: 0.16, grid: 0.08, race: 0.12, results: 0.16 };
+  return {
+    setPlaying,
+    mix(phase: RaceSnapshot['phase'], view: View) {
+      const next = view === 'replay' ? 0.09 : levels[phase];
+      if (next === target) return;
+      target = next;
+      volume.gain.setTargetAtTime(next, context.currentTime, 0.28);
+    },
+  };
+}
+
 export function raceAudio() {
   let context: AudioContext | undefined;
   let mixer: ReturnType<typeof createMixer> | undefined;
+  let soundtrack: ReturnType<typeof createSoundtrack> | undefined;
   let muted = false;
 
   return {
@@ -377,15 +414,21 @@ export function raceAudio() {
           mixer.mute(muted);
         }
         if (context.state === 'suspended') void context.resume().catch(() => {});
+        soundtrack ??= createSoundtrack(context);
+        soundtrack.setPlaying(!muted);
       } catch {
         // The race remains playable on devices without Web Audio.
       }
     },
-    update(frame: RaceMix) { mixer?.update(frame); },
+    update(frame: RaceMix) {
+      mixer?.update(frame);
+      soundtrack?.mix(frame.state.phase, frame.view);
+    },
     mute(value: boolean) {
       if (muted === value) return;
       muted = value;
       mixer?.mute(value);
+      soundtrack?.setPlaying(!value);
     },
   };
 }

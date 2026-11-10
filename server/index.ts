@@ -35,6 +35,7 @@ const mime: Record<string, string> = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".glb": "model/gltf-binary",
+  ".mp3": "audio/mpeg",
 };
 
 if (!development) {
@@ -62,13 +63,33 @@ function text(response: ServerResponse, code: number, value: string) {
 async function file(response: ServerResponse, request: IncomingMessage, path: string, cache = false) {
   const info = await stat(path).catch(() => null);
   if (!info?.isFile()) return text(response, 404, "Archivo no encontrado.");
-  response.writeHead(200, {
-    "Content-Type": mime[extname(path)] ?? "application/octet-stream",
+  const type = mime[extname(path)] ?? "application/octet-stream";
+  const headers: Record<string, string | number> = {
+    "Content-Type": type,
     "Content-Length": info.size,
     "Cache-Control": cache ? "public, max-age=31536000, immutable" : "no-store",
-  });
+  };
+  let start = 0;
+  let end = info.size - 1;
+  let status = 200;
+  if (type === "audio/mpeg") {
+    headers["Accept-Ranges"] = "bytes";
+    const range = request.method === "GET" && /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? "");
+    if (range && (range[1] || range[2])) {
+      start = range[1] ? Number(range[1]) : Math.max(0, info.size - Number(range[2]));
+      if (range[1] && range[2]) end = Math.min(end, Number(range[2]));
+      if (start > end) {
+        response.writeHead(416, { "Accept-Ranges": "bytes", "Content-Range": `bytes */${info.size}` });
+        return response.end();
+      }
+      headers["Content-Range"] = `bytes ${start}-${end}/${info.size}`;
+      headers["Content-Length"] = end - start + 1;
+      status = 206;
+    }
+  }
+  response.writeHead(status, headers);
   if (request.method === "HEAD") return response.end();
-  const stream = createReadStream(path);
+  const stream = createReadStream(path, status === 206 ? { start, end } : undefined);
   stream.on("error", () => response.destroy());
   stream.pipe(response);
 }
