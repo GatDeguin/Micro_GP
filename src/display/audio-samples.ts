@@ -169,11 +169,45 @@ function variants(context: BaseAudioContext, durations: readonly number[], peak:
   });
 }
 
+const engineBands = [
+  { coast: [1, 0.65, 0.30, 0.46, 0.35, 0.29], power: [1, 1.20, 1.42, 1.10, 0.88, 0.67], noise: 0.12 },
+  { coast: [0.88, 0.82, 0.48, 0.61, 0.46, 0.38], power: [0.84, 1.25, 1.50, 1.55, 1.20, 0.99], noise: 0.18 },
+  { coast: [0.75, 0.72, 0.63, 0.55, 0.58, 0.48], power: [0.67, 1.02, 1.27, 1.56, 1.70, 1.55], noise: 0.24 },
+];
+
+export function buildEngineSamples(context: BaseAudioContext, roots: readonly number[], harmonics: readonly number[], seed: number) {
+  return roots.map((root, band) => {
+    const profile = engineBands[band];
+    const render = (spectrum: readonly number[], loaded: boolean) => {
+      const length = sampleRate / 2;
+      const result = context.createBuffer(1, length, sampleRate);
+      const channel = result.getChannelData(0);
+      const noise = bandNoise(whiteNoise(length, seed + band * 101 + Number(loaded) * 487),
+        loaded ? 420 : 180, (loaded ? 2400 : 1130) + band * 570, true);
+      const partials = harmonics.map((amplitude, i) => amplitude * spectrum[i]);
+      let energy = 0;
+      for (let i = 0; i < length; i++) {
+        const cycle = tau * i / length;
+        // Roots are even integers, so a half-second loop ends on the same phase.
+        const phase = root * cycle / 2 + 0.09 * Math.sin(7 * cycle + seed) + 0.04 * Math.sin(13 * cycle);
+        const pulse = 0.62 + 0.38 * Math.cos(phase - 0.8);
+        let value = noise[i] * pulse * profile.noise * (loaded ? 2.0 : 1);
+        for (let h = 0; h < partials.length; h++) {
+          value += partials[h] * Math.sin((h + 1) * phase + h * 0.27);
+        }
+        channel[i] = value;
+        energy += value * value;
+      }
+      const gain = 0.27 / Math.sqrt(energy / length);
+      for (let i = 0; i < length; i++) channel[i] *= gain;
+      return result;
+    };
+    return { root, coast: render(profile.coast, false), power: render(profile.power, true) };
+  });
+}
+
 export function buildAudioSamples(context: BaseAudioContext) {
   return {
-    drive: loop(context, 1.64, 4273, 0.34, [
-      [240, 1080, 0.34, 9, 0.10], [960, 3460, 0.76, 19, 0.14], [3210, 7200, 0.29, 43, 0.16],
-    ]),
     asphalt: loop(context, 2.25, 1417, 0.51, [
       [170, 670, 0.49, 3, 0.16], [720, 2650, 0.63, 5, 0.10], [2870, 6500, 0.18, 13, 0.11],
     ]),
