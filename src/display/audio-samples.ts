@@ -171,6 +171,9 @@ function variants(context: BaseAudioContext, durations: readonly number[], peak:
 
 export function buildAudioSamples(context: BaseAudioContext) {
   return {
+    drive: loop(context, 1.64, 4273, 0.34, [
+      [240, 1080, 0.34, 9, 0.10], [960, 3460, 0.76, 19, 0.14], [3210, 7200, 0.29, 43, 0.16],
+    ]),
     asphalt: loop(context, 2.25, 1417, 0.51, [
       [170, 670, 0.49, 3, 0.16], [720, 2650, 0.63, 5, 0.10], [2870, 6500, 0.18, 13, 0.11],
     ]),
@@ -194,6 +197,17 @@ export function buildAudioSamples(context: BaseAudioContext) {
     scrape: loop(context, 1.7, 4483, 0.50, [
       [355, 1050, 0.40, 7, 0.13], [950, 2620, 0.78, 17, 0.24], [2600, 6500, 0.32, 33, 0.24],
     ], samples => grains(samples, 96, 43, 0.092, 1850, 0.013, 0.28)),
+    upshift: variants(context, [0.083, 0.092, 0.104], 0.65, (samples, i) => {
+      // The contact climbs from a brief brush to a brighter locking click.
+      strike(samples, 0, 1831 + i * 43, 760, 4300, 0.72, 176);
+      strike(samples, 0.017 + i * 0.003, 137 + i * 79, 1700, 7650, 1, 278);
+    }),
+    downshift: variants(context, [0.108, 0.124, 0.136], 0.67, (samples, i) => {
+      const catchTime = 0.026 + i * 0.005;
+      strike(samples, 0, 2287 + i * 37, 1250, 5900, 0.54, 175);
+      strike(samples, catchTime, 581 + i * 61, 285, 2550, 1.08, 120);
+      strike(samples, catchTime + 0.019, 819 + i * 31, 630, 3200, 0.34, 204);
+    }),
     curb: variants(context, [0.103, 0.117, 0.128, 0.112], 0.70, (samples, i) => {
       const second = 0.026 + i * 0.004;
       strike(samples, 0, 123 + i * 19, 580, 3900, 1.10, 128);

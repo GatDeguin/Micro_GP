@@ -38,6 +38,15 @@ export interface RaceImpact {
   strength: number;
 }
 
+export interface TransmissionView {
+  /** -1 is reverse, 0 is neutral and 1–4 are the forward gears. */
+  gear: number;
+  /** Engine speed from idle to redline, normalized to 0–1. */
+  rev: number;
+  /** Counts changes for this car within the current heat. */
+  shift: number;
+}
+
 export interface CarView {
   x: number;
   y: number;
@@ -50,6 +59,7 @@ export interface CarView {
   braking: boolean;
   steer: number;
   sound?: CarSound;
+  transmission?: TransmissionView;
 }
 
 export interface RaceSnapshot {

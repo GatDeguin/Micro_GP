@@ -230,6 +230,66 @@ test('GAS gives a strong launch and builds speed without a jump', async () => {
   assert.ok(race.snapshot().cars[0].speed > 7.8);
 });
 
+test('the automatic box shifts through fourth with a short torque break', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = { owned: true, input: NEUTRAL };
+  const accelerating = { owned: true, input: { ...NEUTRAL, gas: true } };
+  step(race, 3, [stopped, stopped, stopped, stopped]);
+  let before = race.snapshot().cars[0];
+  assert.equal(before.transmission?.gear, 0);
+
+  const gears: number[] = [];
+  for (let i = 0; i < 120; i++) {
+    race.step(TICK, [accelerating, stopped, stopped, stopped]);
+    const car = race.snapshot().cars[0];
+    const box = car.transmission;
+    assert.ok(box && box.rev >= 0 && box.rev <= 1);
+    if (box.gear !== before.transmission?.gear) {
+      gears.push(box.gear);
+      assert.equal(box.shift, (before.transmission?.shift ?? 0) + 1);
+      if (box.gear > 1) {
+        assert.ok(car.speed - before.speed < 0.033, 'torque falls when the box shifts up');
+        assert.ok(box.rev < before.transmission!.rev, 'engine revs drop as the longer ratio engages');
+      }
+    }
+    before = car;
+    if (car.speed >= 8.04) break;
+  }
+  assert.deepEqual(gears, [1, 2, 3, 4]);
+  assert.ok(before.speed >= 8.04 && before.speed <= 8.05);
+});
+
+test('fourth holds while coasting through the overlap and fresh GAS kicks down', async () => {
+  const { Race } = await import('../src/sim/race.ts');
+  const race = new Race();
+  const stopped = { owned: true, input: NEUTRAL };
+  const accelerating = { owned: true, input: { ...NEUTRAL, gas: true } };
+  const gas = [accelerating, stopped, stopped, stopped];
+  const coast = [stopped, stopped, stopped, stopped];
+  step(race, 3, coast);
+  runUntil(race, 2, gas, () => {
+    const car = race.snapshot().cars[0];
+    return car.transmission?.gear === 4 && car.speed >= 6.7;
+  });
+  const top = race.snapshot().cars[0].transmission;
+  runUntil(race, 0.7, coast, () => race.snapshot().cars[0].speed < 6.12);
+  const coasting = race.snapshot().cars[0];
+  assert.equal(coasting.transmission?.gear, 4);
+  assert.equal(coasting.transmission?.shift, top?.shift);
+
+  race.step(TICK, gas);
+  const lower = race.snapshot().cars[0].transmission;
+  assert.equal(lower?.gear, 3);
+  assert.equal(lower?.shift, top!.shift + 1);
+  assert.ok(lower!.rev > coasting.transmission!.rev + 0.08);
+  step(race, 0.10, gas);
+  assert.equal(race.snapshot().cars[0].transmission?.gear, 3);
+  runUntil(race, 0.75, gas, () => race.snapshot().cars[0].transmission?.gear === 4);
+  runUntil(race, 1.15, coast, () => race.snapshot().cars[0].speed < 5.42);
+  assert.equal(race.snapshot().cars[0].transmission?.gear, 3, 'further slowing triggers a normal downshift');
+});
+
 test('a sharp steering input at full pace scrubs speed and turns progressively', async () => {
   const { Race } = await import('../src/sim/race.ts');
   const race = new Race();
@@ -289,11 +349,15 @@ test('FRENO overrides GAS and reverse needs a fresh press after stopping', async
   assert.ok(race.snapshot().cars[0].speed < initialSpeed - 0.5);
   step(race, 1.5, both);
   assert.equal(race.snapshot().cars[0].speed, 0);
+  assert.equal(race.snapshot().cars[0].transmission?.gear, 1);
   step(race, 0.05, drive(NEUTRAL));
+  assert.equal(race.snapshot().cars[0].transmission?.gear, 0);
   step(race, 0.45, both);
   assert.ok(race.snapshot().cars[0].speed < -0.5);
+  assert.equal(race.snapshot().cars[0].transmission?.gear, -1);
   step(race, 0.05, drive(NEUTRAL));
   assert.equal(race.snapshot().cars[0].speed, 0);
+  assert.equal(race.snapshot().cars[0].transmission?.gear, 0);
 });
 
 test('a mid-race join takes the moving bot in place', async () => {

@@ -3,6 +3,7 @@ import { CAR_DIMENSIONS, GRID_LANE_OFFSET, type CarDimensions } from '../shared/
 import { CURB_WIDTH, GRID_ROWS, ROAD_HALF, TRACK, WALL_HALF, type TrackLocation } from '../shared/track.ts';
 import { capsule, contactBetween } from './contact.ts';
 import { LapProgress } from './progress.ts';
+import { AutomaticTransmission } from './transmission.ts';
 
 const LAPS = 3;
 const GRID_TIME = 3;
@@ -31,6 +32,7 @@ interface Car {
   progress: LapProgress;
   steer: number;
   throttle: number;
+  transmission: AutomaticTransmission;
   surfaceSound: Pick<CarSound, 'curb' | 'runoff' | 'scrape'>;
   owned: boolean;
   human: boolean;
@@ -78,6 +80,7 @@ function spawn(s: number, index: number, speed: number): Car {
   const car: Car = {
     x: 0, z: 0, yaw: 0, dimensions: CAR_DIMENSIONS[index], motionYaw: 0, speed: 0, steer: 0, throttle: 0,
     road: { ...TRACK.sampleAt(s), offset: 0 }, progress: new LapProgress(s),
+    transmission: new AutomaticTransmission(speed),
     surfaceSound: { curb: 0, runoff: 0, scrape: 0 },
     owned: false, human: false, braking: false, reverseReady: false, reversing: false,
     stalled: 0, protection: 0,
@@ -178,25 +181,28 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   if (input.brake) {
     if (human && !car.braking && car.reverseReady && car.speed === 0) car.reversing = true;
     car.reverseReady = false;
-    const braking = 13 * (0.55 + 0.45 * grip) + uphill;
-    car.speed = car.reversing
-      ? Math.max(-1.9, car.speed - (3.5 * grip + uphill) * dt)
-      : approach(car.speed, 0, braking * dt);
   } else {
     if (human && car.braking && car.speed === 0) car.reverseReady = true;
     if (car.reversing) car.speed = 0;
     car.reversing = false;
-    if (input.gas) {
-      car.reverseReady = false;
-      const engine = (8.6 - 4.95 * speedRatio ** 1.22) * car.throttle * grip;
-      const acceleration = car.speed > speedLimit
-        ? 5 + 4 * loose + 2.4 * cornerLoad + uphill
-        : Math.max(0, engine - uphill - 1.35 * cornerLoad);
-      car.speed = approach(car.speed, speedLimit, acceleration * dt);
-    } else {
-      const drag = 0.79 + Math.abs(car.speed) * 0.18 + 2.5 * loose + 1.6 * cornerLoad + uphill;
-      if (car.speed > 0) car.speed = Math.max(0, car.speed - drag * dt);
-    }
+  }
+  const traction = car.transmission.step(car.speed, fullPower, input.brake, car.reversing, dt);
+
+  if (input.brake) {
+    const braking = 13 * (0.55 + 0.45 * grip) + uphill;
+    car.speed = car.reversing
+      ? Math.max(-1.9, car.speed - (3.5 * grip + uphill) * dt)
+      : approach(car.speed, 0, braking * dt);
+  } else if (input.gas) {
+    car.reverseReady = false;
+    const engine = (8.6 - 4.95 * speedRatio ** 1.22) * car.throttle * grip * traction;
+    const acceleration = car.speed > speedLimit
+      ? 5 + 4 * loose + 2.4 * cornerLoad + uphill
+      : Math.max(0, engine - uphill - 1.35 * cornerLoad);
+    car.speed = approach(car.speed, speedLimit, acceleration * dt);
+  } else {
+    const drag = 0.79 + Math.abs(car.speed) * 0.18 + 2.5 * loose + 1.6 * cornerLoad + uphill;
+    if (car.speed > 0) car.speed = Math.max(0, car.speed - drag * dt);
   }
   car.braking = input.brake;
 
@@ -319,6 +325,7 @@ function recover(car: Car, index: number, previousS: number, racing: boolean) {
   place(car, s, laneFor(index), 0);
   car.steer = 0;
   car.throttle = 0;
+  car.transmission.neutralize();
   car.surfaceSound = { curb: 0, runoff: 0, scrape: 0 };
   car.stalled = 0;
   car.protection = 0.86;
@@ -450,6 +457,7 @@ export class Race {
         x: car.x, y: car.road.y, z: car.z, yaw: car.yaw, speed: car.speed,
         lap: demo ? 0 : car.progress.lap, owned: car.owned, steer: car.steer, braking: car.braking,
         blink: car.protection > 0 && Math.floor(car.protection * 8) % 2 === 0,
+        transmission: car.transmission.view(car.speed),
         sound: {
           ...car.surfaceSound, throttle: car.throttle,
           slip: clamp((Math.abs(car.speed * Math.sin(car.motionYaw - car.yaw)) - 0.09) / 1.65, 0, 1),

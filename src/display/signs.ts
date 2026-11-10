@@ -40,6 +40,25 @@ function addScrews(parent: THREE.Object3D, width: number, height: number, z: num
   }
 }
 
+function drawGear(context: CanvasRenderingContext2D, gear: string, spec: typeof CAR_SPECS[number], x: number, y: number) {
+  context.fillStyle = '#242825';
+  context.fillRect(x, y, 193, 90);
+  context.strokeStyle = '#65594a';
+  context.lineWidth = 2;
+  context.strokeRect(x, y, 193, 90);
+  context.fillStyle = '#f0e0c3';
+  context.font = '900 70px ui-monospace, monospace';
+  context.fillText(gear, x + 18, y + 70);
+  context.fillStyle = '#c7b192';
+  context.font = 'bold 23px ui-monospace, monospace';
+  context.fillText('MARCHA', x + 88, y + 29);
+  context.fillStyle = spec.color;
+  context.fillRect(x + 89, y + 42, 84, 34);
+  context.fillStyle = '#242726';
+  context.font = '900 26px ui-monospace, monospace';
+  context.fillText(`#${spec.number}`, x + 106, y + 67);
+}
+
 function raceBoard(parent: THREE.Object3D) {
   const base = new THREE.Group();
   base.position.set(-10.55, -0.23, 4.45);
@@ -71,7 +90,16 @@ function raceBoard(parent: THREE.Object3D) {
   return (state: RaceSnapshot) => {
     const leader = state.order[0] ?? 0;
     const lap = Math.min(3, Math.max(0, state.cars[leader]?.lap ?? 0));
-    const key = `${state.phase}:${lap}:${state.phase === 'results' ? state.order.join() : leader}`;
+    const player = state.cars.findIndex(car => car.owned);
+    const solo = state.phase !== 'demo' && player >= 0 && !state.cars.some((car, slot) => slot !== player && car.owned);
+    const gearSlot = solo ? player : leader;
+    const gear = state.cars[gearSlot]?.transmission?.gear;
+    const gearLabel = gear === -1 ? 'R' : gear === 0 ? 'N'
+      : gear !== undefined && Number.isInteger(gear) && gear >= 1 && gear <= 4 ? String(gear) : '';
+    const gearSpec = CAR_SPECS[gearSlot];
+    const results = state.phase === 'results';
+    const gearKey = gearLabel && gearSpec ? `${gearSlot}/${gearLabel}` : '';
+    const key = `${state.phase}:${lap}:${results ? state.order.join() : leader}:${gearKey}`;
     if (key === previous) return;
     previous = key;
 
@@ -89,7 +117,7 @@ function raceBoard(parent: THREE.Object3D) {
     context.lineTo(991, 78);
     context.stroke();
 
-    if (state.phase === 'results') {
+    if (results) {
       context.fillStyle = '#f0e0c3';
       context.font = '900 62px system-ui, sans-serif';
       context.fillText('LLEGADA', 34, 164);
@@ -129,6 +157,7 @@ function raceBoard(parent: THREE.Object3D) {
       context.font = '900 94px system-ui, sans-serif';
       context.fillText(CAR_SPECS[leader].number, 796, 270);
     }
+    if (gearLabel && gearSpec) drawGear(context, gearLabel, gearSpec, results ? 773 : 532, results ? 92 : 181);
     map.needsUpdate = true;
   };
 }

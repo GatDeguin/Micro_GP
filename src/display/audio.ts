@@ -15,11 +15,12 @@ interface RaceMix {
 }
 
 const limit = (value: number, low = 0, high = 1) => Math.max(low, Math.min(high, value));
+// Compacto, Cupé, Bólido, Cuña. The pitched layers stay in C major as the cars rev.
 const motorStyles = [
-  { base: 103, rise: 183, gear: 2.1, color: 0.72, harmonics: [1, 0.48, 0.31, 0.13, 0.05, 0.04] },
-  { base: 110, rise: 166, gear: 2.9, color: 1.04, harmonics: [1, 0.69, 0.45, 0.32, 0.21, 0.12] },
-  { base: 126, rise: 223, gear: 3.4, color: 0.68, harmonics: [1, 0.34, 0.37, 0.14, 0.09, 0.05] },
-  { base: 141, rise: 172, gear: 2.55, color: 0.87, harmonics: [1, 0.21, 0.57, 0.12, 0.24, 0.08] },
+  { note: 48, color: 0.70, brush: 0.80, harmonics: [1, 0.48, 0.15, 0.24, 0, 0, 0, 0.06] }, // C3
+  { note: 52, color: 1.05, brush: 1.15, harmonics: [1, 0.68, 0, 0.34, 0, 0, 0, 0.11] }, // E3
+  { note: 55, color: 0.82, brush: 0.65, harmonics: [1, 0.35, 0, 0.22, 0, 0, 0, 0.05] }, // G3
+  { note: 60, color: 0.98, brush: 1.00, harmonics: [1, 0.25, 0.24, 0.20, 0, 0, 0, 0.08] }, // C4
 ];
 
 function emitter(context: AudioContext, destination: AudioNode) {
@@ -68,6 +69,8 @@ function carVoice(context: AudioContext, destination: AudioNode, samples: Return
   engineFilter.connect(distanceFilter);
 
   const oscillator = context.createOscillator();
+  const fundamental = 440 * 2 ** ((style.note - 69) / 12);
+  oscillator.frequency.value = fundamental;
   const harmonics = Float32Array.from([0, ...style.harmonics]);
   oscillator.setPeriodicWave(context.createPeriodicWave(new Float32Array(harmonics.length), harmonics));
   const motor = layer(context, engineFilter);
@@ -75,10 +78,21 @@ function carVoice(context: AudioContext, destination: AudioNode, samples: Return
   oscillator.start();
 
   const gear = context.createOscillator();
-  gear.type = slot === 1 || slot === 3 ? 'triangle' : 'sine';
+  gear.frequency.value = fundamental * 2;
   const gearGain = layer(context, distanceFilter);
   gear.connect(gearGain);
   gear.start();
+
+  const whine = context.createOscillator();
+  whine.frequency.value = fundamental * 4;
+  const whineGain = layer(context, distanceFilter);
+  whine.connect(whineGain);
+  whine.start();
+
+  const drive = layer(context, distanceFilter);
+  const driveFilter = band(context, 'bandpass', 740, 0.66);
+  driveFilter.connect(drive);
+  const brush = loop(context, samples.drive, driveFilter, slot * 0.22);
 
   const asphalt = layer(context, distanceFilter);
   const asphaltFilter = band(context, 'bandpass', 960, 0.53);
@@ -98,9 +112,11 @@ function carVoice(context: AudioContext, destination: AudioNode, samples: Return
   loop(context, samples.scrape, scrape, slot * 0.21);
 
   return {
-    style, output, distanceFilter, engineFilter, oscillator, motor, gear, gearGain,
+    style, output, distanceFilter, engineFilter, motor, gearGain, whineGain, drive, driveFilter, brush,
     asphalt, asphaltFilter, road, bridge, runoff, grass, skid, skidFilter, scrape,
     previousDistance: 0, lastX: NaN, lastZ: NaN, curbTravel: 0, onCurb: false,
+    gear: undefined as number | undefined, shift: undefined as number | undefined,
+    shiftUntil: 0, downshift: false,
   };
 }
 
@@ -180,7 +196,8 @@ function createMixer(context: AudioContext) {
     const wide = view === 'general';
     const replay = view === 'replay';
     const changedView = timeline !== view;
-    const reset = timeline === undefined || (timeline === 'replay') !== replay || tick < previousTick;
+    const reset = timeline === undefined || (timeline === 'replay') !== replay
+      || tick < previousTick || state.heat !== previousState?.heat;
     timeline = view;
     previousTick = tick;
     cameraRight.setFromMatrixColumn(camera.matrixWorld, 0);
@@ -229,6 +246,8 @@ function createMixer(context: AudioContext) {
       const runoff = limit(car.sound?.runoff ?? 0);
       const slip = limit(car.sound?.slip ?? 0);
       const scrape = limit(car.sound?.scrape ?? 0);
+      const transmission = car.transmission;
+      const rev = limit(transmission?.rev ?? motion);
       const dominant = slot === focus && !wide;
       if (dominant || wide) pace = Math.max(pace, motion);
       locate(camera, car.x, car.y + 0.23, car.z, wide);
@@ -239,6 +258,18 @@ function createMixer(context: AudioContext) {
         ? limit((voice.previousDistance - distance) / dt, -16, 16)
         : 0;
       voice.previousDistance = distance;
+      if (reset) voice.shiftUntil = 0;
+      if (transmission && !reset && voice.gear !== undefined && voice.gear !== transmission.gear
+        && voice.shift !== transmission.shift) {
+        const driveGear = transmission.gear > 0 && voice.gear > 0;
+        voice.downshift = driveGear && transmission.gear < voice.gear;
+        voice.shiftUntil = now + (driveGear ? 0.12 : 0.065);
+        const shiftSamples = voice.downshift || transmission.gear === -1 ? samples.downshift : samples.upshift;
+        const strike = driveGear ? 0.17 + 0.12 * motion : 0.11;
+        play(shiftSamples, loudness * strike, pan, transmission.shift + slot);
+      }
+      voice.gear = transmission?.gear;
+      voice.shift = transmission?.shift;
       const onCurb = curb > 0.14 && speed > 1.25 && !car.blink;
       if (onCurb && !reset) {
         if (travel < 1.1) voice.curbTravel += travel;
@@ -254,17 +285,22 @@ function createMixer(context: AudioContext) {
 
       const voiceLevel = (wide ? loudness * 0.89 : dominant ? 0.96 : loudness * 0.68) * (state.phase === 'demo' ? 0.72 : 1);
       const doppler = wide || view === 'chase' ? 1 : 1 + approaching * 0.0027;
-      const pitch = (voice.style.base + motion * voice.style.rise + throttle * 43) * doppler;
+      const shifting = limit((voice.shiftUntil - now) / 0.12);
+      const engaged = 1 - shifting * 0.60;
+      const revAccent = limit(rev + (voice.downshift ? shifting * 0.38 : 0));
       const energized = limit(motion * 1.6 + throttle * 1.2);
+      const response = shifting > 0 ? 0.018 : 0.067;
       const bridge = limit((car.y - 0.18) / 1.34);
       target(voice.output.gain, voiceLevel);
       target(voice.output.pan, dominant ? pan * 0.38 : pan);
       target(voice.distanceFilter.frequency, dominant || wide ? 4900 : 1100 + loudness * 4500, 0.12);
-      target(voice.oscillator.frequency, pitch);
-      target(voice.engineFilter.frequency, 575 + 820 * motion + 1420 * throttle);
-      target(voice.motor.gain, 0.006 + energized * (0.05 + 0.065 * throttle));
-      target(voice.gear.frequency, pitch * voice.style.gear);
-      target(voice.gearGain.gain, energized * (0.009 + 0.019 * throttle + 0.007 * motion) * voice.style.color);
+      target(voice.engineFilter.frequency, 495 + 1100 * revAccent + 1370 * throttle, response);
+      target(voice.motor.gain, engaged * (0.008 + energized * (0.065 + 0.059 * throttle)), response);
+      target(voice.gearGain.gain, engaged * energized * (0.009 + 0.044 * revAccent + 0.018 * throttle) * voice.style.color, response);
+      target(voice.whineGain.gain, energized * revAccent ** 2 * (0.014 + 0.018 * throttle) * voice.style.color, response);
+      target(voice.drive.gain, energized * (0.027 + 0.087 * throttle + 0.056 * revAccent) * voice.style.brush * engaged, response);
+      target(voice.driveFilter.frequency, 535 + 1280 * revAccent + 485 * throttle, response);
+      target(voice.brush.playbackRate, (0.67 + 1.06 * revAccent) * doppler, response);
       target(voice.asphalt.gain, motion * (0.117 + bridge * 0.046) * (1 - 0.8 * runoff));
       target(voice.asphaltFilter.frequency, 680 + motion * 570 - bridge * 360, 0.11);
       target(voice.bridge.gain, motion * bridge * 0.20);

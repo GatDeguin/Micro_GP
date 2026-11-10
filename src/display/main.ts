@@ -242,6 +242,14 @@ function bootstrap() {
           scrape: THREE.MathUtils.lerp(from.sound.scrape, car.sound.scrape, alpha),
         };
       }
+      if (car.transmission && from.transmission) {
+        const selected = alpha < 1 ? from.transmission : car.transmission;
+        view.transmission = {
+          gear: selected.gear,
+          shift: selected.shift,
+          rev: THREE.MathUtils.lerp(from.transmission.rev, car.transmission.rev, alpha),
+        };
+      }
       let slope = 0;
       if (view.y > 0.005) {
         const road = TRACK.locate(view.x, view.z);

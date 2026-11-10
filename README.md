@@ -14,6 +14,8 @@ Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para 
 
 Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
 
+Los cuatro autitos tienen caja automática de cuatro marchas. El tablero de la maqueta indica la marcha y el dorsal. Los motores están afinados en Do3, Mi3, Sol3 y Do4, respectivamente para los dorsales 07, 21, 34 y 58.
+
 Hay cuatro plazas. Los bots conducen los autos libres y retoman el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
 
 En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución y **3** para ver a ras de pista. **C** abre el menú de cámaras y **M** activa o desactiva la pantalla dividida. También podés abrir el menú desde la esquina superior izquierda. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
