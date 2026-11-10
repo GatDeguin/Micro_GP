@@ -1,6 +1,6 @@
 import './style.css';
 import type { ViewMode } from './race-views';
-import { applyQuality, audioLimits, defaultAudioSettings, saveAudioSettings, type AudioChannel, type AudioSettings } from './settings';
+import { applyQuality, audioLimits, defaultAudioSettings, saveAudioSettings, type AudioChannel, type AudioSettings, type GraphicsQuality } from './settings';
 
 const audioLabels: Record<AudioChannel, string> = {
   master: 'Volumen general', music: 'Música', engines: 'Motores', effects: 'Efectos',
@@ -9,12 +9,12 @@ const audioChannels = Object.keys(audioLabels) as AudioChannel[];
 
 interface ViewControlsOptions {
   multiplayer: boolean;
-  lowQuality: boolean;
+  graphics: GraphicsQuality;
   audio: AudioSettings;
   onAudioChange: (settings: AudioSettings) => void;
 }
 
-export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChange }: ViewControlsOptions) {
+export function buildViewControls({ multiplayer, graphics, audio, onAudioChange }: ViewControlsOptions) {
   const root = document.createElement('div');
   root.className = 'view-tools';
   root.innerHTML = `
@@ -56,7 +56,7 @@ export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChang
         <legend>Gráficos</legend>
         <label class="view-tools-quality">
           <span>Calidad gráfica</span>
-          <select><option value="full">Completa</option><option value="low">Ligera</option></select>
+          <select><option value="auto">Adaptativa (60 FPS)</option><option value="full">Completa</option><option value="low">Ligera</option></select>
         </label>
         <button type="button" data-apply-quality disabled>Aplicar y recargar</button>
       </fieldset>
@@ -77,7 +77,7 @@ export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChang
     output: slider.parentElement!.querySelector<HTMLElement>('.view-tools-value')!,
   }));
   let audioSettings = { ...audio };
-  const initialQuality = lowQuality ? 'low' : 'full';
+  const initialQuality = graphics;
   quality.value = initialQuality;
   const modes = {
     general: root.querySelector<HTMLInputElement>('input[value=general]')!,
@@ -122,7 +122,7 @@ export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChang
     commitAudioSettings();
   });
   quality.addEventListener('change', () => { apply.disabled = quality.value === initialQuality; });
-  apply.addEventListener('click', () => applyQuality(quality.value === 'low' ? 'low' : 'full'));
+  apply.addEventListener('click', () => applyQuality(quality.value as GraphicsQuality));
 
   function selectMode(mode: ViewMode, moveFocus = false) {
     currentMode = mode;

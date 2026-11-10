@@ -4,10 +4,11 @@ import { TRACK, wallHalfAt, type TrackPoint } from '../shared/track';
 import type { buildPlacard } from './signs';
 import { approachingCover, coverClearance } from './track-cover';
 import { cinematicStation } from './cinematic-cameras';
+import { cameraLights } from './render-layers';
 
 export type ViewMode = 'general' | 'chase' | 'trackside' | 'broadcast';
 
-function followCamera() {
+function followCamera(slot: number) {
   const camera = new THREE.PerspectiveCamera(46, 1, 0.09, 160);
   const position = new THREE.Vector3();
   const target = new THREE.Vector3();
@@ -18,7 +19,8 @@ function followCamera() {
   let direction = 1;
   let side = 1;
 
-  return (mode: ViewMode, car: CarView, width: number, height: number, dt: number, qrSize = 0) => {
+  return (mode: ViewMode, car: CarView, width: number, height: number, dt: number, qrSize = 0, compact = false) => {
+    cameraLights(camera, compact, slot);
     const aspect = width / height;
     const road = TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
     const cover = approachingCover(road.s, 6);
@@ -74,9 +76,11 @@ function followCamera() {
       : mode === 'general' ? 44 : mode === 'chase' ? 48 : 42;
     const fov = lens
       + THREE.MathUtils.clamp((1.25 - aspect) * 22, 0, 22) + (qrSize ? 4 : 0);
-    if (camera.view?.enabled || camera.aspect !== aspect || camera.fov !== fov) {
+    const far = compact ? (mode === 'general' ? 46 : 34) : 160;
+    if (camera.view?.enabled || camera.aspect !== aspect || camera.fov !== fov || camera.far !== far) {
       camera.aspect = aspect;
       camera.fov = fov;
+      camera.far = far;
       camera.clearViewOffset();
     }
     if (qrSize) {
@@ -97,7 +101,7 @@ export function buildRaceViews(
   placard: ReturnType<typeof buildPlacard>, cameraFit: (camera: THREE.PerspectiveCamera) => (width: number, height: number) => void,
   backdrop: { wall: THREE.Object3D; build(): THREE.Texture },
 ) {
-  const followers = Array.from({ length: 4 }, followCamera);
+  const followers = Array.from({ length: 4 }, (_, slot) => followCamera(slot));
   const shared = new THREE.PerspectiveCamera(overhead.fov, 1, overhead.near, overhead.far);
   const fitShared = cameraFit(shared);
   const plateScene = new THREE.Scene();
@@ -108,7 +112,6 @@ export function buildRaceViews(
   let sharedWidth = 0;
   let sharedHeight = 0;
   let wasSplit = false;
-  let displayWindow: THREE.Texture | undefined;
 
   return (scene: THREE.Scene, mode: ViewMode, cars: readonly CarView[], slots: readonly number[],
     width: number, height: number, dt: number) => {
@@ -123,7 +126,7 @@ export function buildRaceViews(
 
     const room = scene.background;
     const roomBlur = scene.backgroundBlurriness;
-    const collector = mode === 'general' ? undefined : (displayWindow ??= backdrop.build());
+    const collector = mode === 'general' ? undefined : backdrop.build();
     const draw = (camera: THREE.PerspectiveCamera, following: boolean) => {
       const background = following ? collector : undefined;
       scene.background = background ?? room;
@@ -138,10 +141,14 @@ export function buildRaceViews(
     if (split) {
       const rows = slots.length > 2 || height > width ? 2 : 1;
       const columns = slots.length > 2 || width >= height ? 2 : 1;
+      const dividerInset = 2;
       const plateFit = Math.min(width * 0.26, (width / columns) * 0.38, (height / rows) * 0.38);
       const plateLimit = THREE.MathUtils.clamp(plateFit, 92, 145);
       placard.resize(overhead, width, height, undefined, plateLimit);
       const shadowUpdate = renderer.shadowMap.autoUpdate;
+      const matrixUpdate = scene.matrixWorldAutoUpdate;
+      if (matrixUpdate) scene.updateMatrixWorld();
+      scene.matrixWorldAutoUpdate = false;
       renderer.setClearColor(divider);
       renderer.clear();
       renderer.setScissorTest(true);
@@ -149,10 +156,10 @@ export function buildRaceViews(
       for (let i = 0; i < rows * columns; i++) {
         const column = i % columns;
         const row = Math.floor(i / columns);
-        const left = Math.floor(column * width / columns) + (column ? 1 : 0);
-        const right = Math.floor((column + 1) * width / columns) - (column < columns - 1 ? 1 : 0);
-        const top = Math.floor(row * height / rows) + (row ? 1 : 0);
-        const bottom = Math.floor((row + 1) * height / rows) - (row < rows - 1 ? 1 : 0);
+        const left = Math.floor(column * width / columns) + (column ? dividerInset : 0);
+        const right = Math.floor((column + 1) * width / columns) - (column < columns - 1 ? dividerInset : 0);
+        const top = Math.floor(row * height / rows) + (row ? dividerInset : 0);
+        const bottom = Math.floor((row + 1) * height / rows) - (row < rows - 1 ? dividerInset : 0);
         const w = Math.max(1, right - left);
         const h = Math.max(1, bottom - top);
         const slot = slots[i];
@@ -161,15 +168,17 @@ export function buildRaceViews(
           sharedWidth = w;
           sharedHeight = h;
         }
+        if (slot === undefined) cameraLights(shared, true, slots[0]);
         renderer.setViewport(left, height - bottom, w, h);
         renderer.setScissor(left, height - bottom, w, h);
         const qrSize = i === rows * columns - 1 ? plateLimit : 0;
-        draw(slot === undefined ? shared : followers[slot](mode, cars[slot], w, h, dt, qrSize), slot !== undefined);
+        draw(slot === undefined ? shared : followers[slot](mode, cars[slot], w, h, dt, qrSize, slots.length > 2), slot !== undefined);
         // All panes show the same world at the same time, so the first shadow map is reusable.
         renderer.shadowMap.autoUpdate = false;
       }
 
       renderer.shadowMap.autoUpdate = shadowUpdate;
+      scene.matrixWorldAutoUpdate = matrixUpdate;
       renderer.setScissorTest(false);
       renderer.setViewport(0, 0, width, height);
     } else {

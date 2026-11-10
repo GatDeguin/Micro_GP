@@ -3,7 +3,8 @@ import type { CarView, RaceSnapshot } from '../shared/protocol';
 import { sectorAt, TRACK, TRACK_SECTORS, type SectorId } from '../shared/track';
 import firstTrack from '../../Musica/01.mp3?url';
 import secondTrack from '../../Musica/02.mp3?url';
-import { buildAudioSamples, buildEngineSamples } from './audio-samples';
+import type { prepareAudioBank } from './audio-samples';
+import type { PCMBank, PCMClip } from './audio-worker';
 import { defaultAudioSettings, type AudioSettings } from './settings';
 import { coverClearance } from './track-cover';
 
@@ -27,6 +28,35 @@ const motorStyles = [
   { idle: 89, sweep: 278, mesh: 2.77, color: 0.82, harmonics: [1, 0.34, 0.13, 0.23, 0.08, 0.04] },
   { idle: 77, sweep: 271, mesh: 2.28, color: 0.98, harmonics: [1, 0.28, 0.50, 0.18, 0.18, 0.08] },
 ];
+const motorSamples = motorStyles.map(({ idle, sweep, harmonics }, slot) => ({
+  roots: [0.13, 0.48, 0.88].map(rev => 2 * Math.round((idle + sweep * rev) / 2)),
+  harmonics, seed: 419 + slot * 97,
+}));
+type AudioBank = ReturnType<typeof prepareAudioBank<AudioBuffer>>;
+
+function prepareInWorker() {
+  return new Promise<PCMBank | undefined>(resolve => {
+    try {
+      const worker = new Worker(new URL('./audio-worker.ts', import.meta.url), { type: 'module' });
+      const finish = (value?: PCMBank) => { worker.terminate(); resolve(value); };
+      worker.addEventListener('message', (event: MessageEvent<PCMBank>) => finish(event.data), { once: true });
+      worker.addEventListener('error', () => finish(), { once: true });
+      worker.postMessage(motorSamples);
+    } catch { resolve(undefined); }
+  });
+}
+
+function decodeBank(context: AudioContext, bank: PCMBank): AudioBank {
+  function decode({ samples, rate }: PCMClip) {
+    const buffer = context.createBuffer(1, samples.length, rate);
+    buffer.copyToChannel(samples, 0);
+    return buffer;
+  }
+  const effects = Object.fromEntries(Object.entries(bank.effects).map(([key, value]) =>
+    [key, Array.isArray(value) ? value.map(decode) : decode(value)])) as AudioBank['effects'];
+  const engines = bank.engines.map(clips => clips.map(({ root, coast, power }) => ({ root, coast: decode(coast), power: decode(power) })));
+  return { effects, engines };
+}
 const roadTones: Record<SectorId, { frequency: number; gain: number }> = {
   straight: { frequency: 760, gain: 1 }, esses: { frequency: 1020, gain: 0.96 },
   hairpin: { frequency: 830, gain: 1.18 }, bridge: { frequency: 580, gain: 1.08 },
@@ -75,7 +105,7 @@ function layer(context: AudioContext, destination: AudioNode) {
   return gain;
 }
 
-function carVoice(context: AudioContext, destination: AudioNode, samples: ReturnType<typeof buildAudioSamples>, slot: number) {
+function carVoice(context: AudioContext, destination: AudioNode, samples: AudioBank['effects'], clips: AudioBank['engines'][number], slot: number) {
   const style = motorStyles[slot];
   const output = emitter(context, destination);
   const distanceFilter = band(context, 'lowpass', 4800);
@@ -84,8 +114,6 @@ function carVoice(context: AudioContext, destination: AudioNode, samples: Return
   engineFilter.connect(distanceFilter);
 
   const fundamental = style.idle + style.sweep * 0.15;
-  const roots = [0.13, 0.48, 0.88].map(rev => 2 * Math.round((style.idle + style.sweep * rev) / 2));
-  const clips = buildEngineSamples(context, roots, style.harmonics, 419 + slot * 97);
   const start = context.currentTime + 0.025;
   const engine = clips.map(({ root, coast, power }) => {
     const makeLoop = (sample: AudioBuffer) => {
@@ -140,8 +168,7 @@ function carVoice(context: AudioContext, destination: AudioNode, samples: Return
   };
 }
 
-function createMixer(context: AudioContext, initial: AudioSettings) {
-  const samples = buildAudioSamples(context);
+function createMixer(context: AudioContext, initial: AudioSettings, { effects: samples, engines }: AudioBank) {
   const master = context.createGain();
   master.gain.value = 0;
   const compressor = context.createDynamicsCompressor();
@@ -155,7 +182,7 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
   effects.gain.value = initial.effects;
   effects.connect(master);
 
-  const voices = motorStyles.map((_, slot) => carVoice(context, master, samples, slot));
+  const voices = engines.map((clips, slot) => carVoice(context, master, samples, clips, slot));
   const river = emitter(context, effects);
   const pond = emitter(context, effects);
   const crowd = emitter(context, effects);
@@ -467,6 +494,8 @@ export function raceAudio(initial = defaultAudioSettings) {
   let soundtrack: ReturnType<typeof createSoundtrack> | undefined;
   let muted = false;
   let settings = initial;
+  let pending = false;
+  let sampleBank: Promise<PCMBank | undefined> | undefined = prepareInWorker();
 
   function updatePlayback() {
     soundtrack?.setPlaying(!muted && !settings.muted && settings.master > 0 && settings.music > 0);
@@ -476,9 +505,17 @@ export function raceAudio(initial = defaultAudioSettings) {
     unlock() {
       try {
         context ??= new AudioContext();
-        if (!mixer) {
-          mixer = createMixer(context, settings);
-          mixer.mute(muted);
+        if (!mixer && !pending) {
+          pending = true;
+          const playback = context;
+          void (async () => {
+            const pcm = await sampleBank;
+            sampleBank = undefined;
+            const bank = pcm ? decodeBank(playback, pcm)
+              : (await import('./audio-samples')).prepareAudioBank(playback, motorSamples);
+            mixer = createMixer(playback, settings, bank);
+            mixer.mute(muted);
+          })().catch(() => {}).finally(() => { pending = false; });
         }
         if (context.state === 'suspended') void context.resume().catch(() => {});
         soundtrack ??= createSoundtrack(context);

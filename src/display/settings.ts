@@ -25,13 +25,19 @@ export function saveAudioSettings(settings: AudioSettings) {
   try { localStorage.setItem(audioKey, JSON.stringify(settings)); } catch { /* Use the session settings. */ }
 }
 
-export function useLowQuality() {
+export type GraphicsQuality = 'auto' | 'low' | 'full';
+
+export function readQuality(): GraphicsQuality {
   const mode = new URLSearchParams(location.search).get('quality');
-  if (mode === 'low' || mode === 'full') return mode === 'low';
-  try { return localStorage.getItem(qualityKey) === 'low'; } catch { return false; }
+  if (mode === 'auto' || mode === 'low' || mode === 'full') return mode;
+  try {
+    const saved = localStorage.getItem(qualityKey);
+    if (saved === 'low' || saved === 'full') return saved;
+  } catch { /* Adaptive graphics are available without storage. */ }
+  return 'auto';
 }
 
-export function applyQuality(mode: 'low' | 'full') {
+export function applyQuality(mode: GraphicsQuality) {
   try { localStorage.setItem(qualityKey, mode); } catch { /* The URL also carries the choice. */ }
   const url = new URL(location.href);
   url.searchParams.set('quality', mode);

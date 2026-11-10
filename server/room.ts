@@ -38,7 +38,7 @@ export class Room<Peer> {
     if (!this.isHost(peer)) return "Solo la pantalla anfitriona puede controlar la sala.";
     this.seats.expire(now);
     if (command.type === "return") {
-      if (this.phase !== "practice" && this.phase !== "results") return "La carrera todavía está en curso.";
+      if (!this.active) return "La sala ya está abierta.";
       this.race.returnToDemo();
       this.active = false;
       this.phase = "lobby";

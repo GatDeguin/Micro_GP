@@ -194,6 +194,7 @@ export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3
   const finish = TRACK.sampleAt(0);
   const waving: THREE.Group[] = [];
   const photographers: Photo[] = [];
+  const crowds: THREE.Group[] = [];
   const spark = canvas2d(64, 64);
   const glow = spark.context.createRadialGradient(32, 32, 1, 32, 32, 31);
   glow.addColorStop(0, 'rgba(255,255,248,1)');
@@ -215,6 +216,7 @@ export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3
     crowd.position.copy(stands.position);
     crowd.quaternion.copy(stands.quaternion);
     animated.add(crowd);
+    crowds.push(crowd);
     const shadow = new THREE.Mesh(new THREE.PlaneGeometry(6.55, 2.48), horizontalShadow());
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = -0.068;
@@ -251,6 +253,7 @@ export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3
   let reactionAt = -10_000;
   let finishReaction = false;
   return {
+    setDetail(enabled: boolean) { for (const crowd of crowds) crowd.visible = enabled; },
     observe(snapshot: RaceSnapshot) {
       const cue = crowdCue(previous, snapshot, finish);
       if (cue) pending = cue;
@@ -263,6 +266,7 @@ export function buildGrandstands(parent: THREE.Object3D, animated: THREE.Object3
         reactionAt = now;
       }
       pending = null;
+      if (!crowds[0].visible) return;
       const energy = Math.max(0, 1 - (now - reactionAt) / (finishReaction ? 2600 : 1550));
       for (const [i, wave] of waving.entries()) {
         const phase = now * (0.003 + energy * 0.004) + i * 1.27;

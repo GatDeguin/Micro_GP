@@ -55,6 +55,15 @@ const displays = new Set<WebSocket>();
 const controllers = new Map<WebSocket, number>();
 const lastLobby = new WeakMap<WebSocket, string>();
 const wss = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false });
+const responsive = new WeakSet<WebSocket>();
+const heartbeat = setInterval(() => {
+  for (const peer of wss.clients) {
+    if (peer.readyState !== WebSocket.OPEN) continue;
+    if (responsive.delete(peer)) peer.ping();
+    else peer.terminate();
+  }
+}, 2500);
+heartbeat.unref();
 
 function text(response: ServerResponse, code: number, value: string) {
   response.writeHead(code, { "Content-Type": "text/plain; charset=utf-8" });
@@ -119,7 +128,7 @@ async function serve(request: IncomingMessage, response: ServerResponse) {
 }
 
 function send(peer: WebSocket, data: object) {
-  if (peer.readyState === WebSocket.OPEN) peer.send(JSON.stringify(data));
+  if (peer.readyState === WebSocket.OPEN && peer.bufferedAmount < 64 * 1024) peer.send(JSON.stringify(data));
 }
 
 function publishLobby(snapshot: RaceSnapshot = room.snapshot()) {
@@ -149,11 +158,11 @@ function display(peer: WebSocket, local: boolean) {
     publishLobby();
   });
   peer.on("message", (buffer, binary) => {
-    if (binary) return;
+    if (binary || peer.readyState !== WebSocket.OPEN) return;
     const command = readCommand(buffer.toString());
     if (command?.type !== "configure" && command?.type !== "launch" && command?.type !== "return") return;
     const error = room.control(peer, command, performance.now());
-    if (error) send(peer, { type: "error", message: error });
+    if (error) return send(peer, { type: "error", message: error });
     publishLobby();
   });
   send(peer, { type: "hello", url: controllerUrl });
@@ -170,7 +179,7 @@ function controller(peer: WebSocket) {
     if (slot !== undefined) publishLobby();
   });
   peer.on("message", (buffer, binary) => {
-    if (binary) return;
+    if (binary || peer.readyState !== WebSocket.OPEN) return;
     const message = readCommand(buffer.toString());
     if (!message) return;
     const now = performance.now();
@@ -180,7 +189,7 @@ function controller(peer: WebSocket) {
         const error = message.type === "select"
           ? room.select(slot, peer, message.car, message.livery, now)
           : room.ready(slot, peer, message.ready, now);
-        if (error) send(peer, { type: "error", message: error });
+        if (error) return send(peer, { type: "error", message: error });
         publishLobby();
       } else {
         room.receive(slot, peer, message, now);
@@ -219,6 +228,8 @@ server.on("upgrade", (request, socket, head) => {
     return;
   }
   wss.handleUpgrade(request, socket, head, (peer) => {
+    responsive.add(peer);
+    peer.on("pong", () => responsive.add(peer));
     peer.on("error", () => peer.terminate());
     const remote = request.socket.remoteAddress;
     const loopback = remote === "127.0.0.1" || remote === "::ffff:127.0.0.1" || remote === "::1";

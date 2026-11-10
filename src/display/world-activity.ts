@@ -3,6 +3,7 @@ import { PIT_LANE, TRACK, wallHalfAt } from '../shared/track';
 import type { RaceSnapshot } from '../shared/protocol';
 import { instanceStatic } from './batches';
 import { box, canvas2d, standard, texture } from './materials';
+import { sceneryLights } from './render-layers';
 import { marshalSignal, nearestCar, pitGateOpen } from './world-cues';
 
 const steel = standard(0x83847c, 0.46, 0.6);
@@ -76,6 +77,7 @@ function pitGate(fixed: THREE.Object3D, animated: THREE.Object3D, s: number, lab
   const beacon = lightLens(gate, red, 0.076);
   beacon.position.set(1.81, 1.17, -0.05);
   const lamp = new THREE.SpotLight(0xffd194, 16, 8, 0.69, 0.82, 2);
+  lamp.layers.set(sceneryLights);
   lamp.position.copy(coursePoint(s, outer, 1.49));
   lamp.target.position.copy(coursePoint(s + 1.3, PIT_LANE.offset, 0.025));
   fixed.add(lamp, lamp.target);

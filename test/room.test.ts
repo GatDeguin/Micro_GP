@@ -109,7 +109,7 @@ test("car reservations survive reconnect and lock choices when the host launches
   assert.equal(room.control("host", { type: "launch" }, 8), null);
   assert.ok(room.select(first.slot, "new a", 0, "original", 9));
   assert.ok(room.ready(first.slot, "new a", false, 10));
-  assert.ok(room.control("host", { type: "return" }, 11));
+  assert.ok(room.control("new a", { type: "return" }, 11));
 });
 
 test("a host can end free practice and reuse connected seats for the next heat", () => {
@@ -132,6 +132,46 @@ test("a host can end free practice and reuse connected seats for the next heat",
   assert.equal(room.lobby().slots[3]?.ready, false);
   assert.equal(room.lobby().slots[3]?.connected, true);
   assert.equal(room.lobby().canLaunch, false);
+});
+
+test("a practice swap requires fresh input before the replacement car moves", () => {
+  const room = new Room<string>();
+  room.addDisplay("host", true);
+  const first = room.join("a", undefined, 0)!;
+  room.ready(first.slot, "a", true, 0);
+  assert.equal(room.control("host", { type: "configure", config: {
+    laps: 3, bots: 0, difficulty: "club", mode: "practice", night: false,
+  } }, 0), null);
+  assert.equal(room.control("host", { type: "launch" }, 0), null);
+  room.step(1 / 60, 17);
+  assert.equal(room.snapshot().cars[0].pitReady, true);
+
+  room.receive(first.slot, "a", accelerate, 19);
+  assert.equal(room.select(first.slot, "a", 3, "original", 20), null);
+  for (let frame = 1; frame <= 12; frame++) room.step(1 / 60, 20 + frame * 17);
+  assert.equal(room.snapshot().cars[3].speed, 0);
+
+  room.receive(first.slot, "a", { ...accelerate, seq: 2, x: 0 }, 225);
+  for (let frame = 1; frame <= 12; frame++) room.step(1 / 60, 225 + frame * 17);
+  assert.ok(room.snapshot().cars[3].speed > 0.5);
+});
+
+test("the host can cancel an active heat and reopen the same seats", () => {
+  const room = new Room<string>();
+  room.addDisplay("host", true);
+  room.addDisplay("spectator", false);
+  const player = room.join("phone", undefined, 0)!;
+  room.ready(player.slot, "phone", true, 0);
+  assert.equal(room.control("host", { type: "launch" }, 0), null);
+  for (let frame = 0; frame < 210; frame++) room.step(1 / 60, frame * 17);
+  assert.equal(room.snapshot().phase, "race");
+
+  assert.ok(room.control("spectator", { type: "return" }, 3600));
+  assert.equal(room.control("host", { type: "return" }, 3600), null);
+  assert.equal(room.snapshot().phase, "demo");
+  assert.equal(room.lobby().phase, "lobby");
+  assert.equal(room.lobby().slots[0]?.connected, true);
+  assert.equal(room.lobby().slots[0]?.ready, false);
 });
 
 test("a reservation expiring just after confirmation still starts the locked grid", () => {

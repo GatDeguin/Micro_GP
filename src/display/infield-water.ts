@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TRACK, wallHalfAt } from '../shared/track';
+import { cameraLights } from './render-layers';
 
 export const waterline = -0.156;
 // x, z and radius. These rocks have matching wakes in the surface shader.
@@ -106,6 +107,7 @@ export function pondMaterials(bedMap: THREE.Texture) {
     clearcoat: 0.73, clearcoatRoughness: 0.16, transparent: true, opacity: 0.27, depthWrite: false,
   });
   const probePosition = new THREE.Vector3(4.57, waterline + 0.11, -1.23);
+  let reflection: THREE.WebGLRenderTarget | undefined;
   const spans = [-4.10, 0, 4.10].map(offset => TRACK.sampleAt(TRACK.bridge.crest + offset));
 
   bed.onBeforeCompile = shader => {
@@ -159,6 +161,7 @@ export function pondMaterials(bedMap: THREE.Texture) {
       type: renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType,
     });
     const camera = new THREE.CubeCamera(0.075, 85, target);
+    cameraLights(camera, false);
     camera.position.copy(probePosition);
     const shadows = renderer.shadowMap.autoUpdate;
     const generator = new THREE.PMREMGenerator(renderer);
@@ -167,7 +170,10 @@ export function pondMaterials(bedMap: THREE.Texture) {
       renderer.shadowMap.autoUpdate = false;
       renderer.shadowMap.needsUpdate = true;
       camera.update(renderer, scene);
-      water.envMap = generator.fromCubemap(target.texture).texture;
+      const next = generator.fromCubemap(target.texture);
+      reflection?.dispose();
+      reflection = next;
+      water.envMap = next.texture;
       water.envMapIntensity = 1.25 * light.value;
       water.needsUpdate = true;
     } finally {

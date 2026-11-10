@@ -477,6 +477,10 @@ export class Race {
 
     const racing = this.phase === 'race';
     const practice = this.phase === 'practice';
+    if (racing && this.firstFinishAt !== null) {
+      // A crossing in the rest of the final tick is outside the finish window.
+      dt = Math.min(dt, this.firstFinishAt + FINISH_WINDOW - this.clock);
+    }
     if (racing || practice) this.clock += dt;
     const previous = this.cars.map(car => ({
       x: car.x, y: car.road.y, z: car.z, s: car.road.s, speed: car.speed, motionYaw: car.motionYaw, progress: car.progress.distance,
@@ -545,12 +549,15 @@ export class Race {
       this.firstFinishAt ??= this.clock - dt + finishedThisTick[0].fraction * dt;
       this.finishOrder.push(...finishedThisTick.map(finish => finish.index));
     }
-    if (this.firstFinishAt !== null && this.phase === 'race' && (
-      this.finishOrder.length === this.cars.filter(car => car.active).length
-      || this.clock + EPSILON >= this.firstFinishAt + FINISH_WINDOW
-    )) {
-      this.phase = 'results';
-      this.elapsed = 0;
+    if (racing && this.firstFinishAt !== null) {
+      const cutoff = this.firstFinishAt + FINISH_WINDOW;
+      const allFinished = this.finishOrder.length === this.cars.filter(car => car.active).length;
+      if (allFinished || this.clock + EPSILON >= cutoff) {
+        const last = this.cars[this.finishOrder[this.finishOrder.length - 1]];
+        this.clock = allFinished ? last.timing.finishTime! : cutoff;
+        this.phase = 'results';
+        this.elapsed = 0;
+      }
     }
   }
 

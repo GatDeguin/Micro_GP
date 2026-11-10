@@ -32,7 +32,7 @@ function loadGarage() {
   return { slot: Math.max(0, slot), config: normalizeRaceConfig(saved?.config ?? defaultRaceConfig), progress, liveries };
 }
 
-export function startSolo(onState: (snapshot: RaceSnapshot) => void) {
+export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => void) {
   const panel = document.createElement('div');
   panel.className = 'solo';
   const garage = loadGarage();
@@ -232,8 +232,8 @@ export function startSolo(onState: (snapshot: RaceSnapshot) => void) {
     return false;
   }
 
-  function update(snapshot: RaceSnapshot) {
-    onState(snapshot);
+  function update(snapshot: RaceSnapshot, now?: number) {
+    onState(snapshot, now);
     if (phase !== snapshot.phase) {
       phase = snapshot.phase;
       pedals.hidden = !driver.owned || phase === 'results';
@@ -271,7 +271,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot) => void) {
 
   update(race.snapshot());
   return {
-    advance(dt: number) {
+    advance(dt: number, now?: number) {
       elapsed += dt;
       if (elapsed < step) return;
       input.x = Number(held('right')) - Number(held('left'));
@@ -284,7 +284,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot) => void) {
       }
       if (ticks >= 3) {
         ticks %= 3;
-        update(race.snapshot());
+        update(race.snapshot(), now);
       }
     },
   };

@@ -96,6 +96,51 @@ test('a configured one-lap heat waits for launch and retains timed results', () 
   assert.equal(race.snapshot().phase, 'demo');
 });
 
+test('two cars side by side report a zero gap between progress samples', () => {
+  const race = new Race({ manual: true });
+  race.configure(config);
+  race.launch();
+  tick(race, [stopped, stopped], 3);
+  tick(race, [gas, gas], 52 * TICK);
+  const [first, second] = race.snapshot().cars;
+  assert.ok(first.distance! > 0 && first.distance! < 0.85);
+  assert.equal(first.distance, second.distance);
+  assert.equal(first.gap, 0);
+  assert.ok(Math.abs(second.gap ?? Infinity) < 1e-6);
+});
+
+test('a crossing just after the finish cutoff is a DNF even on the same tick', () => {
+  function finishWithDelay(delay: number) {
+    const race = new Race({ manual: true });
+    race.configure(config);
+    race.launch();
+    tick(race, [stopped, stopped], 3);
+    for (let frame = 0; frame < 60 * 53; frame++) {
+      const state = race.snapshot();
+      if (state.phase === 'results') return state;
+      const [first, second] = state.cars;
+      const leader = aimAt(first, first.distance! + 1.8 + first.speed * 0.34, 0.93, 6.15);
+      const trailer = frame < delay ? stopped
+        : aimAt(second, second.distance! + 1.8 + second.speed * 0.34, -0.93, 6.17);
+      race.step(TICK, [leader, trailer]);
+    }
+    assert.fail('the heat did not reach results');
+  }
+
+  const onTime = finishWithDelay(906);
+  const [leader, trailer] = onTime.results!;
+  assert.ok(leader.time !== null && trailer.time !== null);
+  const cutoff = leader.time + 15;
+  assert.ok(trailer.time < cutoff && trailer.time + TICK > cutoff);
+  assert.equal(Math.ceil((trailer.time + TICK) / TICK), Math.ceil(cutoff / TICK));
+
+  const late = finishWithDelay(907);
+  assert.equal(late.results?.[1].time, null);
+  assert.equal(late.cars[1].lap, 0);
+  assert.ok(Math.abs(late.time! - cutoff) < 1e-8);
+  assert.equal(onTime.time, trailer.time);
+});
+
 test('a stopped practice driver swaps cars in the garage and can leave under power', () => {
   const race = new Race({ manual: true });
   assert.equal(race.configure({ ...config, mode: 'practice', bots: 1 }), true);

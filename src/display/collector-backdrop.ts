@@ -3,7 +3,12 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { instanceStatic } from './batches';
 import { canvas2d, standard } from './materials';
 
-const panoramas = new WeakMap<THREE.WebGLRenderer, THREE.WebGLCubeRenderTarget>();
+const panoramas = new WeakMap<THREE.WebGLRenderer, THREE.WebGLRenderTarget>();
+
+export function disposeCollectorBackdrop(renderer: THREE.WebGLRenderer) {
+  panoramas.get(renderer)?.dispose();
+  panoramas.delete(renderer);
+}
 const displayWidth = 6.30;
 const shelves = [0.86, 2.13, 3.40];
 
@@ -211,19 +216,20 @@ export function buildCollectorBackdrop(renderer: THREE.WebGLRenderer): THREE.Tex
   const face = renderer.getActiveCubeFace();
   const mip = renderer.getActiveMipmapLevel();
   const xr = renderer.xr.enabled;
+  const pmrem = new THREE.PMREMGenerator(renderer);
   try {
     renderer.autoClear = true;
     // Offscreen rendering keeps the linear values above 1 from the light strips.
     camera.update(renderer, scene);
-    panoramas.set(renderer, target);
-    return target.texture;
-  } catch (error) {
-    target.dispose();
-    throw error;
+    const filtered = pmrem.fromCubemap(target.texture);
+    panoramas.set(renderer, filtered);
+    return filtered.texture;
   } finally {
     renderer.autoClear = autoClear;
     renderer.setRenderTarget(renderTarget, face, mip);
     renderer.xr.enabled = xr;
+    pmrem.dispose();
+    target.dispose();
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     room.traverse(object => {

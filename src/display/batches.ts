@@ -5,7 +5,7 @@ type OpaqueMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
 
 function meshGroups(
   root: THREE.Group,
-  keyFor: (geometry: THREE.BufferGeometry) => string | number,
+  keyFor: (mesh: OpaqueMesh) => string | number,
   animated?: ReadonlySet<THREE.Object3D>,
 ) {
   root.updateWorldMatrix(true, true);
@@ -26,7 +26,7 @@ function meshGroups(
       object.matrixWorld.determinant() <= 0
     ) continue;
     const key = [
-      keyFor(geometry), material.id, object.castShadow, object.receiveShadow,
+      keyFor(object as OpaqueMesh), material.id, object.castShadow, object.receiveShadow,
       object.renderOrder, object.layers.mask, object.frustumCulled,
     ].join(':');
     const group = groups.get(key);
@@ -48,7 +48,7 @@ function replace(root: THREE.Group, sources: OpaqueMesh[], batch: OpaqueMesh) {
 }
 
 export function instanceStatic(root: THREE.Group) {
-  const groups = meshGroups(root, geometry => geometry.id);
+  const groups = meshGroups(root, mesh => mesh.geometry.id);
   const worldToRoot = root.matrixWorld.clone().invert();
   const local = new THREE.Matrix4();
   for (const sources of groups) {
@@ -62,10 +62,21 @@ export function instanceStatic(root: THREE.Group) {
   }
 }
 
-export function mergeStatic(root: THREE.Group, animated: ReadonlySet<THREE.Object3D>) {
-  const groups = meshGroups(root, geometry => [
-    Boolean(geometry.index), ...Object.keys(geometry.attributes).sort(),
-  ].join(','), animated);
+export function mergeStatic(root: THREE.Group, animated?: ReadonlySet<THREE.Object3D>, cell?: number) {
+  const center = new THREE.Vector3();
+  const groups = meshGroups(root, mesh => {
+    const geometry = mesh.geometry;
+    const attributes = Object.keys(geometry.attributes).sort().map(name => {
+      const attribute = geometry.getAttribute(name);
+      return `${name}:${attribute.itemSize}:${attribute.normalized}:${attribute.array.constructor.name}`;
+    });
+    if (cell) {
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      geometry.boundingBox!.getCenter(center).applyMatrix4(mesh.matrixWorld);
+      attributes.push(String(Math.floor(center.x / cell)), String(Math.floor(center.z / cell)));
+    }
+    return [Boolean(geometry.index), ...attributes].join(',');
+  }, animated);
   const worldToRoot = root.matrixWorld.clone().invert();
   const local = new THREE.Matrix4();
   for (const sources of groups) {

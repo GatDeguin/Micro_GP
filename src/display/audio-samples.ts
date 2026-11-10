@@ -1,6 +1,10 @@
 const sampleRate = 24_000;
 const tau = Math.PI * 2;
 
+interface MonoBuffer { getChannelData(channel: number): Float32Array<ArrayBufferLike> }
+interface BufferWriter<T extends MonoBuffer> { createBuffer(channels: number, length: number, rate: number): T }
+export interface EngineSampleSpec { roots: readonly number[]; harmonics: readonly number[]; seed: number }
+
 function random(seed: number) {
   return () => {
     seed ^= seed << 13;
@@ -44,7 +48,7 @@ function bandNoise(source: Float32Array, low: number, high: number, periodic: bo
   return result;
 }
 
-function buffer(context: BaseAudioContext, data: Float32Array, peak: number, periodic: boolean) {
+function buffer<T extends MonoBuffer>(context: BufferWriter<T>, data: Float32Array, peak: number, periodic: boolean) {
   const result = context.createBuffer(1, data.length, sampleRate);
   const channel = result.getChannelData(0);
   let offset = 0;
@@ -82,7 +86,7 @@ function buffer(context: BaseAudioContext, data: Float32Array, peak: number, per
 
 type NoiseLayer = [low: number, high: number, level: number, waves: number, motion: number];
 
-function loop(context: BaseAudioContext, seconds: number, seed: number, peak: number,
+function loop<T extends MonoBuffer>(context: BufferWriter<T>, seconds: number, seed: number, peak: number,
   layers: readonly NoiseLayer[], detail?: (samples: Float32Array) => void) {
   const samples = new Float32Array(Math.round(seconds * sampleRate));
   const noise = whiteNoise(samples.length, seed);
@@ -160,7 +164,7 @@ function strike(samples: Float32Array, time: number, seed: number, low: number, 
   }
 }
 
-function variants(context: BaseAudioContext, durations: readonly number[], peak: number,
+function variants<T extends MonoBuffer>(context: BufferWriter<T>, durations: readonly number[], peak: number,
   render: (samples: Float32Array, variant: number) => void) {
   return durations.map((seconds, variant) => {
     const samples = new Float32Array(Math.round(seconds * sampleRate));
@@ -175,7 +179,7 @@ const engineBands = [
   { coast: [0.75, 0.72, 0.63, 0.55, 0.58, 0.48], power: [0.67, 1.02, 1.27, 1.56, 1.70, 1.55], noise: 0.24 },
 ];
 
-export function buildEngineSamples(context: BaseAudioContext, roots: readonly number[], harmonics: readonly number[], seed: number) {
+export function buildEngineSamples<T extends MonoBuffer>(context: BufferWriter<T>, roots: readonly number[], harmonics: readonly number[], seed: number) {
   return roots.map((root, band) => {
     const profile = engineBands[band];
     const render = (spectrum: readonly number[], loaded: boolean) => {
@@ -206,7 +210,7 @@ export function buildEngineSamples(context: BaseAudioContext, roots: readonly nu
   });
 }
 
-export function buildAudioSamples(context: BaseAudioContext) {
+export function buildAudioSamples<T extends MonoBuffer>(context: BufferWriter<T>) {
   return {
     asphalt: loop(context, 2.25, 1417, 0.51, [
       [170, 670, 0.49, 3, 0.16], [720, 2650, 0.63, 5, 0.10], [2870, 6500, 0.18, 13, 0.11],
@@ -304,5 +308,12 @@ export function buildAudioSamples(context: BaseAudioContext) {
         ring(samples, time, hz * 3.74, 0.075, 48);
       }
     }),
+  };
+}
+
+export function prepareAudioBank<T extends MonoBuffer>(context: BufferWriter<T>, specs: readonly EngineSampleSpec[]) {
+  return {
+    effects: buildAudioSamples(context),
+    engines: specs.map(({ roots, harmonics, seed }) => buildEngineSamples(context, roots, harmonics, seed)),
   };
 }

@@ -2,23 +2,27 @@ import * as THREE from 'three';
 import { type CarView, type RaceSnapshot } from '../shared/protocol';
 import { roadHalfAt, TRACK, wallHalfAt } from '../shared/track';
 import { raceAudio } from './audio';
-import { instanceStatic } from './batches';
+import { instanceStatic, mergeStatic } from './batches';
 import { buildCars } from './cars';
 import { buildCircuit } from './circuit';
-import { buildCollectorBackdrop } from './collector-backdrop';
+import { buildCollectorBackdrop, disposeCollectorBackdrop } from './collector-backdrop';
+import { buildCompactScenery } from './compact-scenery';
+import { frameBudget } from './frame-budget';
 import { buildGrandstands } from './grandstands';
 import { buildInfield } from './infield';
 import { buildMultiplayerLobby } from './lobby';
 import { BENCH_SURFACE, plankMap } from './materials';
 import { buildRaceViews } from './race-views';
+import { cameraLights } from './render-layers';
 import { ReplayHistory, replayCompanion } from './replay';
 import { buildReplayShot } from './replay-shot';
 import { buildRaceResults } from './results';
 import { buildSafetyBarriers } from './safety-barriers';
 import { buildSceneLighting } from './scene-lighting';
-import { readAudioSettings, useLowQuality } from './settings';
+import { readAudioSettings, readQuality } from './settings';
 import { buildPlacard, buildRaceSigns, placardLayout } from './signs';
 import { startSolo } from './solo';
+import { SnapshotClock } from './snapshot-clock';
 import { approachingCover } from './track-cover';
 import { buildTyreMarks } from './tyre-marks';
 import { buildViewControls } from './view-controls';
@@ -32,7 +36,9 @@ const homeLogo = document.querySelector<HTMLImageElement>('#home-logo')!;
 const splash = document.querySelector<HTMLElement>('#race-splash')!;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const pages = import.meta.env.MODE === 'pages';
-const lowQuality = useLowQuality();
+const graphics = readQuality();
+const lowQuality = graphics === 'low';
+const adaptive = graphics === 'auto';
 // Fit to the projected centerline and finish stripe annotated in img01 of the atlas.
 const target = new THREE.Vector3(-1.1, 0.11, -0.6);
 const eyeDirection = new THREE.Vector3(-0.338, 0.779, 0.625).normalize();
@@ -83,8 +89,10 @@ function cameraFit(camera: THREE.PerspectiveCamera) {
   };
 }
 
-function bootstrap() {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+async function bootstrap() {
+  // Let the loading screen paint before procedural textures and geometry are built.
+  await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowQuality, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 0.97;
@@ -94,32 +102,41 @@ function bootstrap() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x211917);
   const camera = new THREE.PerspectiveCamera(27, 1, 0.3, 800);
+  cameraLights(camera, false);
   const fit = cameraFit(camera);
   const wood = plankMap();
   const workshop = new THREE.Group();
-  const backWall = buildWorkshop(workshop);
+  const benchDetails = new THREE.Group();
+  const backWall = buildWorkshop(workshop, benchDetails);
   const stands = buildGrandstands(workshop, scene);
   instanceStatic(workshop);
+  mergeStatic(workshop, new Set([backWall]), 12);
+  instanceStatic(benchDetails);
+  mergeStatic(benchDetails);
+  workshop.add(benchDetails);
   const circuit = new THREE.Group();
   buildCircuit(circuit, wood);
   instanceStatic(circuit);
+  mergeStatic(circuit, undefined, 12);
   scene.add(workshop, circuit);
+  if (!pages) buildCompactScenery(scene, [workshop, circuit], new Set([backWall, benchDetails]));
   const infield = buildInfield(scene);
   const world = buildWorldActivity(scene);
   const barriers = buildSafetyBarriers(scene);
   const tyreMarks = buildTyreMarks(scene);
-  const { lightShot, setNight } = buildSceneLighting(scene, renderer, lowQuality);
+  const { lightShot, setNight, restoreReflections } = buildSceneLighting(scene, renderer, lowQuality);
   if (!lowQuality) infield.captureReflections(renderer, scene);
   const cars = buildCars(scene);
   const signs = buildRaceSigns(scene);
   const placard = buildPlacard(scene, !pages);
   const audioSettings = readAudioSettings();
   const audio = raceAudio(audioSettings);
-  const controls = buildViewControls({ multiplayer: !pages, lowQuality, audio: audioSettings, onAudioChange: audio.setLevels });
+  const controls = buildViewControls({ multiplayer: !pages, graphics, audio: audioSettings, onAudioChange: audio.setLevels });
   const lobby = pages ? undefined : buildMultiplayerLobby();
+  let displayWindow = buildCollectorBackdrop(renderer);
   const renderViews = buildRaceViews(renderer, camera, placard, cameraFit, {
     wall: backWall,
-    build: () => buildCollectorBackdrop(renderer),
+    build: () => displayWindow,
   });
   const replay = new ReplayHistory(false);
   const results = buildRaceResults(replay);
@@ -127,17 +144,26 @@ function bootstrap() {
   let replaying = false;
   let replayClip = -1;
   let night = false;
+  const budget = frameBudget();
+  let lastShadow = -Infinity;
+  let fourPanes = false;
 
   let width = 1, height = 1;
+  function resizeBuffer() {
+    const pixels = lowQuality ? 1_440_000 : adaptive ? 2_073_600 : Infinity;
+    const density = Math.min(devicePixelRatio, lowQuality ? 1 : 1.55, Math.sqrt(pixels / (width * height)));
+    const scale = adaptive ? budget.scale * (fourPanes ? 0.80 : 1) : 1;
+    renderer.setDrawingBufferSize(width, height, density * scale);
+  }
   function resize() {
     width = Math.max(1, canvas.clientWidth);
     height = Math.max(1, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, lowQuality ? 1 : 1.55));
-    renderer.setSize(width, height, false);
+    resizeBuffer();
     fit(width, height);
     placard.resize(camera, width, height);
   }
   resize();
+  renderer.shadowMap.autoUpdate = false;
   addEventListener('resize', resize);
 
   const initial: RaceSnapshot = {
@@ -149,10 +175,9 @@ function bootstrap() {
     }),
   };
   let current = initial;
-  let previous = current;
-  let received = performance.now();
-  let interval = 50;
-  let lastFrame = received;
+  const clock = new SnapshotClock(pages ? 50 : 75);
+  let lastFrame = performance.now();
+  clock.add(initial, lastFrame);
   let lostContext = false;
   let ownedSlots: number[] = [];
   const interpolated: CarView[] = [...initial.cars];
@@ -162,18 +187,16 @@ function bootstrap() {
     if (event.animationName === 'race-fade-to-grid') splash.dataset.stage = 'ready';
   });
 
-  function updateState(snapshot: RaceSnapshot) {
-    const now = performance.now();
+  function updateState(snapshot: RaceSnapshot, now = performance.now()) {
+    clock.add(snapshot, now);
     replay.add(snapshot, now);
     stands.observe(snapshot);
     world.observe(snapshot);
-    const snap = current.frame < 0 || snapshot.heat !== current.heat || snapshot.frame <= current.frame || now - received > 420;
-    previous = snap ? snapshot : current;
-    if (!reduceMotion.matches && current.frame >= 0 && current.phase === 'demo'
+    if (!lostContext && !reduceMotion.matches && current.frame >= 0 && current.phase === 'demo'
       && (snapshot.phase === 'grid' || snapshot.phase === 'practice')) {
       splash.dataset.stage = 'launch';
     }
-    homeLogo.hidden = snapshot.phase !== 'demo';
+    if (snapshot.phase !== current.phase) homeLogo.hidden = snapshot.phase !== 'demo';
     current = snapshot;
     const nextNight = snapshot.config?.night === true;
     if (night !== nextNight) {
@@ -181,12 +204,11 @@ function bootstrap() {
       setNight(night);
       infield.setNight(night);
       world.setNight(night);
+      lastShadow = -Infinity;
       for (const car of cars) car.setNight(night);
     }
     ownedSlots = snapshot.cars.flatMap((car, i) => car.owned && car.active !== false ? [i] : []);
     controls.setPlayerCount(ownedSlots.length);
-    interval = snap ? 50 : THREE.MathUtils.clamp(now - received, 28, 94);
-    received = now;
     signs.board(snapshot);
     signs.lights(snapshot.lights);
     results.update(snapshot);
@@ -228,6 +250,7 @@ function bootstrap() {
 
   for (const event of ['pointerdown', 'click', 'keydown']) addEventListener(event, audio.unlock, { passive: true });
   document.addEventListener('visibilitychange', updateAudioMute);
+  document.addEventListener('visibilitychange', () => budget.reset(performance.now()));
   canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault();
     lostContext = true;
@@ -235,29 +258,52 @@ function bootstrap() {
     updateAudioMute();
   });
   canvas.addEventListener('webglcontextrestored', () => {
+    lastShadow = -Infinity;
+    restoreReflections();
+    if (!lowQuality) infield.captureReflections(renderer, scene);
+    disposeCollectorBackdrop(renderer);
+    displayWindow = buildCollectorBackdrop(renderer);
+    resize();
     lostContext = false;
     updateAudioMute();
-    resize();
   });
 
   function frame(now: number) {
     requestAnimationFrame(frame);
     if (lostContext) return;
-    const dt = Math.min(0.05, (now - lastFrame) / 1000);
+    const elapsed = now - lastFrame;
+    const dt = Math.min(0.05, elapsed / 1000);
     lastFrame = now;
-    solo?.advance(dt);
+    if (adaptive && budget.sample(now, elapsed)) resizeBuffer();
+    solo?.advance(dt, now);
     infield.update(now);
     stands.update(now);
     world.update(now);
     const mode = controls.mode;
     const split = controls.split && ownedSlots.length > 1;
+    const moment = replay.sample(now);
+    const nextFourPanes = split && ownedSlots.length > 2 && !moment;
+    if (fourPanes !== nextFourPanes) {
+      fourPanes = nextFourPanes;
+      lastShadow = -Infinity;
+      for (const car of cars) car.setProjectedShadow(!fourPanes);
+      benchDetails.visible = !fourPanes;
+      infield.setDetail(!fourPanes);
+      stands.setDetail(!fourPanes);
+      if (adaptive) { budget.reset(now); resizeBuffer(); }
+    }
+    // Four views share the scenery shadow map. Moving cars retain their own contact shadows.
+    if (!lowQuality && (lastShadow === -Infinity || (!fourPanes && now - lastShadow >= 32))) {
+      renderer.shadowMap.needsUpdate = true;
+      lastShadow = now;
+    }
     const slot = (mode === 'broadcast' ? current.order[0] : ownedSlots[0]) ?? current.order[0] ?? 0;
     const slots = split ? ownedSlots : [slot];
-    const moment = replay.sample(now);
     results.showReplay(moment);
-    const progress = moment?.alpha ?? THREE.MathUtils.clamp((now - received) / interval, 0, 1);
-    const toState = moment?.to ?? current;
-    const fromState = moment?.from ?? previous;
+    const live = moment ?? clock.sample(now);
+    const progress = live?.alpha ?? 0;
+    const toState = live?.to ?? current;
+    const fromState = live?.from ?? current;
     const tick = THREE.MathUtils.lerp(fromState.frame, toState.frame, progress);
     const subject = moment ? toState.cars[moment.slot] : undefined;
     const partnerSlot = moment ? moment.rival ?? replayCompanion(toState.cars, moment.slot) : -1;
@@ -323,7 +369,7 @@ function bootstrap() {
       const slope = grade * along + bank * across;
       const bankRoll = Math.atan(grade * across - bank * along);
       interpolated[i] = view;
-      const closeView = mode !== 'general' && slots.includes(i);
+      const closeView = mode !== 'general' && slots.length <= 2 && slots.includes(i);
       cars[i].setDetail(!lowQuality && (closeView
         || (subject !== undefined && Math.hypot(car.x - subject.x, car.z - subject.z) < 7.0)));
       cars[i].update(view, dt, slope, now, approachingCover(road.s, 4) > 0.24, bankRoll);
@@ -335,7 +381,7 @@ function bootstrap() {
     signs.flag(toState.flag, now / 1000);
     let listener: THREE.Camera;
     if (focus && moment) {
-      if (!replaying) lightShot(true);
+      if (!replaying) { lightShot(true); renderer.shadowMap.needsUpdate = true; }
       replaying = true;
       placard.setGrounded(false);
       replayShot ??= buildReplayShot(renderer);
@@ -347,6 +393,7 @@ function bootstrap() {
         replaying = false;
         replayClip = -1;
         lightShot(false);
+        renderer.shadowMap.needsUpdate = true;
         replayShot?.stop();
         placard.resize(camera, width, height);
       }
@@ -363,14 +410,20 @@ function bootstrap() {
       dt,
     });
   }
+  if (!lowQuality) {
+    await renderer.compileAsync(scene, camera);
+    if (!pages) {
+      const compactCamera = camera.clone();
+      cameraLights(compactCamera, true, 0);
+      await renderer.compileAsync(scene, compactCamera);
+    }
+  }
   requestAnimationFrame(frame);
 }
 
-try {
-  bootstrap();
-} catch (error) {
+void bootstrap().catch(error => {
   console.error(error);
   homeLogo.hidden = splash.hidden = true;
   canvas.hidden = true;
   document.querySelector<HTMLElement>('#fallback')!.hidden = false;
-}
+});

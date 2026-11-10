@@ -162,13 +162,15 @@ function resume() {
   link?.connect();
 }
 
-window.addEventListener("blur", suspend);
-window.addEventListener("focus", resume);
-document.addEventListener("visibilitychange", () => document.hidden ? suspend() : resume());
-window.addEventListener("pagehide", () => {
+function detach() {
   suspend();
   link?.close();
-});
+}
+
+window.addEventListener("blur", suspend);
+window.addEventListener("focus", resume);
+document.addEventListener("visibilitychange", () => document.hidden ? detach() : resume());
+window.addEventListener("pagehide", detach);
 window.addEventListener("pageshow", resume);
 window.addEventListener("offline", () => {
   controls.reset();
@@ -183,7 +185,7 @@ if (link) {
     if ((driving || latest?.lobby.phase === "grid") && foreground && !document.hidden) link.send(controls.input);
   }, 1000 / 30);
   window.setInterval(() => {
-    if (foreground && !document.hidden) link.heartbeat();
+    if (!document.hidden) link.heartbeat();
   }, 1000);
 } else {
   showStatus("invalid");

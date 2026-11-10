@@ -19,7 +19,7 @@ Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
 
 Los temas de `Musica` suenan en orden y vuelven a empezar al terminar. La música baja durante la largada, la carrera y las repeticiones para dejar espacio a los motores. Se pausa al ocultar la pestaña.
 
-Abrí **Configuración** arriba a la izquierda o con **C**. Podés ajustar el volumen general, la música, los motores y los efectos por separado, o silenciar todo. Los niveles se aplican en vivo y se guardan en ese navegador. Para cambiar la calidad gráfica, elegí un modo y pulsá **Aplicar y recargar**.
+Abrí **Configuración** arriba a la izquierda o con **C**. Podés ajustar el volumen general, la música, los motores y los efectos por separado, o silenciar todo. Los niveles se aplican en vivo y se guardan en ese navegador. Para cambiar la calidad gráfica, elegí un modo y pulsá **Aplicar y recargar**. El modo predeterminado **Adaptativa (60 FPS)** ajusta la resolución interna según los tiempos de cuadro y deja margen para dibujar cuatro cámaras a la vez. **Completa** usa una escala fija y **Ligera** reduce la resolución y los efectos.
 
 Los cuatro autitos tienen caja automática de cinco marchas. La quinta aprovecha la velocidad punta de cada modelo, con el Bólido como el más rápido en recta. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir. Cada faro ilumina su lado de la pista en la sesión nocturna y al acercarse al tramo cubierto.
 
@@ -59,4 +59,4 @@ El puerto predeterminado es 4173. `PORT` y `HOST` permiten cambiarlo. Para un de
 - `npm run build` verifica tipos y genera las dos pantallas en `dist`.
 - El diseño está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. La escena jugable usa geometría y materiales procedurales. Las imágenes de `referencias/` documentan el diseño.
 
-Se verificaron 18 pruebas automáticas y el flujo completo en Chrome con emulación móvil. Se leyó el QR renderizado en dos tamaños de pantalla, se asignaron cuatro plazas, se comprobó el límite de capacidad y se movió un auto con dos dedos. La prueba de reconexión incluyó un corte silencioso del enlace. Queda la comprobación con un celular físico.
+La verificación en Chrome cubre partida individual, cámaras, pantalla dividida, lectura del QR y mandos con emulación móvil. Las pruebas de red también comprueban las cuatro plazas, la reconexión del mando y el relevo del anfitrión tras un corte silencioso.

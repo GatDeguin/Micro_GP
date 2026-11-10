@@ -37,6 +37,7 @@ export function buildRaceResults(replay: ReplayHistory) {
   let rows = '';
 
   function showTimes(visible: boolean) {
+    if (times.hidden === !visible) return;
     times.hidden = !visible;
     toggle.setAttribute('aria-expanded', String(visible));
   }
@@ -51,13 +52,15 @@ export function buildRaceResults(replay: ReplayHistory) {
 
   return {
     update(state: RaceSnapshot) {
-      root.hidden = state.phase !== 'results';
-      if (root.hidden) {
+      const showing = state.phase === 'results';
+      if (root.hidden === showing) root.hidden = !showing;
+      if (!showing) {
         showTimes(false);
-        recap.hidden = true;
+        if (!recap.hidden) recap.hidden = true;
         return;
       }
-      recap.hidden = !replay.available;
+      const available = replay.available;
+      if (recap.hidden === available) recap.hidden = !available;
       const results = state.results ?? [];
       const key = JSON.stringify(results);
       if (key === rows) return;
@@ -74,10 +77,12 @@ export function buildRaceResults(replay: ReplayHistory) {
       }));
     },
     showReplay(moment: ReturnType<ReplayHistory['sample']>) {
-      playing = moment !== null;
-      const button = playing ? 'Cerrar resumen' : 'Ver resumen';
-      if (recap.textContent !== button) recap.textContent = button;
-      caption.hidden = !playing;
+      const active = moment !== null;
+      if (playing !== active) {
+        playing = active;
+        recap.textContent = playing ? 'Cerrar resumen' : 'Ver resumen';
+        caption.hidden = !playing;
+      }
       if (moment) {
         const text = `${moment.clip + 1}/${moment.count} · ${replayLabels[moment.kind]}`;
         if (caption.textContent !== text) caption.textContent = text;

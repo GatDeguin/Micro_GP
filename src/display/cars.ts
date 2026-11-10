@@ -7,6 +7,7 @@ import { TRACK, wallHalfAt } from '../shared/track';
 import { mergeStatic } from './batches';
 import { ARCH_RADIUS, archFloor, crownHeight, sectionAt, shellGeometry, shellSections, sidePoint, type Section } from './car-shell';
 import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
+import { headlightLayer } from './render-layers';
 
 const compact: Section[] = [
   [-0.88, 0.414, 0.142, 0.408], [-0.77, 0.465, 0.134, 0.451], [-0.56, 0.537, 0.133, 0.490],
@@ -526,6 +527,25 @@ function frontFascia(parent: THREE.Object3D, detail: THREE.Object3D, model: Mode
   }
 }
 
+function headlightPattern() {
+  const { canvas, context } = canvas2d(128, 128);
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, 128, 128);
+  for (const x of [42, 86]) {
+    context.save();
+    context.translate(x, 64);
+    context.scale(1, 1.65);
+    const beam = context.createRadialGradient(0, 0, 3, 0, 0, 20);
+    beam.addColorStop(0, '#fff');
+    beam.addColorStop(0.34, '#ddd');
+    beam.addColorStop(1, '#000');
+    context.fillStyle = beam;
+    context.fillRect(-20, -20, 40, 40);
+    context.restore();
+  }
+  return texture(canvas);
+}
+
 export function buildCars(parent: THREE.Object3D) {
   const shadowMaterial = horizontalShadow();
   shadowMaterial.vertexColors = true;
@@ -537,6 +557,7 @@ export function buildCars(parent: THREE.Object3D) {
   const tyre = tyreMaterial();
   const lens = flutedLens();
   const enamel = enamelRelief();
+  const beamMask = headlightPattern();
   return CAR_SPECS.map((car, i) => {
     const model = models[i];
     const dimensions = CAR_DIMENSIONS[i];
@@ -545,13 +566,15 @@ export function buildCars(parent: THREE.Object3D) {
     const root = new THREE.Group();
     const chassis = new THREE.Group();
     const axles = new THREE.Group();
+    const headlights = new THREE.Group();
     const detail = new THREE.Group();
     chassis.scale.set(scaleX, scaleY, scaleZ);
     axles.scale.copy(chassis.scale);
+    headlights.scale.copy(chassis.scale);
     const shadow = contactShadow(dimensions, shadowMaterial);
     const shadowVertices = shadow.geometry.getAttribute('position');
     chassis.add(detail);
-    root.add(shadow, chassis, axles);
+    root.add(shadow, chassis, axles, headlights);
     parent.add(root);
 
     const paint = new THREE.MeshPhysicalMaterial({
@@ -591,7 +614,14 @@ export function buildCars(parent: THREE.Object3D) {
     const headlamp = lens.clone();
     headlamp.emissive.setHex(0xffebc7);
     headlamp.emissiveIntensity = 0;
-    const beams: THREE.SpotLight[] = [];
+    // One masked spotlight projects two distinct pools and keeps the light layout stable in tunnels.
+    const beam = new THREE.SpotLight(0xffe5bb, 0, 11, 0.33, 0.28, 2);
+    beam.name = 'Proyección de los dos faros';
+    beam.layers.set(headlightLayer(i));
+    beam.map = beamMask;
+    beam.position.set(0, 0.30, nose + 0.07);
+    beam.target.position.set(0, -0.44, nose + 4.6);
+    headlights.add(beam, beam.target);
     const blink = new THREE.MeshStandardMaterial({ color: 0xf0aa42, emissive: 0xff9b19, emissiveIntensity: 4, roughness: 0.35 });
     const hazards: THREE.Mesh[] = [];
     const wheels: ReturnType<typeof wheel>[] = [];
@@ -607,13 +637,6 @@ export function buildCars(parent: THREE.Object3D) {
       const radius = [0.081, 0.074, 0.077, 0.067][i];
       roundHeadlight(chassis, i === 2 ? chrome : trim, headlamp, headX, headY, headZ, radius,
         i < 2 ? 0 : i === 2 ? -1 : -1.02);
-      const beam = new THREE.SpotLight(0xffe5bb, 30, 11, 0.245, 0.65, 2);
-      beam.name = side < 0 ? 'Faro izquierdo' : 'Faro derecho';
-      beam.position.set(headX, headY, Math.max(headZ, nose) + 0.045);
-      beam.target.position.set(headX + side * 0.49, -0.44, nose + 4.6);
-      beam.visible = false;
-      axles.add(beam, beam.target);
-      beams.push(beam);
       if (i < 2) {
         if (i === 1) roundHeadlight(chassis, chrome, lens, side * 0.115, 0.245, nose + 0.076, 0.064);
         const markX = side * (i === 0 ? 0.277 : 0.254);
@@ -644,6 +667,8 @@ export function buildCars(parent: THREE.Object3D) {
     mergeStatic(detail, new Set());
     detail.visible = false;
     mergeStatic(chassis, new Set([detail, glazing, ...hazards]));
+    const casters: THREE.Object3D[] = [];
+    root.traverse(object => { if (object.castShadow) casters.push(object); });
     let angle = 0;
     let settled = false;
     let night = false;
@@ -651,19 +676,22 @@ export function buildCars(parent: THREE.Object3D) {
     let livery: CarView['livery'] = 'original';
     return {
       setNight(enabled: boolean) { night = enabled; },
+      setProjectedShadow(enabled: boolean) { for (const caster of casters) caster.castShadow = enabled; },
       setDetail(close: boolean) {
         if (detail.visible === close) return;
         detail.visible = close;
         glazing.material = close ? closeGlass : glass;
       },
       update(view: CarView, delta: number, slope: number, now: number, covered = false, bankRoll = 0) {
-        root.visible = view.active !== false;
-        if (!root.visible) return;
-        if (lit !== (night || covered)) {
-          lit = night || covered;
-          for (const beam of beams) beam.visible = lit;
+        const active = view.active !== false;
+        chassis.visible = axles.visible = shadow.visible = active;
+        const lighting = active && (night || covered);
+        if (lit !== lighting) {
+          lit = lighting;
+          beam.intensity = lit ? 54 : 0;
           headlamp.emissiveIntensity = lit ? 2.5 : 0;
         }
+        if (!active) return;
         const nextLivery = view.livery ?? 'original';
         if (nextLivery !== livery) {
           livery = nextLivery;
@@ -675,8 +703,8 @@ export function buildCars(parent: THREE.Object3D) {
         const pitch = -Math.atan(slope);
         const roll = view.suspension?.roll ?? 0;
         const heave = view.suspension?.heave ?? 0;
-        shadow.rotation.x = axles.rotation.x = pitch;
-        shadow.rotation.z = axles.rotation.z = bankRoll;
+        shadow.rotation.x = axles.rotation.x = headlights.rotation.x = pitch;
+        shadow.rotation.z = axles.rotation.z = headlights.rotation.z = bankRoll;
         chassis.rotation.x = pitch + (view.suspension?.pitch ?? 0);
         chassis.rotation.z = bankRoll + roll;
         chassis.position.y = heave;

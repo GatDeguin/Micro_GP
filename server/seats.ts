@@ -87,6 +87,10 @@ export class Seats<Peer> {
     if (!selected) return "Esa librea todavía está bloqueada.";
     if (swap && !swap(seat.car, car)) return "Estacioná en boxes para cambiar de auto.";
     if (car !== seat.car || selected !== seat.livery) seat.ready = false;
+    if (car !== seat.car) {
+      seat.input = NEUTRAL;
+      seat.lastInput = now;
+    }
     seat.car = car;
     seat.livery = selected;
     return null;

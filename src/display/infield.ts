@@ -431,7 +431,9 @@ export function buildInfield(parent: THREE.Object3D) {
   const bank = shoreline(garden, outline);
   pondPlants(garden, bank, meadow.time);
   instanceStatic(garden);
-  const swim = fish(garden);
+  const swimmers = new THREE.Group();
+  garden.add(swimmers);
+  const swim = fish(swimmers);
   swim(0);
 
   return {
@@ -439,11 +441,12 @@ export function buildInfield(parent: THREE.Object3D) {
       materials.capture(renderer, scene, water);
     },
     setNight(enabled: boolean) { materials.setNight(enabled); },
+    setDetail(enabled: boolean) { swimmers.visible = enabled; },
     update(now: number) {
       const time = now / 1000;
       materials.update(time);
       meadow.update(time);
-      swim(time);
+      if (swimmers.visible) swim(time);
     },
   };
 }

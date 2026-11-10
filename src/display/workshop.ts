@@ -397,6 +397,7 @@ function bakeLightPools(parent: THREE.Object3D, pools: LightPool[]) {
   context.fillRect(0, 0, 64, 64);
   const material = new THREE.MeshBasicMaterial({ map: texture(canvas), transparent: true,
     blending: THREE.AdditiveBlending, depthWrite: false });
+  material.name = 'Luz sobre la calzada';
   const positions: number[] = [];
   const uv: number[] = [];
   const indices: number[] = [];
@@ -414,7 +415,7 @@ function bakeLightPools(parent: THREE.Object3D, pools: LightPool[]) {
         const offset = side * (roadHalfAt(p.s) - 0.035);
         const px = p.x - p.dz * offset;
         const pz = p.z + p.dx * offset;
-        positions.push(px, p.y + 0.004, pz);
+        positions.push(px, TRACK.heightAt(p.s, offset) + 0.007, pz);
         uv.push(0.5 + ((px - x) * cos - (pz - z) * sin) / (5.0 * spread),
           0.5 + ((px - x) * sin + (pz - z) * cos) / (6.8 * spread));
       }
@@ -514,6 +515,7 @@ function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
         finish ? 17.5 : 13.4, finish ? 0.54 : 0.60, 0.78, 2);
       beam.name = 'Foco de pista';
       beam.userData.finishFloodlight = finish;
+      beam.userData.secondary = !finish && index !== 2;
       beam.position.set(x, BOARD_SURFACE + height, z);
       beam.target.position.set(aimX, p.y, aimZ);
       parent.add(beam, beam.target);
@@ -726,20 +728,20 @@ function buildTires(parent: THREE.Object3D, contacts: Contact[]) {
   }
 }
 
-export function buildWorkshop(parent: THREE.Object3D) {
+export function buildWorkshop(parent: THREE.Object3D, detail: THREE.Object3D = parent) {
   const contacts: Contact[] = [];
   const parts = fastenerShapes();
   const backWall = buildBench(parent);
-  dressPegboards(parent);
+  dressPegboards(detail);
   buildWestBench(parent, contacts);
-  buildViseStation(parent);
-  buildDioramaStation(parent);
+  buildViseStation(detail);
+  buildDioramaStation(detail);
   buildServiceStation(parent);
   buildWrench(parent, contacts);
   buildChest(parent, contacts);
   buildCan(parent, contacts);
-  buildFastenerJar(parent, contacts, parts);
-  buildPartsBin(parent, contacts, parts);
+  buildFastenerJar(detail, contacts, parts);
+  buildPartsBin(detail, contacts, parts);
   buildFloodlights(parent, contacts);
   wireFrontLights(parent);
   buildTires(parent, contacts);

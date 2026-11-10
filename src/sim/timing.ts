@@ -12,6 +12,8 @@ export class RaceTiming {
   private clean = true;
   private sectorAssisted = false;
   private readonly arrivals: number[] = [];
+  private latestDistance = -Infinity;
+  private latestTime = 0;
 
   dirty() {
     this.clean = false;
@@ -48,15 +50,24 @@ export class RaceTiming {
       const fraction = (i * SAMPLE_SPACING - before) / (after - before);
       this.arrivals[i] = time - dt + dt * fraction;
     }
+    if (after > this.latestDistance) {
+      this.latestDistance = after;
+      this.latestTime = time;
+    }
   }
 
   arrivalAt(distance: number): number | null {
-    if (distance < 0) return null;
+    if (distance < 0 || distance > this.latestDistance) return null;
     const sample = distance / SAMPLE_SPACING;
     const index = Math.floor(sample);
     const first = this.arrivals[index];
     if (first === undefined) return null;
-    const next = this.arrivals[index + 1] ?? first;
-    return first + (next - first) * (sample - index);
+    const next = this.arrivals[index + 1];
+    if (next !== undefined) return first + (next - first) * (sample - index);
+
+    const startDistance = index * SAMPLE_SPACING;
+    const covered = this.latestDistance - startDistance;
+    if (covered <= 0 || covered >= SAMPLE_SPACING) return first;
+    return first + (this.latestTime - first) * (distance - startDistance) / covered;
   }
 }

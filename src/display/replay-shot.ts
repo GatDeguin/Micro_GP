@@ -5,9 +5,11 @@ import { cinematicStation } from './cinematic-cameras';
 import type { CarView } from '../shared/protocol';
 import { TRACK, wallHalfAt } from '../shared/track';
 import type { buildPlacard } from './signs';
+import { cameraLights } from './render-layers';
 
 export function buildReplayShot(renderer: THREE.WebGLRenderer) {
   const camera = new THREE.PerspectiveCamera(38.5, 1, 0.06, 130);
+  cameraLights(camera, false);
   const plateCamera = new THREE.PerspectiveCamera();
   const plateScene = new THREE.Scene();
   const plateKey = new THREE.DirectionalLight(0xffd2a0, 2);
@@ -28,6 +30,7 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
     samples: Math.min(2, renderer.capabilities.maxSamples),
   });
   const pixel = new THREE.Vector2();
+  const buffer = new THREE.Vector2();
   const material = new THREE.ShaderMaterial({
     uniforms: {
       image: { value: target.texture }, depthImage: { value: target.depthTexture },
@@ -143,9 +146,10 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
         renderer.render(scene, camera);
         return camera;
       }
-      const ratio = Math.min(1, 1600 / Math.max(width, height));
-      const targetWidth = Math.max(1, Math.round(width * ratio));
-      const targetHeight = Math.max(1, Math.round(height * ratio));
+      renderer.getDrawingBufferSize(buffer);
+      const ratio = Math.min(1, 1600 / Math.max(buffer.x, buffer.y));
+      const targetWidth = Math.max(1, Math.round(buffer.x * ratio));
+      const targetHeight = Math.max(1, Math.round(buffer.y * ratio));
       target.setSize(targetWidth, targetHeight);
       pixel.set(1 / targetWidth, 1 / targetHeight);
       const plate = placard.object;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TRACK, wallHalfAt } from '../shared/track';
 import { BENCH_SURFACE } from './materials';
+import { sceneryLights } from './render-layers';
 
 function panelFalloff() {
   const width = 128;
@@ -25,7 +26,7 @@ function panelFalloff() {
   return map;
 }
 
-function prefilterWorkshop(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+function prefilterWorkshop(renderer: THREE.WebGLRenderer) {
   const room = new RoomEnvironment();
   room.traverse(object => {
     if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshLambertMaterial
@@ -57,7 +58,7 @@ function prefilterWorkshop(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   try {
     // The static probe is filtered once. Moving objects keep the direct lights and shadows.
-    scene.environment = pmrem.fromScene(room, 0.021).texture;
+    return pmrem.fromScene(room, 0.021);
   } finally {
     pmrem.dispose();
     softEdge.dispose();
@@ -103,7 +104,15 @@ function fitShadow(key: THREE.DirectionalLight, points: readonly THREE.Vector3[]
 }
 
 export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRenderer, lowQuality: boolean) {
-  if (!lowQuality) prefilterWorkshop(scene, renderer);
+  let environment: THREE.WebGLRenderTarget | undefined;
+  function restoreReflections() {
+    if (lowQuality) return;
+    const next = prefilterWorkshop(renderer);
+    environment?.dispose();
+    environment = next;
+    scene.environment = next.texture;
+  }
+  restoreReflections();
 
   const key = new THREE.DirectionalLight();
   key.castShadow = !lowQuality;
@@ -112,9 +121,11 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   const bounce = new THREE.HemisphereLight(0xffe9d7, 0x4d4d54);
 
   const benchLight = new THREE.SpotLight(0xffbc83, 277, 34, 0.69, 0.84, 2);
+  benchLight.layers.set(sceneryLights);
   benchLight.position.set(-6.9, 10.7, 17.4);
   benchLight.target.position.set(-1.7, BENCH_SURFACE, 14.8);
   const toolLight = new THREE.SpotLight(0xffbc7d, 254, 38, 0.92, 0.86, 2);
+  toolLight.layers.set(sceneryLights);
   toolLight.position.set(0.7, 12.2, -14.4);
   toolLight.target.position.set(-4.9, BENCH_SURFACE, -16.7);
   scene.add(key, key.target, fill, bounce, benchLight, benchLight.target, toolLight, toolLight.target);
@@ -125,6 +136,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   let finish: THREE.SpotLight | undefined;
   scene.traverse(object => {
     if (object instanceof THREE.SpotLight && object.name === 'Foco de pista') {
+      if (object.userData.secondary) object.layers.set(sceneryLights);
       trackLamps.push({ light: object, day: object.intensity });
       if (object.userData.finishFloodlight) finish = object;
     } else if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial
@@ -134,14 +146,6 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
       halos.add(object.material);
     }
   });
-  if (finish && !lowQuality) {
-    finish.shadow.mapSize.set(1024, 1024);
-    finish.shadow.camera.near = 0.44;
-    finish.shadow.normalBias = 0.011;
-    finish.shadow.bias = -0.00009;
-    finish.shadow.intensity = 0.73;
-    finish.shadow.radius = 1.9;
-  }
   const dayBackground = scene.background;
   const dayBackgroundIntensity = scene.backgroundIntensity;
   const nightBackground = new THREE.Color(0x101521);
@@ -163,10 +167,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     benchLight.intensity = night ? 187 : 277;
     toolLight.intensity = night ? 164 : 254;
     for (const { light, day } of trackLamps) light.intensity = day * (night ? 3.8 : 1);
-    if (finish) {
-      if (night) finish.intensity *= 1.30;
-      finish.castShadow = night && !lowQuality;
-    }
+    if (finish && night) finish.intensity *= 1.30;
     for (const material of diffusers) material.emissiveIntensity = night ? 3.65 : 2.18;
     for (const material of halos) material.opacity = night ? 0.95 : 0.59;
     scene.environmentIntensity = night ? 0.19 : close ? 0.42 : 0.38;
@@ -178,6 +179,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   }
   applyLighting();
   return {
+    restoreReflections,
     lightShot(next: boolean) {
       if (close === next) return;
       close = next;

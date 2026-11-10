@@ -78,8 +78,9 @@ export function buildMultiplayerLobby() {
 
   function render({ lobby, host }: DisplayLobbyPacket) {
     panel.hidden = lobby.phase !== 'lobby';
-    end.hidden = !host || (lobby.phase !== 'results' && lobby.phase !== 'practice');
-    returnButton.textContent = lobby.phase === 'practice' ? 'Terminar práctica' : 'Volver a la sala';
+    end.hidden = !host || !panel.hidden;
+    returnButton.textContent = lobby.phase === 'practice' ? 'Terminar práctica'
+      : lobby.phase === 'results' ? 'Volver a la sala' : 'Cancelar carrera';
     returnButton.disabled = false;
     returnStatus.textContent = '';
     if (panel.hidden) return;
