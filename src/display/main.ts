@@ -412,12 +412,16 @@ async function bootstrap() {
   }
   if (!lowQuality) {
     await renderer.compileAsync(scene, camera);
+    // Draw once behind the loading screen so the GPU uploads the visible meshes and textures before play.
+    if (!lostContext) renderer.render(scene, camera);
     if (!pages) {
       const compactCamera = camera.clone();
       cameraLights(compactCamera, true, 0);
       await renderer.compileAsync(scene, compactCamera);
+      if (!lostContext) renderer.render(scene, compactCamera);
     }
   }
+  lastFrame = performance.now();
   requestAnimationFrame(frame);
 }
 
