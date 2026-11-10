@@ -28,6 +28,9 @@ import { buildWorldActivity } from './world-activity';
 type DisplayMessage = { type: 'hello'; url: string } | { type: 'state'; state: RaceSnapshot };
 
 const canvas = document.querySelector<HTMLCanvasElement>('#track')!;
+const homeLogo = document.querySelector<HTMLImageElement>('#home-logo')!;
+const splash = document.querySelector<HTMLElement>('#race-splash')!;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const pages = import.meta.env.MODE === 'pages';
 const lowQuality = useLowQuality();
 // Fit to the projected centerline and finish stripe annotated in img01 of the atlas.
@@ -154,6 +157,10 @@ function bootstrap() {
   let ownedSlots: number[] = [];
   const interpolated: CarView[] = [...initial.cars];
   signs.board(initial);
+  homeLogo.hidden = false;
+  splash.addEventListener('animationend', event => {
+    if (event.animationName === 'race-fade-to-grid') splash.dataset.stage = 'ready';
+  });
 
   function updateState(snapshot: RaceSnapshot) {
     const now = performance.now();
@@ -162,6 +169,11 @@ function bootstrap() {
     world.observe(snapshot);
     const snap = current.frame < 0 || snapshot.heat !== current.heat || snapshot.frame <= current.frame || now - received > 420;
     previous = snap ? snapshot : current;
+    if (!reduceMotion.matches && current.frame >= 0 && current.phase === 'demo'
+      && (snapshot.phase === 'grid' || snapshot.phase === 'practice')) {
+      splash.dataset.stage = 'launch';
+    }
+    homeLogo.hidden = snapshot.phase !== 'demo';
     current = snapshot;
     const nextNight = snapshot.config?.night === true;
     if (night !== nextNight) {
@@ -219,6 +231,7 @@ function bootstrap() {
   canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault();
     lostContext = true;
+    splash.dataset.stage = 'loading';
     updateAudioMute();
   });
   canvas.addEventListener('webglcontextrestored', () => {
@@ -339,6 +352,7 @@ function bootstrap() {
       }
       listener = renderViews(scene, mode, interpolated, slots, width, height, dt);
     }
+    if (splash.dataset.stage === 'loading') splash.dataset.stage = 'ready';
     audio.update({
       state: moment?.from ?? current,
       cars: interpolated,
@@ -356,6 +370,7 @@ try {
   bootstrap();
 } catch (error) {
   console.error(error);
+  homeLogo.hidden = splash.hidden = true;
   canvas.hidden = true;
   document.querySelector<HTMLElement>('#fallback')!.hidden = false;
 }

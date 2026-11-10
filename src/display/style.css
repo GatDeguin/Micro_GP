@@ -247,6 +247,15 @@
 .solo button:disabled { opacity: 0.5; cursor: default; }
 .solo-practice-note { font-size: 0.78rem; pointer-events: none; }
 .solo [hidden] { display: none; }
+
+@media (max-height: 560px) {
+  .solo-setup { max-height: calc(100dvh - 8rem); }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .solo-menu:has(.solo-setup:not([hidden])) { margin-left: 0; }
+}
+
 .race-results {
   position: fixed;
   z-index: 3;

@@ -1,0 +1,67 @@
+#home-logo {
+  position: fixed;
+  z-index: 1;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(22px, env(safe-area-inset-right));
+  width: clamp(15rem, 35vw, 38rem);
+  height: auto;
+  transform: translateY(-16%);
+  pointer-events: none;
+  filter: drop-shadow(0 7px 12px #0b0806a0);
+}
+
+#race-splash {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+
+#race-splash[hidden] { display: none; }
+
+#race-splash img {
+  width: min(78vw, 150dvh, 56rem);
+  height: auto;
+  transform: translateY(-3%);
+  animation: race-logo-in 410ms 100ms both;
+}
+
+#race-splash[data-stage="ready"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 440ms ease, visibility 0s 440ms;
+}
+
+#race-splash[data-stage="launch"] {
+  animation: race-fade-to-grid 980ms ease both;
+}
+
+#race-splash[data-stage="launch"] img { animation: race-logo-in 320ms both; }
+
+@keyframes race-logo-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes race-fade-to-grid {
+  0%, 45% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  #home-logo {
+    width: min(48vw, 16rem);
+    top: max(9px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #race-splash[data-stage="ready"] { transition: none; }
+  #race-splash img { animation: none; }
+  #race-splash[data-stage="launch"] { animation-duration: 1ms; }
+  #race-splash[data-stage="launch"] img { animation: none; }
+}

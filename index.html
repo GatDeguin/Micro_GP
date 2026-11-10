@@ -7,6 +7,7 @@
     <link rel="icon" href="data:," />
     <link rel="icon" href="data:," />
     <title>Micro GP · Taller 07</title>
+    <link rel="stylesheet" href="/src/display/intro.css" />
     <style>
       :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #1c1816; }
       body { margin: 0; overflow: hidden; }
@@ -14,9 +15,24 @@
       #fallback { max-width: 26rem; margin: 25vh auto 0; padding: 0 1.25rem; color: #eee0cb; }
       #track[hidden] { display: none; }
     </style>
+    <script>
+      addEventListener('error', ({ target }) => {
+        if (!(target instanceof HTMLScriptElement) || target.type !== 'module') return;
+        document.getElementById('race-splash').hidden = true;
+        document.getElementById('track').hidden = true;
+        const fallback = document.getElementById('fallback');
+        fallback.textContent = 'No se pudo cargar Micro GP. Volvé a cargar la página.';
+        fallback.hidden = false;
+      }, true);
+    </script>
+    <noscript><style>#race-splash { display: none; }</style></noscript>
   </head>
   <body>
     <canvas id="track" aria-label="Micro GP · Taller 07, carrera de autitos en un circuito de maqueta"></canvas>
+    <div id="race-splash" data-stage="loading" aria-hidden="true">
+      <img src="/Logo.png" alt="" fetchpriority="high" />
+    </div>
+    <img id="home-logo" src="/Logo.png" alt="Micro GP" hidden />
     <p id="fallback" hidden>Esta pantalla necesita WebGL 2. Activa la aceleración gráfica del navegador y vuelve a cargar.</p>
     <noscript>Activa JavaScript para ver la carrera.</noscript>
     <script type="module" src="/src/display/main.ts"></script>
