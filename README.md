@@ -16,13 +16,15 @@ Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
 
 Los temas de `Musica` suenan en orden y vuelven a empezar al terminar. La música baja durante la largada, la carrera y las repeticiones para dejar espacio a los motores. Se pausa al ocultar la pestaña.
 
+Abrí **Configuración** arriba a la izquierda o con **C**. Podés ajustar el volumen general, la música, los motores y los efectos por separado, o silenciar todo. Los niveles se aplican en vivo y se guardan en ese navegador. Para cambiar la calidad gráfica, elegí un modo y pulsá **Aplicar y recargar**.
+
 Los cuatro autitos tienen caja automática de cuatro marchas. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir.
 
 El motor de cada auto combina bucles de bajas, medias y altas revoluciones, con un timbre al acelerar y otro al soltar el gas. Micro GP genera esos bucles con Web Audio. El diseño toma como referencia la [guía de audio vehicular de Wreckfest](https://www.audiokinetic.com/media/blog/LoopBasedCarEngineDesign/vehicle_audio_modding_guide_for_wreckfest-Wwise2019_2_9.pdf).
 
 Hay cuatro plazas. Los bots conducen los autos libres y retoman el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
 
-En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución y **3** para ver a ras de pista. **C** abre el menú de cámaras y **M** activa o desactiva la pantalla dividida. También podés abrir el menú desde la esquina superior izquierda. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
+En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución y **3** para ver a ras de pista. **M** activa o desactiva la pantalla dividida. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
 
 ## Ejecutar desde la terminal
 

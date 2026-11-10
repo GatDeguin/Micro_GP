@@ -3,6 +3,7 @@ import type { CarView, RaceSnapshot } from '../shared/protocol';
 import firstTrack from '../../Musica/01.mp3?url';
 import secondTrack from '../../Musica/02.mp3?url';
 import { buildAudioSamples, buildEngineSamples } from './audio-samples';
+import { defaultAudioSettings, type AudioSettings } from './settings';
 
 type View = 'general' | 'chase' | 'trackside' | 'replay';
 
@@ -127,7 +128,7 @@ function carVoice(context: AudioContext, destination: AudioNode, samples: Return
   };
 }
 
-function createMixer(context: AudioContext) {
+function createMixer(context: AudioContext, initial: AudioSettings) {
   const samples = buildAudioSamples(context);
   const master = context.createGain();
   master.gain.value = 0;
@@ -138,12 +139,15 @@ function createMixer(context: AudioContext) {
   compressor.attack.value = 0.004;
   compressor.release.value = 0.13;
   master.connect(compressor).connect(context.destination);
+  const effects = context.createGain();
+  effects.gain.value = initial.effects;
+  effects.connect(master);
 
   const voices = motorStyles.map((_, slot) => carVoice(context, master, samples, slot));
-  const river = emitter(context, master);
-  const pond = emitter(context, master);
-  const crowd = emitter(context, master);
-  const room = layer(context, master);
+  const river = emitter(context, effects);
+  const pond = emitter(context, effects);
+  const crowd = emitter(context, effects);
+  const room = layer(context, effects);
   loop(context, samples.water, river.input);
   const stillWater = band(context, 'lowpass', 950);
   stillWater.connect(pond.input);
@@ -167,6 +171,12 @@ function createMixer(context: AudioContext) {
   let transients = 0;
   let previousTick = -1;
   let muted = false;
+  let settings = initial;
+
+  function updateMaster() {
+    const level = muted || settings.muted ? 0 : 0.72 * settings.master;
+    master.gain.setTargetAtTime(level, context.currentTime, 0.075);
+  }
 
   function locate(camera: Camera, x: number, y: number, z: number, wide: boolean) {
     direction.set(x, y, z).sub(camera.position);
@@ -184,7 +194,7 @@ function createMixer(context: AudioContext) {
     const source = context.createBufferSource();
     source.buffer = buffers[id % buffers.length];
     source.playbackRate.value = 0.94 + ((id * 13) % 11) * 0.012;
-    const output = emitter(context, master);
+    const output = emitter(context, effects);
     output.gain.value = level;
     output.pan.value = side;
     source.connect(output.input);
@@ -299,7 +309,7 @@ function createMixer(context: AudioContext) {
       const blip = voice.shiftDirection < 0 ? limit(shiftAge / 0.024) * limit(1 - shiftAge / 0.19) ** 1.25 : 0;
       const coastLoad = transmission?.gear === 0 ? 0.30 : 0.24 - 0.20 * motion;
       const load = Math.max((coastLoad + (1 - coastLoad) * throttle) * (1 - 0.95 * lift), blip);
-      const engineLevel = 0.5625 * (1 - 0.68 * lift);
+      const engineLevel = 0.5625 * settings.engines * (1 - 0.68 * lift);
       const revAccent = limit(rev - 0.09 * lift + 0.28 * blip, 0, 1.10);
       const pitch = (voice.style.idle + voice.style.sweep * revAccent) * doppler;
       const energized = limit(motion * 1.6 + load * 1.2);
@@ -329,15 +339,17 @@ function createMixer(context: AudioContext) {
       target(voice.engineFilter.frequency, 700 + 1800 * revAccent + 1500 * load, response);
       target(voice.gearGain.gain, engineLevel * energized * (0.006 + 0.030 * revAccent + 0.012 * load) * voice.style.color, response);
       target(voice.whineGain.gain, engineLevel * energized * revAccent ** 2 * (0.009 + 0.013 * load) * voice.style.color, response);
-      target(voice.asphalt.gain, motion * (0.117 + bridge * 0.046) * (1 - 0.8 * runoff));
+      const surfaceLevel = motion * settings.effects;
+      target(voice.asphalt.gain, surfaceLevel * (0.117 + bridge * 0.046) * (1 - 0.8 * runoff));
       target(voice.asphaltFilter.frequency, 680 + motion * 570 - bridge * 360, 0.11);
-      target(voice.bridge.gain, motion * bridge * 0.20);
+      target(voice.bridge.gain, surfaceLevel * bridge * 0.20);
       target(voice.road.playbackRate, 0.55 + 0.90 * motion);
-      target(voice.runoff.gain, motion * runoff * 0.20);
+      target(voice.runoff.gain, surfaceLevel * runoff * 0.20);
       target(voice.grass.playbackRate, 0.69 + motion * 0.67);
       target(voice.skidFilter.frequency, 1000 + motion * 1550, 0.045);
-      target(voice.skid.gain, (slip * 0.25 + Number(car.braking && car.speed > 0) * motion * 0.07) * (1 - runoff * 0.45), 0.05);
-      target(voice.scrape.gain, scrape * motion * 0.23, 0.045);
+      target(voice.skid.gain, (slip * 0.25 + Number(car.braking && car.speed > 0) * motion * 0.07)
+        * (1 - runoff * 0.45) * settings.effects, 0.05);
+      target(voice.scrape.gain, scrape * surfaceLevel * 0.23, 0.045);
     }
 
     if (!setMix) return;
@@ -357,10 +369,15 @@ function createMixer(context: AudioContext) {
 
   return {
     update,
+    setLevels(value: AudioSettings) {
+      settings = value;
+      effects.gain.setTargetAtTime(settings.effects, context.currentTime, 0.075);
+      updateMaster();
+    },
     mute(value: boolean) {
       muted = value;
       if (value) timeline = undefined;
-      master.gain.setTargetAtTime(value ? 0 : 0.72, context.currentTime, 0.075);
+      updateMaster();
     },
   };
 }
@@ -390,8 +407,8 @@ function createSoundtrack(context: AudioContext) {
   const levels = { demo: 0.23125, grid: 0.11625, race: 0.175, results: 0.23125 };
   return {
     setPlaying,
-    mix(phase: RaceSnapshot['phase'], view: View) {
-      const next = view === 'replay' ? 0.13125 : levels[phase];
+    mix(phase: RaceSnapshot['phase'], view: View, level: number) {
+      const next = (view === 'replay' ? 0.13125 : levels[phase]) * level;
       if (next === target) return;
       target = next;
       volume.gain.setTargetAtTime(next, context.currentTime, 0.28);
@@ -399,36 +416,47 @@ function createSoundtrack(context: AudioContext) {
   };
 }
 
-export function raceAudio() {
+export function raceAudio(initial = defaultAudioSettings) {
   let context: AudioContext | undefined;
   let mixer: ReturnType<typeof createMixer> | undefined;
   let soundtrack: ReturnType<typeof createSoundtrack> | undefined;
   let muted = false;
+  let settings = initial;
+
+  function updatePlayback() {
+    soundtrack?.setPlaying(!muted && !settings.muted && settings.master > 0 && settings.music > 0);
+  }
 
   return {
     unlock() {
       try {
         context ??= new AudioContext();
         if (!mixer) {
-          mixer = createMixer(context);
+          mixer = createMixer(context, settings);
           mixer.mute(muted);
         }
         if (context.state === 'suspended') void context.resume().catch(() => {});
         soundtrack ??= createSoundtrack(context);
-        soundtrack.setPlaying(!muted);
+        updatePlayback();
       } catch {
         // The race remains playable on devices without Web Audio.
       }
     },
     update(frame: RaceMix) {
       mixer?.update(frame);
-      soundtrack?.mix(frame.state.phase, frame.view);
+      const music = settings.muted ? 0 : settings.master * settings.music;
+      soundtrack?.mix(frame.state.phase, frame.view, music);
+    },
+    setLevels(value: AudioSettings) {
+      settings = value;
+      mixer?.setLevels(settings);
+      updatePlayback();
     },
     mute(value: boolean) {
       if (muted === value) return;
       muted = value;
       mixer?.mute(value);
-      soundtrack?.setPlaying(!value);
+      updatePlayback();
     },
   };
 }

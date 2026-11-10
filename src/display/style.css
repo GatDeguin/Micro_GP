@@ -1,9 +1,13 @@
 .view-tools {
+  --settings-text: #f1e4cf;
+  --settings-accent: #e4bb82;
+  --settings-border: #88705a;
+  --settings-panel: #26211e;
   position: fixed;
   z-index: 2;
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
-  color: #f1e4cf;
+  color: var(--settings-text);
   font: 500 0.875rem/1.35 system-ui, sans-serif;
 }
 
@@ -13,7 +17,7 @@
   gap: 0.45rem;
   min-height: 44px;
   padding: 0.38rem 0.75rem;
-  border: 1px solid #88705a;
+  border: 1px solid var(--settings-border);
   border-radius: 0.45rem;
   background: #251f1bee;
   color: inherit;
@@ -25,24 +29,19 @@
   background: #3b3026;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .view-tools:not(:hover, :focus-within) .view-tools-trigger[aria-expanded="false"] {
-    opacity: 0;
-  }
-}
-
 .view-tools-panel {
   position: absolute;
   top: calc(100% + 0.4rem);
   left: 0;
   box-sizing: border-box;
-  width: min(17rem, calc(100vw - 1.5rem));
-  max-height: calc(100dvh - 4.6rem);
+  width: min(20rem, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right))));
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom)) - 3.15rem);
   padding: 0.65rem;
   overflow: auto;
-  border: 1px solid #88705a;
+  overscroll-behavior: contain;
+  border: 1px solid var(--settings-border);
   border-radius: 0.55rem;
-  background: #26211e;
+  background: var(--settings-panel);
   box-shadow: 0 0.4rem 1.5rem #17110bcc;
 }
 
@@ -50,16 +49,17 @@
   display: none;
 }
 
-.view-tools-views {
+.view-tools-panel fieldset {
   min-inline-size: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.view-tools-views legend {
+.view-tools-panel legend {
   padding: 0.25rem 0.3rem 0.35rem;
-  color: #cdb79c;
+  color: var(--settings-accent);
+  font-weight: 650;
   font-size: 0.75rem;
 }
 
@@ -82,10 +82,11 @@
   inline-size: 1rem;
   block-size: 1rem;
   margin: 0;
-  accent-color: #e4bb82;
+  accent-color: var(--settings-accent);
 }
 
 .view-tools-trigger:focus-visible,
+.view-tools-panel :is(button, select):focus-visible,
 .view-tools-panel label:has(input:focus-visible) {
   outline: 2px solid #f6d5a9;
   outline-offset: 1px;
@@ -110,6 +111,69 @@
   color: #d2bfa8;
   font-size: 0.75rem;
 }
+
+.view-tools-panel .view-tools-sound,
+.view-tools-panel .view-tools-graphics {
+  padding-block-end: 0.25rem;
+}
+
+.view-tools-panel .view-tools-views,
+.view-tools-panel .view-tools-graphics {
+  margin-block-start: 0.65rem;
+  border-block-start: 1px solid #6b5546;
+}
+
+.view-tools-panel .view-tools-slider {
+  grid-template-columns: 1fr auto;
+  row-gap: 0;
+  min-height: 52px;
+  padding-block: 0.15rem;
+}
+
+.view-tools-value {
+  color: var(--settings-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.view-tools-panel .view-tools-slider input {
+  grid-column: 1 / -1;
+  inline-size: 100%;
+  block-size: 1.65rem;
+  cursor: pointer;
+}
+
+.view-tools-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.view-tools-panel .view-tools-mute,
+.view-tools-panel .view-tools-quality {
+  grid-template-columns: auto 1fr;
+}
+
+.view-tools-panel :is(button, select) {
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--settings-border);
+  border-radius: 0.32rem;
+  background: #342920;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.view-tools-panel button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.view-tools-quality select { justify-self: end; }
+.view-tools-graphics button { margin: 0.35rem 0.45rem 0; }
 .solo {
   position: fixed;
   z-index: 1;

@@ -1,19 +1,43 @@
 import './style.css';
 import type { ViewMode } from './race-views';
+import { applyQuality, audioLimits, defaultAudioSettings, saveAudioSettings, type AudioChannel, type AudioSettings } from './settings';
 
-export function buildViewControls(multiplayer = true) {
+const audioLabels: Record<AudioChannel, string> = {
+  master: 'Volumen general', music: 'Música', engines: 'Motores', effects: 'Efectos',
+};
+const audioChannels = Object.keys(audioLabels) as AudioChannel[];
+
+interface ViewControlsOptions {
+  multiplayer: boolean;
+  lowQuality: boolean;
+  audio: AudioSettings;
+  onAudioChange: (settings: AudioSettings) => void;
+}
+
+export function buildViewControls({ multiplayer, lowQuality, audio, onAudioChange }: ViewControlsOptions) {
   const root = document.createElement('div');
   root.className = 'view-tools';
   root.innerHTML = `
     <button type="button" class="view-tools-trigger" aria-expanded="false"
       aria-controls="view-tools-panel" aria-keyshortcuts="C">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="3.5" y="6.5" width="12.5" height="11" rx="2" stroke="currentColor" stroke-width="1.6" />
-        <path d="M16 10l4.5-2.2v8.4L16 14" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M4 5h16M4 12h16M4 19h16M8 3v4m8 3v4M9 17v4"
+          stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
       </svg>
-      Cámaras
+      Configuración
     </button>
-    <section class="view-tools-panel" id="view-tools-panel" aria-label="Configuración de cámaras" hidden>
+    <section class="view-tools-panel" id="view-tools-panel" aria-label="Configuración del juego" hidden>
+      <fieldset class="view-tools-sound">
+        <legend>Sonido</legend>
+        ${audioChannels.map(channel => `<label class="view-tools-slider">
+          <span>${audioLabels[channel]}</span><span class="view-tools-value" aria-hidden="true"></span>
+          <input type="range" data-channel="${channel}" min="0" max="${audioLimits[channel] * 100}" step="1">
+        </label>`).join('')}
+        <div class="view-tools-actions">
+          <label class="view-tools-mute"><input type="checkbox" data-mute><span>Silenciar todo</span></label>
+          <button type="button" data-reset>Restablecer sonido</button>
+        </div>
+      </fieldset>
       <fieldset class="view-tools-views">
         <legend>Cámara principal</legend>
         <label><input type="radio" name="camera-view" value="general" aria-keyshortcuts="1" checked>
@@ -23,16 +47,36 @@ export function buildViewControls(multiplayer = true) {
         <label><input type="radio" name="camera-view" value="trackside" aria-keyshortcuts="3">
           <span>A ras</span><kbd aria-hidden="true">3</kbd></label>
       </fieldset>
-      ${multiplayer ? `<label class="view-tools-split"><input type="checkbox" aria-keyshortcuts="M" aria-describedby="view-tools-status">
+      ${multiplayer ? `<label class="view-tools-split"><input type="checkbox" data-split aria-keyshortcuts="M" aria-describedby="view-tools-status">
         <span>Pantalla dividida</span><kbd aria-hidden="true">M</kbd></label>
       <p id="view-tools-status" class="view-tools-status" role="status"></p>` : ''}
+      <fieldset class="view-tools-graphics">
+        <legend>Gráficos</legend>
+        <label class="view-tools-quality">
+          <span>Calidad gráfica</span>
+          <select><option value="full">Completa</option><option value="low">Ligera</option></select>
+        </label>
+        <button type="button" data-apply-quality disabled>Aplicar y recargar</button>
+      </fieldset>
     </section>`;
   document.body.append(root);
 
   const trigger = root.querySelector<HTMLButtonElement>('button')!;
   const panel = root.querySelector<HTMLElement>('section')!;
-  const split = root.querySelector<HTMLInputElement>('input[type=checkbox]');
+  const split = root.querySelector<HTMLInputElement>('[data-split]');
   const status = root.querySelector<HTMLParagraphElement>('.view-tools-status');
+  const mute = root.querySelector<HTMLInputElement>('[data-mute]')!;
+  const reset = root.querySelector<HTMLButtonElement>('[data-reset]')!;
+  const quality = root.querySelector<HTMLSelectElement>('select')!;
+  const apply = root.querySelector<HTMLButtonElement>('[data-apply-quality]')!;
+  const sliders = Array.from(root.querySelectorAll<HTMLInputElement>('[data-channel]'), slider => ({
+    slider,
+    channel: slider.dataset.channel as AudioChannel,
+    output: slider.parentElement!.querySelector<HTMLElement>('.view-tools-value')!,
+  }));
+  let audioSettings = { ...audio };
+  const initialQuality = lowQuality ? 'low' : 'full';
+  quality.value = initialQuality;
   const modes = {
     general: root.querySelector<HTMLInputElement>('input[value=general]')!,
     chase: root.querySelector<HTMLInputElement>('input[value=chase]')!,
@@ -40,6 +84,41 @@ export function buildViewControls(multiplayer = true) {
   };
   let currentMode: ViewMode = 'general';
   let playerCount = 0;
+
+  function showAudioSettings() {
+    mute.checked = audioSettings.muted;
+    for (const { slider, channel, output } of sliders) {
+      slider.value = String(Math.round(audioSettings[channel] * 100));
+      const value = `${slider.value} %`;
+      output.textContent = value;
+      slider.setAttribute('aria-valuetext', value);
+    }
+  }
+
+  function commitAudioSettings() {
+    saveAudioSettings(audioSettings);
+    onAudioChange(audioSettings);
+  }
+
+  showAudioSettings();
+  for (const { slider, channel } of sliders) {
+    slider.addEventListener('input', () => {
+      audioSettings = { ...audioSettings, [channel]: slider.valueAsNumber / 100 };
+      showAudioSettings();
+      commitAudioSettings();
+    });
+  }
+  mute.addEventListener('change', () => {
+    audioSettings = { ...audioSettings, muted: mute.checked };
+    commitAudioSettings();
+  });
+  reset.addEventListener('click', () => {
+    audioSettings = { ...defaultAudioSettings };
+    showAudioSettings();
+    commitAudioSettings();
+  });
+  quality.addEventListener('change', () => { apply.disabled = quality.value === initialQuality; });
+  apply.addEventListener('click', () => applyQuality(quality.value === 'low' ? 'low' : 'full'));
 
   function selectMode(mode: ViewMode, moveFocus = false) {
     currentMode = mode;
@@ -50,7 +129,7 @@ export function buildViewControls(multiplayer = true) {
   function setOpen(open: boolean, moveFocus = false) {
     panel.hidden = !open;
     trigger.setAttribute('aria-expanded', String(open));
-    if (moveFocus) (open ? modes[currentMode] : trigger).focus();
+    if (moveFocus) (open ? sliders[0].slider : trigger).focus();
   }
 
   function updateStatus() {
@@ -71,21 +150,23 @@ export function buildViewControls(multiplayer = true) {
   });
   document.addEventListener('keydown', event => {
     if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
-    const target = event.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || target.matches('textarea, select, input:not([type=radio]):not([type=checkbox])'))) return;
-
-    const key = event.key.toLowerCase();
-    if (key === 'escape' && !panel.hidden) {
+    if (event.key === 'Escape' && !panel.hidden) {
       event.preventDefault();
       setOpen(false, root.contains(document.activeElement));
-    } else if (key === 'c') {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || target.matches('textarea, select'))) return;
+
+    const key = event.key.toLowerCase();
+    if (key === 'c') {
       event.preventDefault();
       setOpen(panel.hidden, true);
     } else if (key === 'm' && split) {
       event.preventDefault();
       split.checked = !split.checked;
       updateStatus();
-    } else if (key === '1' || key === '2' || key === '3') {
+    } else if (['1', '2', '3'].includes(key) && !(target instanceof HTMLInputElement && target.type === 'range')) {
       event.preventDefault();
       const next = key === '1' ? 'general' : key === '2' ? 'chase' : 'trackside';
       selectMode(next, !panel.hidden && target instanceof HTMLInputElement && target.type === 'radio');

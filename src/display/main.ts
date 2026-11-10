@@ -13,6 +13,7 @@ import { buildRaceViews } from './race-views';
 import { ReplayHistory, replayCompanion } from './replay';
 import { buildReplayShot } from './replay-shot';
 import { buildSceneLighting } from './scene-lighting';
+import { readAudioSettings, useLowQuality } from './settings';
 import { buildPlacard, buildRaceSigns, placardLayout } from './signs';
 import { startSolo } from './solo';
 import { buildViewControls } from './view-controls';
@@ -22,7 +23,7 @@ type DisplayMessage = { type: 'hello'; url: string } | { type: 'state'; state: R
 
 const canvas = document.querySelector<HTMLCanvasElement>('#track')!;
 const pages = import.meta.env.MODE === 'pages';
-const lowQuality = new URLSearchParams(location.search).get('quality') === 'low';
+const lowQuality = useLowQuality();
 // Fit to the projected centerline and finish stripe annotated in img01 of the atlas.
 const target = new THREE.Vector3(-2.29, 0.11, 1.745);
 const eyeDirection = new THREE.Vector3(-0.338, 0.779, 0.625).normalize();
@@ -99,12 +100,13 @@ function bootstrap() {
   const cars = buildCars(scene);
   const signs = buildRaceSigns(scene);
   const placard = buildPlacard(scene, !pages);
-  const controls = buildViewControls(!pages);
+  const audioSettings = readAudioSettings();
+  const audio = raceAudio(audioSettings);
+  const controls = buildViewControls({ multiplayer: !pages, lowQuality, audio: audioSettings, onAudioChange: audio.setLevels });
   const renderViews = buildRaceViews(renderer, camera, placard, cameraFit, {
     wall: backWall,
     build: () => buildCollectorBackdrop(renderer),
   });
-  const audio = raceAudio();
   const replay = new ReplayHistory();
   let replayShot: ReturnType<typeof buildReplayShot> | undefined;
   let replaying = false;
