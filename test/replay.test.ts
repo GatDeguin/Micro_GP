@@ -53,6 +53,19 @@ test('the replay frames a nearby trailing rival instead of a closer car ahead', 
   assert.equal(replayCompanion(cars.slice(0, 2), 0), -1);
 });
 
+test('cars on different decks do not register as a close pass or a replay companion', () => {
+  const replay = new ReplayHistory(false);
+  for (let frame = 3; frame <= 120; frame += 3) {
+    const state = snapshot(frame, { order: frame < 105 ? [0, 1] : [1, 0] });
+    state.cars[0].y = 3.10;
+    state.cars[1].z = -0.5;
+    assert.equal(replayCompanion(state.cars, 0), -1);
+    replay.add(state, frame / 0.06);
+  }
+  replay.add(snapshot(123, { phase: 'results', order: [1, 0] }), 2050);
+  assert.equal(replay.available, false);
+});
+
 test('the requested recap plays an overtake, a return to the track and a close finish', () => {
   const replay = new ReplayHistory(false);
   const sound = { throttle: 0.6, curb: 0, runoff: 0, slip: 0, scrape: 0 };

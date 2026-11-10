@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { PIT_LANE, TRACK, wallHalfAt } from '../shared/track';
 import { instanceStatic } from './batches';
+import { buildGroundcover } from './infield-plants';
 import { pondMaterials, streamRocks, waterline as WATER_Y } from './infield-water';
 import { canvas2d, noiseField, random, standard, texture } from './materials';
 
 const GRASS_Y = -0.141;
 const BED_Y = -0.218;
-const FRAME = { left: -38, right: 42, top: -17.4, bottom: 9 };
+const FRAME = { left: -41, right: 43, top: -18, bottom: 12 };
 
 const waterBanks: [number, number][] = [
   [1.56, -14.61], [1.16, -14.33], [0.96, -13.52], [0.95, -12.95], [1.03, -11.87], [1.46, -10.91], [2.04, -9.96],
@@ -31,9 +32,8 @@ function shapeFrom(points: readonly THREE.Vector3[]) {
   return geometry;
 }
 
-function drawMask(context: CanvasRenderingContext2D, points: readonly THREE.Vector3[]) {
+function traceMask(context: CanvasRenderingContext2D, points: readonly THREE.Vector3[]) {
   const { width, height } = context.canvas;
-  context.beginPath();
   points.forEach((p, index) => {
     const x = u(p.x) * width;
     const y = (1 - v(p.z)) * height;
@@ -43,7 +43,20 @@ function drawMask(context: CanvasRenderingContext2D, points: readonly THREE.Vect
   context.closePath();
 }
 
-function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
+function drawMask(context: CanvasRenderingContext2D, points: readonly THREE.Vector3[]) {
+  context.beginPath();
+  traceMask(context, points);
+}
+
+function turfLoops() {
+  const { upper, lower, x, z } = TRACK.crossing;
+  const join = new THREE.Vector3(x, 0, z);
+  const loop = (points: readonly (typeof TRACK.samples)[number][]) => [join, ...points.map(p => new THREE.Vector3(p.x, 0, p.z))];
+  return [loop(TRACK.samples.filter(p => p.s > upper && p.s < lower)),
+    loop([...TRACK.samples.filter(p => p.s > lower), ...TRACK.samples.filter(p => p.s < upper)])];
+}
+
+function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[], islands: readonly (readonly THREE.Vector3[])[]) {
   const grass = canvas2d(1536, 640);
   const { width, height } = grass.canvas;
   const rng = random(2437);
@@ -56,7 +69,7 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
       const s = x / width;
       const clump = meadows(s, t);
       const blade = fibers(s, t) * 0.7 + rng() * 0.3;
-      const age = Math.max(0, (clump - 0.55) * 1.8);
+      const age = Math.max(0, (clump - 0.49) * 1.89);
       const shade = 15 * clump + 31 * blade;
       const i = (y * width + x) * 4;
       pixels.data[i] = 27 + shade + age * 18;
@@ -66,44 +79,49 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
     }
   }
   grass.context.putImageData(pixels, 0, 0);
-  const outline = TRACK.samples.map(p => {
-    const offset = -wallHalfAt(p.s, -1) - 0.49 - 0.055 * Math.sin(p.s / TRACK.length * Math.PI * 12);
-    return new THREE.Vector3(p.x - p.dz * offset, 0, p.z + p.dx * offset);
-  });
-  grass.context.save();
-  drawMask(grass.context, outline);
-  grass.context.clip();
-  for (const [lineWidth, opacity] of [[32, 0.08], [18, 0.10], [8, 0.13], [3, 0.19]]) {
-    grass.context.lineWidth = lineWidth;
-    grass.context.strokeStyle = `rgba(174,152,94,${opacity})`;
-    grass.context.stroke();
-  }
-  grass.context.restore();
-
   // Bridge contact stays visible on the turf even in the lightweight renderer.
   for (const [margin, lineWidth, opacity] of [[0.27, 48, 0.12], [0.34, 31, 0.13], [0.41, 17, 0.17]]) {
     grass.context.lineWidth = lineWidth;
     grass.context.lineCap = 'round';
     grass.context.strokeStyle = `rgba(16,22,12,${opacity})`;
-    let moving = false;
     grass.context.beginPath();
-    for (const p of TRACK.samples) {
-      if (p.y < 0.58) { moving = false; continue; }
-      const offset = -wallHalfAt(p.s, -1) - margin;
-      const x = u(p.x - p.dz * offset) * width;
-      const y = (1 - v(p.z + p.dx * offset)) * height;
-      if (moving) grass.context.lineTo(x, y);
-      else { grass.context.moveTo(x, y); moving = true; }
+    for (const side of [-1, 1]) {
+      let moving = false;
+      for (const p of TRACK.samples) {
+        if (p.y < 0.58) { moving = false; continue; }
+        const offset = side * (wallHalfAt(p.s, side) + margin);
+        const x = u(p.x - p.dz * offset) * width;
+        const y = (1 - v(p.z + p.dx * offset)) * height;
+        if (moving) grass.context.lineTo(x, y);
+        else { grass.context.moveTo(x, y); moving = true; }
+      }
     }
     grass.context.stroke();
   }
 
+  grass.context.globalCompositeOperation = 'destination-in';
+  grass.context.beginPath();
+  for (const island of islands) traceMask(grass.context, island);
+  grass.context.fill('evenodd');
+
+  const rims = TRACK.samples.map(p => [-1, 1].map(side => {
+    const offset = side * (wallHalfAt(p.s, side) + 0.50);
+    return new THREE.Vector3(p.x - p.dz * offset, 0, p.z + p.dx * offset);
+  }));
   grass.context.globalCompositeOperation = 'destination-out';
+  grass.context.beginPath();
+  rims.forEach(([a, b], i) => {
+    const [c, d] = rims[(i + 1) % rims.length];
+    traceMask(grass.context, [a, b, d, c]);
+  });
+  grass.context.fill();
   drawMask(grass.context, water);
   grass.context.fill();
   const lane = TRACK.sampleAt(PIT_LANE.stalls[1]);
+  const finish = TRACK.sampleAt(0);
   const stationZ = lane.z + PIT_LANE.stationOffset;
-  for (const [left, right, near, far] of [[-17.20, -10.13, 0.13, 3.14], [lane.x - 3.82, lane.x + 4.69, stationZ - 1.49, stationZ + 1.63]]) {
+  for (const [left, right, near, far] of [[finish.x - 3.55, finish.x + 3.55, 0.78, 3.79],
+    [lane.x - 3.82, lane.x + 4.69, stationZ - 1.49, stationZ + 1.63]]) {
     const x = u(left) * width;
     const y = (1 - v(far)) * height;
     grass.context.beginPath();
@@ -113,7 +131,11 @@ function ground(parent: THREE.Object3D, water: readonly THREE.Vector3[]) {
   grass.context.globalCompositeOperation = 'source-over';
 
   const map = texture(grass.canvas);
-  const terrain = new THREE.Mesh(shapeFrom(outline), new THREE.MeshStandardMaterial({ map, bumpMap: map,
+  const frame = [
+    new THREE.Vector3(FRAME.left, 0, FRAME.top), new THREE.Vector3(FRAME.right, 0, FRAME.top),
+    new THREE.Vector3(FRAME.right, 0, FRAME.bottom), new THREE.Vector3(FRAME.left, 0, FRAME.bottom),
+  ];
+  const terrain = new THREE.Mesh(shapeFrom(frame), new THREE.MeshStandardMaterial({ map, bumpMap: map,
     bumpScale: 0.022, roughness: 0.96, alphaTest: 0.49, alphaToCoverage: true }));
   terrain.position.y = GRASS_Y;
   terrain.receiveShadow = true;
@@ -261,7 +283,7 @@ function reedBlade() {
 }
 
 function pondPlants(parent: THREE.Object3D, bank: ReturnType<typeof shoreline>) {
-  const roots = bank.filter(({ p }, i) => (i % 7 === 1 || i % 17 === 3) && p.z > -10.1 && p.z < 0.95);
+  const roots = bank.filter(({ p }, i) => (i % 5 === 1 || i % 17 === 3) && p.z > -10.1 && p.z < 1.12);
   const pose = new THREE.Object3D();
   const rng = random(4027);
   const reedMaterial = standard(0x9da56b, 0.88);
@@ -391,7 +413,9 @@ export function buildInfield(parent: THREE.Object3D) {
   parent.add(garden);
   const outline = new THREE.CatmullRomCurve3(waterBanks.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'centripetal')
     .getPoints(144).slice(0, -1);
-  ground(garden, outline);
+  const islands = turfLoops();
+  ground(garden, outline, islands);
+  buildGroundcover(garden, islands, outline, GRASS_Y);
   const geometry = shapeFrom(outline);
   const materials = pondMaterials(riverbed(outline));
   const depth = new THREE.Mesh(geometry, materials.bed);

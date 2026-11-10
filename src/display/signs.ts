@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { raceTime } from './results';
 import qrcode from 'qrcode-generator';
-import { CAR_SPECS, type RaceSnapshot } from '../shared/protocol';
+import { CAR_SPECS, FORWARD_GEARS, type RaceSnapshot } from '../shared/protocol';
 import { TRACK, WALL_HALF } from '../shared/track';
 import { BENCH_SURFACE, box, canvas2d, flatSign, horizontalShadow, random, standard, texture } from './materials';
 
@@ -97,7 +97,7 @@ function raceBoard(parent: THREE.Object3D) {
     const gearSlot = solo ? player : leader;
     const gear = state.cars[gearSlot]?.transmission?.gear;
     const gearLabel = gear === -1 ? 'R' : gear === 0 ? 'N'
-      : gear !== undefined && Number.isInteger(gear) && gear >= 1 && gear <= 4 ? String(gear) : '';
+      : gear !== undefined && Number.isInteger(gear) && gear >= 1 && gear <= FORWARD_GEARS ? String(gear) : '';
     const gearSpec = CAR_SPECS[gearSlot];
     const results = state.phase === 'results';
     const gearKey = gearLabel && gearSpec ? `${gearSlot}/${gearLabel}` : '';

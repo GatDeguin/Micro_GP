@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NEUTRAL, type CarView, type Driver, type RaceConfig } from '../src/shared/protocol.ts';
-import { PIT_LANE, ROAD_HALF, TRACK } from '../src/shared/track.ts';
+import { PIT_LANE, ROAD_HALF, TRACK, type TrackLocation } from '../src/shared/track.ts';
 import { Race } from '../src/sim/race.ts';
 
 const TICK = 1 / 60;
@@ -34,6 +34,10 @@ function aimAt(car: CarView, distance: number, offset: number, speed: number): D
   const delta = car.yaw - yaw;
   const steer = Math.atan2(Math.sin(delta), Math.cos(delta)) * 1.8;
   return { owned: true, input: { x: Math.max(-1, Math.min(1, steer)), gas: car.speed < speed, brake: car.speed > speed + 0.34 } };
+}
+
+function roadOf(car: CarView): TrackLocation {
+  return TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
 }
 
 test('a configured one-lap heat waits for launch and retains timed results', () => {
@@ -99,7 +103,7 @@ test('the pit lane limits speed and connects back to the main straight', () => {
 
   for (let i = 0; i < 350; i++) {
     const car = race.snapshot().cars[0];
-    const road = TRACK.locate(car.x, car.z);
+    const road = roadOf(car);
     if (road.s > PIT_LANE.exit + 0.8) break;
     const ahead = road.s + 3;
     const merge = Math.max(0, Math.min(1, (ahead - 17.8) / 10.5));
@@ -108,7 +112,7 @@ test('the pit lane limits speed and connects back to the main straight', () => {
     assert.equal(race.snapshot().cars[0].blink, false);
   }
   const car = race.snapshot().cars[0];
-  const road = TRACK.locate(car.x, car.z);
+  const road = roadOf(car);
   assert.ok(road.s > PIT_LANE.exit && Math.abs(road.offset) < ROAD_HALF && car.speed > 2);
 });
 
@@ -126,18 +130,33 @@ test('the compact turns sooner while the bólido pulls ahead on a straight', () 
 
   const straightCompact = ready(0);
   const straightRacer = ready(2);
-  for (const setup of [straightCompact, straightRacer]) tick(setup.race, setup.inputs(gas), 2);
+  for (const setup of [straightCompact, straightRacer]) tick(setup.race, setup.inputs(gas), 2.5);
   assert.ok(straightRacer.race.snapshot().cars[2].speed > straightCompact.race.snapshot().cars[0].speed + 0.35);
+});
+
+test('each model reaches fifth gear and gains 15 to 20 percent straight-line speed', () => {
+  const priorTopSpeeds = [8.05, 8.05, 8.76, 8.09];
+  const topSpeeds = priorTopSpeeds.map((previous, slot) => {
+    const { race, inputs } = ready(slot);
+    tick(race, inputs(gas), 2.7);
+    const car = race.snapshot().cars[slot];
+    assert.equal(car.transmission?.gear, 5);
+    assert.ok(car.speed >= previous * 1.15 && car.speed <= previous * 1.20);
+    return car.speed;
+  });
+  assert.ok(topSpeeds[2] > Math.max(topSpeeds[0], topSpeeds[1], topSpeeds[3]));
 });
 
 test('the cupé gains speed on corner exit and the cuña keeps more speed in a fast turn', () => {
   function exitGain(slot: number) {
     const { race, inputs } = ready(slot);
-    tick(race, inputs(gas), 0.77);
+    tick(race, inputs(gas), 0.70);
     tick(race, inputs({ ...gas, input: { ...gas.input!, x: 0.75 } }), 0.27);
     const entry = race.snapshot().cars[slot].speed;
     tick(race, inputs(gas), 0.25);
-    return race.snapshot().cars[slot].speed - entry;
+    const exit = race.snapshot().cars[slot];
+    assert.equal(exit.transmission?.gear, 4);
+    return exit.speed - entry;
   }
   function cornerSpeed(slot: number) {
     const { race, inputs } = ready(slot);
@@ -200,7 +219,7 @@ test('a driven lap records clean sectors and bridge unload while bot assistance 
     let keptPaint = false;
     for (let i = 0; i < 60 * 42 && race.snapshot().phase === 'race'; i++) {
       const car = race.snapshot().cars[0];
-      const road = TRACK.locate(car.x, car.z);
+      const road = roadOf(car);
       if (Math.abs(road.s - TRACK.anchors.crest) < 7.5) crestHeave = Math.max(crestHeave, car.suspension!.heave);
       const fallback = assisted && i >= 240 && i < 300;
       const driver = aimAt(car, road.s + 1.8 + car.speed * 0.34, 0.93, 6.15);
@@ -222,4 +241,37 @@ test('a driven lap records clean sectors and bridge unload while bot assistance 
   assert.ok(assisted.car.lastLap !== null);
   assert.equal(assisted.car.sectorTimes?.[0], null);
   assert.ok(assisted.keptPaint);
+});
+
+test('every bot completes the upper and lower passes with continuous height and route progress', () => {
+  const race = new Race({ manual: true });
+  const drivers = [{ owned: true, input: null }];
+  race.configure({ ...config, bots: 3 });
+  race.launch();
+  tick(race, drivers, 3);
+  let before = race.snapshot().cars;
+  const crossed = before.map(() => new Set<string>());
+  for (let frame = 0; frame < Math.ceil(60 * (TRACK.length / 4.5 + 5)); frame++) {
+    race.step(TICK, drivers);
+    const state = race.snapshot();
+    for (const [slot, car] of state.cars.entries()) {
+      assert.notEqual(car.distance, undefined);
+      const distance = car.distance!;
+      const delta = Math.abs(distance - before[slot].distance!);
+      assert.ok(Math.min(delta, TRACK.length - delta) < 0.85, 'a car jumped to a noncontiguous part of the route');
+      assert.ok(Math.abs(car.y - before[slot].y) < 0.19, 'a car jumped to another deck');
+      if (Math.abs(distance - TRACK.crossing.upper) < 0.3) {
+        assert.ok(car.y > 2.95);
+        crossed[slot].add('upper');
+      }
+      if (Math.abs(distance - TRACK.crossing.lower) < 0.3) {
+        assert.ok(car.y < 0.15);
+        crossed[slot].add('lower');
+      }
+    }
+    before = state.cars;
+    if (state.phase === 'results') break;
+  }
+  assert.equal(race.snapshot().phase, 'results');
+  assert.deepEqual(crossed.map(decks => decks.size), [2, 2, 2, 2]);
 });

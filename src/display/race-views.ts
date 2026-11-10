@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { CarView } from '../shared/protocol';
-import { TRACK, wallHalfAt } from '../shared/track';
+import { TRACK, wallHalfAt, type TrackPoint } from '../shared/track';
 import type { buildPlacard } from './signs';
+import { approachingCover, coverClearance } from './track-cover';
 
 export type ViewMode = 'general' | 'chase' | 'trackside';
 
@@ -17,25 +18,36 @@ function followCamera() {
 
   return (mode: ViewMode, car: CarView, width: number, height: number, dt: number, qrSize = 0) => {
     const aspect = width / height;
-    const road = TRACK.locate(car.x, car.z);
+    const road = TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
+    const cover = approachingCover(road.s, 6);
     const heading = road.dx * Math.sin(car.yaw) + road.dz * Math.cos(car.yaw);
     const changed = previousMode !== mode;
     if (changed || Math.abs(heading) > 0.72) direction = heading >= 0 ? 1 : -1;
     if (changed) side = road.offset > 0.3 ? -1 : 1;
+    let cameraRoad: TrackPoint = road;
 
-    if (mode === 'general') {
+    if (mode === 'general' && cover === 0) {
       position.set(car.x - 5, car.y + 14, car.z + 10);
       target.set(car.x, car.y, car.z);
-    } else if (mode === 'chase') {
-      const behind = TRACK.sampleAt(road.s - direction * 5.4);
+    } else if (mode !== 'trackside') {
+      const behind = TRACK.sampleAt(road.s - direction * THREE.MathUtils.lerp(5.4, 3.4, cover));
       const ahead = TRACK.sampleAt(road.s + direction * 4.4);
+      cameraRoad = behind;
       position.set(behind.x - behind.dz * road.offset * 0.45,
-        Math.max(car.y + 1.75, behind.y + 2.75), behind.z + behind.dx * road.offset * 0.45);
+        THREE.MathUtils.lerp(Math.max(car.y + 1.75, behind.y + 2.75), behind.y + 1.18, cover),
+        behind.z + behind.dx * road.offset * 0.45);
       target.set(car.x + (ahead.x - road.x) * 0.44, car.y + 0.46, car.z + (ahead.z - road.z) * 0.44);
+      if (mode === 'general') {
+        position.set(THREE.MathUtils.lerp(car.x - 5, position.x, cover),
+          THREE.MathUtils.lerp(car.y + 14, position.y, cover), THREE.MathUtils.lerp(car.z + 10, position.z, cover));
+      }
     } else {
-      const ahead = TRACK.sampleAt(road.s + direction * 4.3);
+      const ahead = TRACK.sampleAt(road.s + direction * THREE.MathUtils.lerp(4.3, 3.1, cover));
+      cameraRoad = ahead;
+      const left = THREE.MathUtils.lerp(wallHalfAt(ahead.s, -1) - 0.35, 1.64, cover);
+      const right = THREE.MathUtils.lerp(wallHalfAt(ahead.s, 1) - 0.35, 1.64, cover);
       const shoulder = THREE.MathUtils.clamp(road.offset + side * 3.3,
-        -wallHalfAt(ahead.s, -1) + 0.35, wallHalfAt(ahead.s, 1) - 0.35);
+        -left, right);
       position.set(ahead.x - ahead.dz * shoulder, ahead.y + 0.75, ahead.z + ahead.dx * shoulder);
       target.set(car.x, car.y + 0.36, car.z);
     }
@@ -43,8 +55,11 @@ function followCamera() {
     const blend = changed || camera.position.distanceToSquared(position) > 28 ? 1 : 1 - Math.exp(-dt * 15);
     camera.position.lerp(position, blend);
     aim.lerp(target, blend);
-    if (mode === 'trackside') {
-      camera.position.y = Math.max(camera.position.y, TRACK.locate(camera.position.x, camera.position.z).y + 0.59);
+    if (mode === 'trackside' || cover > 0) {
+      const ground = TRACK.locate(camera.position.x, camera.position.z, { s: cameraRoad.s, y: cameraRoad.y });
+      const inside = Math.abs(ground.offset) < wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25;
+      const ceiling = inside ? ground.y + coverClearance(ground.s) - 0.23 : Infinity;
+      camera.position.y = THREE.MathUtils.clamp(camera.position.y, ground.y + 0.59, ceiling);
     }
     camera.lookAt(aim);
     const fov = (mode === 'general' ? 44 : mode === 'chase' ? 48 : 42)

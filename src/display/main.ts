@@ -18,6 +18,7 @@ import { buildSceneLighting } from './scene-lighting';
 import { readAudioSettings, useLowQuality } from './settings';
 import { buildPlacard, buildRaceSigns, placardLayout } from './signs';
 import { startSolo } from './solo';
+import { approachingCover } from './track-cover';
 import { buildViewControls } from './view-controls';
 import { buildWorkshop } from './workshop';
 
@@ -35,7 +36,8 @@ function atEdge(p: (typeof TRACK.samples)[number], offset: number, y: number) {
 }
 
 function cameraFit(camera: THREE.PerspectiveCamera) {
-  const deck = TRACK.samples.map(p => atEdge(p, wallHalfAt(p.s, 1) + 1.4, BENCH_SURFACE));
+  const deck = TRACK.samples.flatMap(p => [-1, 1].map(side =>
+    atEdge(p, side * (wallHalfAt(p.s, side) + 1.4), BENCH_SURFACE)));
   const fence = TRACK.samples.flatMap(p => [-1, 1].map(side => atEdge(p, side * (wallHalfAt(p.s, side) + 0.04), p.y + 0.84)));
   const road = TRACK.samples.flatMap(p => [-1, 1].map(side => atEdge(p, side * (roadHalfAt(p.s) + 0.47), p.y + 0.14)));
   const point = new THREE.Vector3();
@@ -133,7 +135,8 @@ function bootstrap() {
     frame: -1, heat: 0, phase: 'demo', lights: 0, flag: false, order: [0, 1, 2, 3],
     cars: cars.map((_, i) => {
       const p = TRACK.sampleAt(7 + i * TRACK.length / 4);
-      return { x: p.x, y: p.y, z: p.z, yaw: Math.atan2(p.dx, p.dz), speed: 0, lap: 0, owned: false, blink: false, braking: false, steer: 0 };
+      return { x: p.x, y: p.y, z: p.z, yaw: Math.atan2(p.dx, p.dz), distance: p.s,
+        speed: 0, lap: 0, owned: false, blink: false, braking: false, steer: 0 };
     }),
   };
   let current = initial;
@@ -252,6 +255,11 @@ function bootstrap() {
         speed: THREE.MathUtils.lerp(from.speed, car.speed, alpha),
         steer: THREE.MathUtils.lerp(from.steer, car.steer, alpha),
       };
+      if (!jump && from.distance !== undefined && car.distance !== undefined) {
+        const half = TRACK.length / 2;
+        const step = TRACK.wrap(car.distance - from.distance + half) - half;
+        view.distance = TRACK.wrap(from.distance + step * alpha);
+      }
       if (car.sound && from.sound) {
         view.sound = {
           throttle: THREE.MathUtils.lerp(from.sound.throttle, car.sound.throttle, alpha),
@@ -280,7 +288,7 @@ function bootstrap() {
       }
       let slope = 0;
       if (view.y > 0.005) {
-        const road = TRACK.locate(view.x, view.z);
+        const road = TRACK.locate(view.x, view.z, { s: view.distance, y: view.y });
         const grade = (TRACK.sampleAt(road.s + 0.75).y - TRACK.sampleAt(road.s - 0.75).y) / 1.5;
         slope = grade * (road.dx * Math.sin(yaw) + road.dz * Math.cos(yaw));
       }
@@ -288,7 +296,8 @@ function bootstrap() {
       const closeView = mode !== 'general' && slots.includes(i);
       cars[i].setDetail(!lowQuality && (closeView
         || (subject !== undefined && Math.hypot(car.x - subject.x, car.z - subject.z) < 7.0)));
-      cars[i].update(view, dt, slope, now);
+      const distance = view.distance ?? TRACK.locate(view.x, view.z, { y: view.y }).s;
+      cars[i].update(view, dt, slope, now, approachingCover(distance, 4) > 0.24);
       if (moment?.slot === i) focus = view;
       if (partnerSlot === i) partner = view;
     });

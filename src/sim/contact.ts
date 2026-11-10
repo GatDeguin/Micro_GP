@@ -7,18 +7,21 @@ interface CarPose {
   dimensions: CarDimensions;
 }
 
-export function capsule({ x, z, yaw, dimensions }: CarPose) {
+const VERTICAL_REACH = 0.82;
+
+export function capsule({ x, z, yaw, dimensions }: CarPose, y = 0) {
   const radius = dimensions.halfWidth;
   const rear = dimensions.rear - radius;
   const front = dimensions.front - radius;
   const dx = Math.sin(yaw);
   const dz = Math.cos(yaw);
-  return { x, z, ax: x - dx * rear, az: z - dz * rear, bx: x + dx * front, bz: z + dz * front, radius };
+  return { x, y, z, ax: x - dx * rear, az: z - dz * rear, bx: x + dx * front, bz: z + dz * front, radius };
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 export function contactBetween(a: ReturnType<typeof capsule>, b: ReturnType<typeof capsule>) {
+  if (Math.abs(a.y - b.y) >= VERTICAL_REACH) return null;
   const ux = a.bx - a.ax;
   const uz = a.bz - a.az;
   const vx = b.bx - b.ax;

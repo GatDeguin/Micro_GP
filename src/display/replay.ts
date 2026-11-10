@@ -20,7 +20,7 @@ function overtake(previous: RaceSnapshot, state: RaceSnapshot) {
     const other = state.order[rank + 1];
     if (previous.order[rank] !== other || previous.order[rank + 1] !== slot) continue;
     const a = state.cars[slot], b = state.cars[other];
-    if (a.speed > 2 && Math.hypot(a.x - b.x, a.z - b.z) < 3.5) return { slot, rival: other };
+    if (a.speed > 2 && Math.abs(a.y - b.y) < 1.1 && Math.hypot(a.x - b.x, a.z - b.z) < 3.5) return { slot, rival: other };
   }
 }
 
@@ -30,7 +30,7 @@ export function replayCompanion(cars: readonly CarView[], slot: number) {
   let best = -1;
   let nearest = 8 * 8;
   for (let i = 0; i < cars.length; i++) {
-    if (i === slot || cars[i].active === false) continue;
+    if (i === slot || cars[i].active === false || Math.abs(cars[i].y - subject.y) >= 1.1) continue;
     const x = cars[i].x - subject.x, z = cars[i].z - subject.z;
     const distance = x * x + z * z;
     if (x * forwardX + z * forwardZ > 0.15 || distance >= nearest) continue;
@@ -90,7 +90,7 @@ export class ReplayHistory {
     if (finish && state.order.length) {
       const [slot, second] = state.order;
       const a = state.cars[slot], b = state.cars[second];
-      const rival = b && Math.hypot(a.x - b.x, a.z - b.z) < 3.4 ? second : undefined;
+      const rival = b && Math.abs(a.y - b.y) < 1.1 && Math.hypot(a.x - b.x, a.z - b.z) < 3.4 ? second : undefined;
       this.moments.push({ tick: state.frame, slot, rival, kind: 'finish', frames: this.history.slice() });
     } else if (state.phase === 'race' && !state.flag && previous.phase === 'race') {
       let backOnTrack: number | undefined;

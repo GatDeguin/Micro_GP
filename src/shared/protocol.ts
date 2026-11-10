@@ -4,6 +4,7 @@ export const CAR_SPECS = [
   { number: "34", color: "#F1CD4F", name: "Bólido" },
   { number: "58", color: "#9D77E6", name: "Cuña" },
 ] as const;
+export const FORWARD_GEARS = 5;
 
 export type Difficulty = 'rookie' | 'club' | 'pro';
 export type Livery = 'original' | 'clean' | 'sector';
@@ -67,7 +68,7 @@ export interface RaceImpact {
 }
 
 export interface TransmissionView {
-  /** -1 is reverse, 0 is neutral and 1–4 are the forward gears. */
+  /** -1 is reverse, 0 is neutral and 1–5 are the forward gears. */
   gear: number;
   /** Engine speed from idle to redline, normalized to 0–1. */
   rev: number;
@@ -86,6 +87,8 @@ export interface CarView {
   blink: boolean;
   braking: boolean;
   steer: number;
+  /** Distance along the circuit, including which deck the car occupies at the crossing. */
+  distance?: number;
   sound?: CarSound;
   transmission?: TransmissionView;
   active?: boolean;

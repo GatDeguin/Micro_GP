@@ -1,6 +1,6 @@
 import { TRACK, wallHalfAt, type TrackPoint } from '../shared/track.ts';
 
-type CrossingPoint = Pick<TrackPoint, 'x' | 'z' | 's'>;
+type CrossingPoint = Pick<TrackPoint, 'x' | 'y' | 'z' | 's'>;
 
 // Meta, Horquilla, Puente and Curvón in travel order.
 const gates = [
@@ -24,9 +24,10 @@ function crossGate(from: CrossingPoint, to: CrossingPoint, gate: TrackPoint) {
 
   const fraction = -before / (after - before);
   const x = from.x + (to.x - from.x) * fraction - gate.x;
+  const y = from.y + (to.y - from.y) * fraction;
   const z = from.z + (to.z - from.z) * fraction - gate.z;
   const offset = z * gate.dx - x * gate.dz;
-  return Math.abs(offset) <= wallHalfAt(gate.s, Math.sign(offset)) ? fraction : null;
+  return Math.abs(y - gate.y) <= 0.45 && Math.abs(offset) <= wallHalfAt(gate.s, Math.sign(offset)) ? fraction : null;
 }
 
 export class LapProgress {

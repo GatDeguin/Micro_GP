@@ -5,6 +5,7 @@ import firstTrack from '../../Musica/01.mp3?url';
 import secondTrack from '../../Musica/02.mp3?url';
 import { buildAudioSamples, buildEngineSamples } from './audio-samples';
 import { defaultAudioSettings, type AudioSettings } from './settings';
+import { coverClearance } from './track-cover';
 
 type View = 'general' | 'chase' | 'trackside' | 'replay';
 
@@ -30,9 +31,11 @@ const roadTones: Record<SectorId, { frequency: number; gain: number }> = {
   straight: { frequency: 760, gain: 1 }, esses: { frequency: 1020, gain: 0.96 },
   hairpin: { frequency: 830, gain: 1.18 }, bridge: { frequency: 580, gain: 1.08 },
   'back-straight': { frequency: 820, gain: 0.88 }, sweep: { frequency: 930, gain: 1 },
-  pit: { frequency: 520, gain: 0.81 },
+  pit: { frequency: 520, gain: 0.81 }, underpass: { frequency: 700, gain: 1.04 },
+  tunnel: { frequency: 665, gain: 1.08 },
 };
 const pitSource = TRACK_SECTORS.find(sector => sector.id === 'pit')!.cue;
+const grandstand = { x: TRACK.sampleAt(0).x, y: 0.38, z: 2.3 };
 
 function emitter(context: AudioContext, destination: AudioNode) {
   const gain = context.createGain();
@@ -321,9 +324,10 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
       }
       voice.onCurb = onCurb;
       if (!setMix && !shifted) continue;
-      const location = TRACK.locate(car.x, car.z);
+      const location = TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
       const section = sectorAt(location.s, location.offset).id;
       const tone = roadTones[section];
+      const covered = Number.isFinite(coverClearance(location.s));
       const overDeck = section === 'bridge' && car.y > 0.85;
       const deckStep = Math.abs(voice.deckAt - location.s);
       voice.deckAt = overDeck ? location.s : NaN;
@@ -334,7 +338,8 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
           voice.deckTravel %= 2.25;
         }
       } else voice.deckTravel = 0;
-      if (section === 'sweep') crowdPass = Math.max(crowdPass, motion);
+      const nearStands = 1 - limit(Math.hypot(car.x - grandstand.x, car.z - grandstand.z) / 12);
+      if (!covered) crowdPass = Math.max(crowdPass, motion * nearStands);
 
       const voiceLevel = (wide ? loudness * 0.89 : dominant ? 0.96 : loudness * 0.68) * (state.phase === 'demo' ? 0.72 : 1);
       const doppler = wide || view === 'chase' ? 1 : 1 + approaching * 0.0027;
@@ -360,7 +365,8 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
       const bridge = overDeck ? limit((car.y - 0.18) / 1.5) : 0;
       target(voice.output.gain, voiceLevel);
       target(voice.output.pan, dominant ? pan * 0.38 : pan);
-      target(voice.distanceFilter.frequency, dominant || wide ? 4900 : 1100 + loudness * 4500, 0.12);
+      const air = dominant || wide ? 4900 : 1100 + loudness * 4500;
+      target(voice.distanceFilter.frequency, air * (covered ? 0.76 : 1), 0.12);
       for (const [index, layer] of voice.engine.entries()) {
         const rate = pitch / layer.root;
         target(layer.coast.rate, rate, response);
@@ -374,8 +380,8 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
       target(voice.gearGain.gain, engineLevel * energized * (0.006 + 0.030 * revAccent + 0.012 * load) * voice.style.color, response);
       target(voice.whineGain.gain, engineLevel * energized * revAccent ** 2 * (0.009 + 0.013 * load) * voice.style.color, response);
       const surfaceLevel = motion * settings.effects;
-      target(voice.asphalt.gain, surfaceLevel * tone.gain * (0.117 + bridge * 0.046) * (1 - 0.8 * runoff));
-      target(voice.asphaltFilter.frequency, tone.frequency + motion * 570 - bridge * 210, 0.11);
+      target(voice.asphalt.gain, surfaceLevel * tone.gain * (0.117 + bridge * 0.046 + (covered ? 0.019 : 0)) * (1 - 0.8 * runoff));
+      target(voice.asphaltFilter.frequency, (tone.frequency + motion * 570 - bridge * 210) * (covered ? 0.80 : 1), 0.11);
       target(voice.bridge.gain, surfaceLevel * bridge * 0.29);
       target(voice.road.playbackRate, 0.55 + 0.90 * motion);
       target(voice.runoff.gain, surfaceLevel * runoff * 0.20);
@@ -394,7 +400,7 @@ function createMixer(context: AudioContext, initial: AudioSettings) {
     locate(camera, 4.65, -0.156, -0.74, wide);
     pond.gain.setTargetAtTime(damp * loudness * 0.031, now, 0.25);
     pond.pan.setTargetAtTime(pan, now, 0.18);
-    locate(camera, -13.65, 0.38, 1.65, wide);
+    locate(camera, grandstand.x, grandstand.y, grandstand.z, wide);
     const cheer = limit((crowdUntil - now) / 1.4);
     crowd.gain.setTargetAtTime(loudness * (damp * 0.037 + cheer * 0.16 + crowdPass * 0.066), now, 0.24);
     crowd.pan.setTargetAtTime(pan, now, 0.18);

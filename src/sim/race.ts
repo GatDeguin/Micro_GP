@@ -78,7 +78,7 @@ function place(car: Car, s: number, offset: number, speed: number) {
   car.yaw = Math.atan2(point.dx, point.dz);
   car.motionYaw = car.yaw;
   car.speed = speed;
-  car.road = TRACK.locate(car.x, car.z);
+  car.road = TRACK.locate(car.x, car.z, point);
 }
 
 function spawn(s: number, index: number, speed: number, offset = laneFor(index),
@@ -158,7 +158,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   car.exitLoad = Math.max(steerLoad, car.exitLoad - dt * 1.25);
   const exitTraction = 1 + (car.exitLoad - steerLoad) * style.exitTraction;
   const top = BASE_TOP_SPEED + style.straightBonus * (1 - Math.min(1, steerLoad * 3.2));
-  const limit = top - 1.6 * curb - 4.15 * loose - style.cornerDrag * cornerLoad;
+  const limit = top - 1.85 * curb - 4.75 * loose - 1.26 * style.cornerDrag * cornerLoad;
   const speedLimit = inPit ? Math.min(PIT_LANE.speedLimit, limit) : limit;
 
   if (input.brake) {
@@ -172,7 +172,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   const traction = car.transmission.step(car.speed, fullPower, input.brake, car.reversing, dt);
 
   if (input.brake) {
-    const braking = 13 * (0.55 + 0.45 * grip) + uphill;
+    const braking = 15.4 * (0.55 + 0.45 * grip) + uphill;
     car.speed = car.reversing
       ? Math.max(-1.9, car.speed - (3.5 * grip + uphill) * dt)
       : approach(car.speed, 0, braking * dt);
@@ -218,7 +218,7 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
     for (let j = i + 1; j < cars.length; j++) {
       const b = cars[j];
       if (!b.active || b.protection > 0) continue;
-      const contact = contactBetween(capsule(a), capsule(b));
+      const contact = contactBetween(capsule(a, a.road.y), capsule(b, b.road.y));
       if (!contact) continue;
       const { nx, nz, depth } = contact;
       const correction = (depth + 0.006) / 2;
@@ -260,14 +260,14 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
 
 function constrain(car: Car, index: number, observe: ContactObserver) {
   if (!Number.isFinite(car.x + car.z)) return false;
-  car.road = TRACK.locate(car.x, car.z);
+  car.road = TRACK.locate(car.x, car.z, car.road);
   const overflow = (point: TrackLocation) => Math.abs(point.offset) - wallHalfAt(point.s, Math.sign(point.offset));
   if (overflow(car.road) > 0.9) return false;
 
   for (let i = 0; i < 3; i++) {
     const { ax, az, bx, bz, radius } = capsule(car);
-    const rear = TRACK.locate(ax, az);
-    const nose = TRACK.locate(bx, bz);
+    const rear = TRACK.locate(ax, az, car.road);
+    const nose = TRACK.locate(bx, bz, car.road);
     let boundary = car.road;
     if (overflow(rear) > overflow(boundary)) boundary = rear;
     if (overflow(nose) > overflow(boundary)) boundary = nose;
@@ -306,7 +306,7 @@ function constrain(car: Car, index: number, observe: ContactObserver) {
       source: `barrier:${index}:${side}`, kind: kickboard ? 'wall' : 'fence', impulse,
       x: boundary.x + nx * wall, y: boundary.y + 0.18, z: boundary.z + nz * wall,
     });
-    car.road = TRACK.locate(car.x, car.z);
+    car.road = TRACK.locate(car.x, car.z, car.road);
   }
   return true;
 }
@@ -469,7 +469,7 @@ export class Race {
     const practice = this.phase === 'practice';
     if (racing || practice) this.clock += dt;
     const previous = this.cars.map(car => ({
-      x: car.x, z: car.z, s: car.road.s, speed: car.speed, motionYaw: car.motionYaw, progress: car.progress.distance,
+      x: car.x, y: car.road.y, z: car.z, s: car.road.s, speed: car.speed, motionYaw: car.motionYaw, progress: car.progress.distance,
     }));
     const commands = this.cars.map((car, i) => {
       if (!car.active) return null;
@@ -513,7 +513,7 @@ export class Race {
 
       if (timed) {
         if (car.registeredDriver && !command.human && moving) car.timing.assisted();
-        const fraction = car.progress.advance(from, { x: car.x, z: car.z, s: car.road.s }, car.speed > 0);
+        const fraction = car.progress.advance(from, { x: car.x, y: car.road.y, z: car.z, s: car.road.s }, car.speed > 0);
         if (racing) car.timing.recordProgress(from.progress, car.progress.distance, this.clock, dt);
         if (fraction !== null) {
           const time = this.clock - dt + fraction * dt;
@@ -572,7 +572,7 @@ export class Race {
       })) : undefined,
       impacts: this.impacts.length ? this.impacts.map(impact => ({ ...impact })) : undefined,
       cars: this.cars.map(car => ({
-        x: car.x, y: car.road.y, z: car.z, yaw: car.yaw, speed: car.speed,
+        x: car.x, y: car.road.y, z: car.z, yaw: car.yaw, speed: car.speed, distance: car.road.s,
         lap: demo ? 0 : car.progress.lap, owned: car.owned, steer: car.steer, braking: car.braking,
         blink: car.protection > 0 && Math.floor(car.protection * 8) % 2 === 0,
         active: car.active,

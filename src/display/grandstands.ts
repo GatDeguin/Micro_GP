@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TRACK } from '../shared/track';
 import { box, horizontalShadow, random, standard } from './materials.ts';
 
 const frame = standard(0x58605b, 0.62, 0.42);
@@ -134,7 +135,7 @@ function spectator(parent: THREE.Object3D, place: Point, variation: number, scal
 export function buildGrandstands(parent: THREE.Object3D) {
   const stands = new THREE.Group();
   stands.name = 'Tribunas y público';
-  stands.position.set(-13.65, -0.23, 1.65);
+  stands.position.set(TRACK.sampleAt(0).x, -0.23, 2.30);
   parent.add(stands);
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(6.55, 2.48), horizontalShadow());
   shadow.rotation.x = -Math.PI / 2;

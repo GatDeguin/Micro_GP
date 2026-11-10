@@ -6,7 +6,7 @@ Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la
 
 Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1, 2 y 3 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
 
-El circuito de 162 unidades tiene una horquilla ancha, una recta de fondo y el puente sobre el arroyo. En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas.
+El circuito forma un ocho con un cruce a dos alturas. El túnel del ramal inferior desemboca bajo el tablero del puente, y la grada queda frente a la línea de meta. En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas.
 
 ## Jugar en Windows
 
@@ -21,7 +21,7 @@ Los temas de `Musica` suenan en orden y vuelven a empezar al terminar. La músic
 
 Abrí **Configuración** arriba a la izquierda o con **C**. Podés ajustar el volumen general, la música, los motores y los efectos por separado, o silenciar todo. Los niveles se aplican en vivo y se guardan en ese navegador. Para cambiar la calidad gráfica, elegí un modo y pulsá **Aplicar y recargar**.
 
-Los cuatro autitos tienen caja automática de cuatro marchas. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir.
+Los cuatro autitos tienen caja automática de cinco marchas. El tablero de la maqueta indica la marcha y el dorsal. Se oye la caída de revoluciones al subir de marcha y un golpe de gas al reducir. Cada faro ilumina su lado de la pista en la sesión nocturna y al acercarse al tramo cubierto.
 
 El motor de cada auto combina bucles de bajas, medias y altas revoluciones, con un timbre al acelerar y otro al soltar el gas. Micro GP genera esos bucles con Web Audio. El diseño toma como referencia la [guía de audio vehicular de Wreckfest](https://www.audiokinetic.com/media/blog/LoopBasedCarEngineDesign/vehicle_audio_modding_guide_for_wreckfest-Wwise2019_2_9.pdf).
 

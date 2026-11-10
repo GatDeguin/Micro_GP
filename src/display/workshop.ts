@@ -162,7 +162,7 @@ function buildBench(parent: THREE.Object3D) {
 
 function buildWestBench(parent: THREE.Object3D, contacts: Contact[]) {
   const casework = new THREE.Group();
-  casework.position.set(-41.55, BENCH_SURFACE, 7.9);
+  casework.position.set(-42.00, BENCH_SURFACE, 9.8);
   casework.rotation.y = 1.48;
   parent.add(casework);
   contacts.push([casework.position.x, BENCH_SURFACE, casework.position.z, 11.2, 5.9, casework.rotation.y]);
@@ -315,7 +315,7 @@ function buildChest(parent: THREE.Object3D, contacts: Contact[]) {
 
 function buildCan(parent: THREE.Object3D, contacts: Contact[]) {
   const can = new THREE.Group();
-  can.position.set(-26.1, BENCH_SURFACE, -16.43);
+  can.position.set(-29.9, BENCH_SURFACE, -19.40);
   can.scale.setScalar(1.49);
   parent.add(can);
   contacts.push([can.position.x, BENCH_SURFACE, can.position.z, 4.35, 4.2]);
@@ -456,7 +456,7 @@ function buildFloodlights(parent: THREE.Object3D, contacts: Contact[]) {
     { ...outward(mark.hairpinApex + 1.6, 0.57, 3.45), faceYaw: -0.72 },
     { ...outward(mark.essesMid - 2.0, 0.65, 4.15), faceYaw: -0.83 },
     ...FRONT_TOWERS.map(({ s, margin, height, aim }) => ({ ...outward(s, margin, height, aim), aimOffset: ROAD_HALF - 0.30 })),
-    { x: -18.88, z: 2.52, height: 4.86, aim: TRACK.length - 13.1, faceYaw: 0.31 },
+    { x: -9.65, z: 2.65, height: 4.62, aim: TRACK.length - 10.8, faceYaw: 0.31 },
     { x: 8.34, z: 1.36, height: 3.53, aim: 15.5, faceYaw: -0.63 },
   ];
   const pools: LightPool[] = [];
@@ -567,7 +567,7 @@ function fastenerShapes() {
 
 function buildPartsBin(parent: THREE.Object3D, contacts: Contact[], parts: THREE.BufferGeometry[]) {
   const bin = new THREE.Group();
-  bin.position.set(-14.6, BENCH_SURFACE, -17.15);
+  bin.position.set(-14.6, BENCH_SURFACE, -18.95);
   bin.rotation.y = 0.22;
   bin.scale.setScalar(1.22);
   parent.add(bin);
@@ -607,7 +607,7 @@ function buildPartsBin(parent: THREE.Object3D, contacts: Contact[], parts: THREE
 
 function buildFastenerJar(parent: THREE.Object3D, contacts: Contact[], parts: THREE.BufferGeometry[]) {
   const jar = new THREE.Group();
-  jar.position.set(-19.4, BENCH_SURFACE, -16.6);
+  jar.position.set(-20.5, BENCH_SURFACE, -19.05);
   parent.add(jar);
   contacts.push([jar.position.x, BENCH_SURFACE, jar.position.z, 2.67, 2.55]);
   const glass = new THREE.MeshPhysicalMaterial({ color: 0xdbd9c5, roughness: 0.13, metalness: 0.04,
