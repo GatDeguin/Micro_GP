@@ -299,7 +299,7 @@ function createMixer(context: AudioContext) {
       const blip = voice.shiftDirection < 0 ? limit(shiftAge / 0.024) * limit(1 - shiftAge / 0.19) ** 1.25 : 0;
       const coastLoad = transmission?.gear === 0 ? 0.30 : 0.24 - 0.20 * motion;
       const load = Math.max((coastLoad + (1 - coastLoad) * throttle) * (1 - 0.95 * lift), blip);
-      const engineLevel = 0.75 * (1 - 0.68 * lift);
+      const engineLevel = 0.5625 * (1 - 0.68 * lift);
       const revAccent = limit(rev - 0.09 * lift + 0.28 * blip, 0, 1.10);
       const pitch = (voice.style.idle + voice.style.sweep * revAccent) * doppler;
       const energized = limit(motion * 1.6 + load * 1.2);
