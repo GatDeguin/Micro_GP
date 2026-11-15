@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { CarView } from '../shared/protocol';
 import { TALLER, type Course } from '../shared/courses';
 import type { TrackPoint } from '../shared/track';
-import type { buildPlacard } from './signs';
+import { overviewPlacardLimit, type buildPlacard } from './signs';
 import { approachingCover, coverClearance } from './track-cover';
 import { cinematicStation } from './cinematic-cameras';
 import { cameraLights } from './render-layers';
@@ -118,7 +118,7 @@ export function buildRaceViews(
   return (scene: THREE.Scene, mode: ViewMode, cars: readonly CarView[], slots: readonly number[],
     width: number, height: number, dt: number) => {
     const split = slots.length > 1;
-    if (wasSplit && !split) placard.resize(overhead, width, height);
+    if (wasSplit && !split) placard.resize(overhead, width, height, undefined, overviewPlacardLimit(course));
     wasSplit = split;
     if (!split && mode === 'general') {
       placard.setGrounded(true);

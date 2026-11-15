@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Course } from '../shared/courses';
 import { GRID_LANE_OFFSET } from '../shared/car-dimensions';
 import type { TrackPoint } from '../shared/track';
@@ -6,7 +7,7 @@ import { box, canvas2d, noiseField, random, standard, texture } from './material
 import { DIQUE_GROUND, diqueBeam, diqueEdge, diquePart, diqueSign, diqueSpan, diqueStrip } from './dique-geometry';
 
 const TINT = {
-  asphalt: 0x555760, escape: 0x707873, gravel: 0xb1a384, grass: 0x708658,
+  asphalt: 0x555458, escape: 0x777672, gravel: 0xa29580, grass: 0x777e63,
   curb: 0x55524b, pit: 0x87837b,
 };
 
@@ -20,7 +21,7 @@ function mineralMap(seed: number, tint: [number, number, number], scale = 1) {
     for (let x = 0; x < canvas.width; x++) {
       const u = x / canvas.width;
       const v = y / canvas.height;
-      const grit = (rng() - 0.5) * 37 + (wear(u, v) - 0.5) * 32 + (speck(u, v) - 0.5) * 38;
+      const grit = (rng() - 0.5) * 19 + (wear(u, v) - 0.5) * 23 + (speck(u, v) - 0.5) * 21;
       const i = (y * canvas.width + x) * 4;
       pixels.data[i] = tint[0] + grit;
       pixels.data[i + 1] = tint[1] + grit;
@@ -35,37 +36,82 @@ function mineralMap(seed: number, tint: [number, number, number], scale = 1) {
   return map;
 }
 
-export function diqueConcrete() {
-  const { canvas, context } = canvas2d(512, 512);
-  const rng = random(66412);
-  const pocks = noiseField(39, 42, rng);
-  const stain = noiseField(16, 22, rng);
-  const pixels = context.createImageData(512, 512);
-  for (let y = 0; y < 512; y++) {
-    for (let x = 0; x < 512; x++) {
-      const row = Math.floor(y / 128);
-      const seam = Math.min(y % 128, (x + (row % 2) * 128) % 256);
-      const u = x / 512;
-      const v = y / 512;
-      const drip = stain(u, v * 0.61) ** 2;
-      const shade = 192 - 48 * drip - 17 * pocks(u, v) + 23 * (rng() - 0.5) - (seam < 3 ? 32 - seam * 7 : 0);
-      const i = (y * 512 + x) * 4;
-      pixels.data[i] = shade + 1;
-      pixels.data[i + 1] = shade + 2;
-      pixels.data[i + 2] = shade + 1 - drip * 6;
-      pixels.data[i + 3] = 255;
+function castConcrete(retaining: boolean) {
+  const size = 512;
+  const { canvas, context } = canvas2d(size, size);
+  const relief = canvas2d(size, size);
+  const rng = random(retaining ? 42189 : 66412);
+  const wear = noiseField(13, 16, rng);
+  const pocks = noiseField(103, 111, rng);
+  const stains = noiseField(48, retaining ? 5 : 25, rng);
+  const edge = noiseField(55, 49, rng);
+  const rows = retaining ? 4 : 6;
+  const columns = retaining ? 5 : 6;
+  const panels = Float64Array.from({ length: rows * columns }, rng);
+  const diffuse = context.createImageData(size, size);
+  const channels = relief.context.createImageData(size, size);
+  const fracture = (v: number) => v - Math.floor(v);
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const vEdge = Math.min(fracture(v * rows), 1 - fracture(v * rows)) / rows;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const shifted = u * columns + (row % 2 ? 0.34 : 0);
+      const uEdge = Math.min(fracture(shifted), 1 - fracture(shifted)) / columns;
+      const center = panels[row * columns + Math.floor(shifted) % columns];
+      const noise = wear(u, v);
+      const grit = pocks(u, v);
+      const edgeChip = edge(u, v);
+      const gap = Math.min(uEdge, vEdge) * size;
+      const seam = 1 - THREE.MathUtils.smoothstep(gap, 0.30, 1.15 + edgeChip * 1.25);
+      const bevel = THREE.MathUtils.smoothstep(gap, 1.1, 1.9) * (1 - THREE.MathUtils.smoothstep(gap, 1.9, 3.1));
+      const splash = retaining
+        ? THREE.MathUtils.smoothstep(v + 0.12 * noise, 0.78, 1)
+        : THREE.MathUtils.smoothstep(noise + 0.18 * edgeChip, 0.58, 0.91) * (0.41 + seam * 0.48);
+      const drip = Math.max(0, stains(u, v) - 0.51) * (retaining ? 1.5 : 0.68);
+      const along = fracture(v * rows);
+      const split = 0.09 + along * (0.79 - center * 0.54) + 0.056 * (edgeChip - 0.5);
+      const crack = center > 0.77 && along < 0.61
+        ? (1 - THREE.MathUtils.smoothstep(Math.abs(fracture(shifted) - split), 0.005, 0.019)) * (1 - along / 0.61)
+        : 0;
+      const shade = (retaining ? 179 : 170) + (center - 0.5) * (retaining ? 26 : 14) + (noise - 0.5) * 19
+        + (grit - 0.5) * 13 - drip * 41 - seam * (retaining ? 45 : 30) - splash * 28 + bevel * 9 - crack * 25;
+      const i = (y * size + x) * 4;
+      diffuse.data[i] = shade + 4 + drip * 6 - splash * 3;
+      diffuse.data[i + 1] = shade + 1 + splash * 3;
+      diffuse.data[i + 2] = shade - 6 - splash * 7 - drip * 1.5;
+      diffuse.data[i + 3] = 255;
+      channels.data[i] = 163 + grit * 9 - seam * 91 + bevel * 10;
+      channels.data[i + 1] = 240 - splash * 60 - drip * 40 - seam * 9;
+      channels.data[i + 3] = 255;
     }
   }
-  context.putImageData(pixels, 0, 0);
+  context.putImageData(diffuse, 0, 0);
+  relief.context.putImageData(channels, 0, 0);
   const map = texture(canvas);
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  return new THREE.MeshStandardMaterial({ color: 0xa1a2a0, map, bumpMap: map, bumpScale: 0.052, roughness: 0.82 });
+  const details = new THREE.CanvasTexture(relief.canvas);
+  map.wrapS = details.wrapS = THREE.RepeatWrapping;
+  map.wrapT = details.wrapT = retaining ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+  details.anisotropy = map.anisotropy;
+  if (!retaining) {
+    map.repeat.set(0.81, 0.68);
+    details.repeat.copy(map.repeat);
+  }
+  return new THREE.MeshStandardMaterial({
+    color: retaining ? 0xcac0ad : 0xc0b9ad, map, bumpMap: details,
+    bumpScale: 0.047, roughnessMap: details, roughness: 0.92,
+  });
+}
+
+export function diqueConcrete() {
+  return castConcrete(false);
 }
 
 function asphalt() {
   const map = mineralMap(929, [193, 196, 201], 1.25);
-  return new THREE.MeshPhysicalMaterial({ color: TINT.asphalt, map, bumpMap: map, bumpScale: 0.035,
-    vertexColors: true, roughness: 0.71, clearcoat: 0.33, clearcoatRoughness: 0.35 });
+  return new THREE.MeshPhysicalMaterial({ color: TINT.asphalt, map, bumpMap: map, bumpScale: 0.025,
+    vertexColors: true, roughness: 0.83, clearcoat: 0.19, clearcoatRoughness: 0.44 });
 }
 
 function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
@@ -79,11 +125,13 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
     for (const [line, fraction] of bands.entries()) {
       const offset = fraction * half;
       const q = diqueEdge(course, p, offset);
-      const wear = (0.94 + 0.067 * Math.cos(p.s * 0.092)) * (0.78 + 0.22 * Math.min(1, Math.abs(fraction) * 2.28));
+      const streak = 0.92 + 0.052 * Math.cos(p.s * 0.092) + 0.025 * Math.sin(p.s * 0.29 + fraction * 1.6);
+      const wheelLine = 1 - Math.min(1, Math.abs(Math.abs(fraction) - 0.46) * 7);
+      const wear = streak * (1 - 0.12 * wheelLine);
       const wet = course.wetAt(p.s, offset);
       positions.push(q.x, q.y, q.z);
-      uv.push(q.x * 0.23, q.z * 0.23);
-      colors.push(wear * (1 - 0.43 * wet), wear * (1 - 0.35 * wet), wear * (1 - 0.25 * wet));
+      uv.push(p.s / course.length * 96, offset * 0.30);
+      colors.push(wear * (1 - 0.44 * wet), wear * (1 - 0.37 * wet), wear * (1 - 0.30 * wet));
       if (line === bands.length - 1 || i === samples.length - 1) continue;
       const k = i * bands.length + line;
       indices.push(k, k + 1, k + bands.length, k + bands.length, k + 1, k + bands.length + 1);
@@ -103,15 +151,17 @@ function wetShoulder(parent: THREE.Group, course: Course) {
   const inner = [-1, -0.81, -0.61, -0.42, -0.19, 0.04];
   const positions = [];
   const colors = [];
+  const uv = [];
   const indices = [];
   for (const [i, p] of samples.entries()) {
     for (const [j, side] of inner.entries()) {
       const lateral = side * course.roadHalfAt(p.s);
       const q = diqueEdge(course, p, lateral, 0.006);
       const wet = course.wetAt(p.s, lateral);
-      const patch = 0.62 + 0.38 * Math.cos(p.s * 0.26 + lateral * 1.4) ** 2;
+      const patch = 0.6 + 0.28 * Math.cos(p.s * 0.23 + lateral * 1.4) ** 2 + 0.12 * Math.sin(p.s * 0.77 - lateral) ** 2;
       positions.push(q.x, q.y, q.z);
-      colors.push(0.65, 0.77, 0.92, 0.58 * patch * wet);
+      colors.push(0.79, 0.87, 0.96, 0.70 * patch * wet);
+      uv.push(p.s * 0.20, lateral * 0.21);
       if (i < samples.length - 1 && j < inner.length - 1) {
         const k = i * inner.length + j;
         indices.push(k, k + 1, k + inner.length, k + inner.length, k + 1, k + inner.length + 1);
@@ -121,10 +171,14 @@ function wetShoulder(parent: THREE.Group, course: Course) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  diquePart(parent, geometry, new THREE.MeshPhysicalMaterial({ color: 0x494d53, roughness: 0.26, vertexColors: true,
-    clearcoat: 1, clearcoatRoughness: 0.16, transparent: true, depthWrite: false }), false, 'Huella húmeda de la grúa');
+  diquePart(parent, geometry, new THREE.MeshPhysicalMaterial({
+    color: 0x393e46, roughness: 0.25, vertexColors: true,
+    bumpMap: mineralMap(2957, [192, 195, 199]), bumpScale: 0.014,
+    clearcoat: 0.95, clearcoatRoughness: 0.18, transparent: true, depthWrite: false,
+  }), false, 'Huella húmeda de la grúa');
 }
 
 function surfaceRuns(parent: THREE.Group, course: Course, concrete: THREE.Material) {
@@ -137,7 +191,7 @@ function surfaceRuns(parent: THREE.Group, course: Course, concrete: THREE.Materi
     gravel: new THREE.MeshStandardMaterial({ color: TINT.gravel, map: gravelMap, bumpMap: gravelMap, bumpScale: 0.10, roughness: 0.98 }),
     wall: new THREE.MeshStandardMaterial({ color: TINT.grass, map: mineralMap(914, [169, 185, 143]), roughness: 0.92 }),
   };
-  const stripe = standard(0xd5ceaf, 0.90);
+  const stripe = standard(0xe2d7ba, 0.90);
   const runs = 12;
   for (let i = 0; i < runs; i++) {
     const samples = diqueSpan(course, i * course.length / runs, (i + 1) * course.length / runs);
@@ -172,9 +226,7 @@ function surfaceRuns(parent: THREE.Group, course: Course, concrete: THREE.Materi
 }
 
 function curbs(parent: THREE.Group, course: Course) {
-  const red = standard(0xb23b2e, 0.68);
-  const ivory = standard(0xe6d9bb, 0.70);
-  const colors = [red.color, ivory.color];
+  const colors = [new THREE.Color(0xb43d32), new THREE.Color(0xeee2c2)];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.74, map: mineralMap(645, [212, 212, 209], 2.5) });
   const rng = random(5532);
   const count = Math.round(course.length / 1.4);
@@ -188,7 +240,7 @@ function curbs(parent: THREE.Group, course: Course) {
       const from = i * step;
       const to = from + step;
       if (side < 0 && to > course.pit.entry && from < course.pit.exit) continue;
-      const color = colors[i % 2].clone().multiplyScalar(0.78 + rng() * 0.26);
+      const color = colors[i % 2].clone().multiplyScalar(0.72 + rng() * 0.33);
       const start = vertices.length / 3;
       for (const [row, along] of [0.035, 0.19, 0.81, 0.965].entries()) {
         const p = course.sampleAt(from + along * step);
@@ -198,7 +250,9 @@ function curbs(parent: THREE.Group, course: Course) {
           const height = [0.014, 0.066, 0.056, 0.010][index] * (row === 0 || row === 3 ? 0.61 : 1);
           const q = diqueEdge(course, p, side * THREE.MathUtils.lerp(band.asphalt, band.curb, margin), height);
           vertices.push(q.x, q.y, q.z);
-          color.toArray(vertexColors, vertexColors.length);
+          const exposed = index === 1 ? 0.96 : index === 2 ? 0.87 : 0.76;
+          const paint = exposed + 0.06 * rng();
+          vertexColors.push(color.r * paint, color.g * paint, color.b * paint);
           uv.push(q.x * 0.36, q.z * 0.36);
         }
       }
@@ -270,9 +324,9 @@ function trackPaint(parent: THREE.Group, course: Course) {
 }
 
 function rails(parent: THREE.Group, course: Course) {
-  const post = standard(0x6c6d63, 0.52, 0.54);
-  const rail = standard(0xa4a59a, 0.49, 0.58);
-  const base = standard(0x615d50, 0.72, 0.32);
+  const post = standard(0x818b8e, 0.46, 0.58);
+  const rail = standard(0xa8b3b0, 0.39, 0.59);
+  const base = standard(0x66615a, 0.72, 0.30);
   const count = Math.round(course.length / 2.30);
   const spacing = course.length / count;
   const skip = (s: number, side: number) => (s > course.tunnel.from + 0.03 && s < course.tunnel.to - 0.03)
@@ -301,9 +355,134 @@ function rails(parent: THREE.Group, course: Course) {
   }
 }
 
+function retainingGlow() {
+  const { canvas, context } = canvas2d(64, 96);
+  const image = context.createImageData(64, 96);
+  for (let y = 0; y < 96; y++) {
+    const v = (y - 15) / (y < 15 ? 15 : 80);
+    for (let x = 0; x < 64; x++) {
+      const u = (x - 31.5) / 31.5;
+      const core = Math.max(0, 1 - Math.hypot(u, v));
+      const i = (y * 64 + x) * 4;
+      image.data[i] = 229 + 26 * core;
+      image.data[i + 1] = 127 + 65 * core;
+      image.data[i + 2] = 53 + 49 * core;
+      image.data[i + 3] = 221 * core ** 1.65;
+    }
+  }
+  context.putImageData(image, 0, 0);
+  return new THREE.MeshBasicMaterial({
+    map: texture(canvas), blending: THREE.AdditiveBlending, transparent: true,
+    depthWrite: false, toneMapped: true,
+  });
+}
+
+function wallLamps(parent: THREE.Group, course: Course, glow: THREE.Material) {
+  const fixture = standard(0x69655c, 0.52, 0.54);
+  const lens = new THREE.MeshStandardMaterial({
+    color: 0xffd889, emissive: 0xffa350, emissiveIntensity: 3.35, roughness: 0.44,
+  });
+  const projections: THREE.BufferGeometry[] = [];
+  for (const s of [321, 340, 410, 427, 442, 457, 472, 491, 509, 534]) {
+    const side = s < 350 ? -1 : 1;
+    const p = course.sampleAt(s);
+    const height = p.y + course.bankAt(s) * side * (course.wallHalfAt(s, side) + 0.22) - DIQUE_GROUND;
+    if (height < 1.3) continue;
+    const mount = (p: TrackPoint, depth: number, drop: number) =>
+      diqueEdge(course, p, side * (course.wallHalfAt(p.s, side) + 0.22 + depth), drop);
+    const plate = mount(p, 0.082, -0.50);
+    const glass = mount(p, 0.196, -0.55);
+    const angle = Math.atan2(p.dx, p.dz);
+    box(parent, fixture, plate.x, plate.y, plate.z, 0.24, 0.22, 0.70, false).rotation.y = angle;
+    box(parent, lens, glass.x, glass.y, glass.z, 0.058, 0.103, 0.55, false).rotation.y = angle;
+    const samples = diqueSpan(course, s - 2.55, s + 2.55);
+    const top = (p: TrackPoint) => mount(p, 0.037, -0.39);
+    const bottom = (p: TrackPoint) => {
+      const vertex = top(p);
+      vertex.y = Math.max(DIQUE_GROUND + 0.018, vertex.y - 2.73);
+      return vertex;
+    };
+    const geometry = diqueStrip(samples, side > 0 ? top : bottom, side > 0 ? bottom : top);
+    const uv = geometry.getAttribute('uv');
+    for (const [index, sample] of samples.entries()) {
+      const u = (sample.s - s) / 5.1 + 0.5;
+      uv.setXY(index * 2, u, side > 0 ? 1 : 0);
+      uv.setXY(index * 2 + 1, u, side > 0 ? 0 : 1);
+    }
+    projections.push(geometry);
+  }
+  const pools = mergeGeometries(projections);
+  for (const projection of projections) projection.dispose();
+  if (pools) diquePart(parent, pools, glow, false, 'Rebote ámbar en el hormigón del dique');
+}
+
+function wallFootings(parent: THREE.Group, course: Course, material: THREE.Material) {
+  for (const [from, to, outer, height] of [[413, 488, 1.08, 0.88], [410, 492, 1.83, 0.34]]) {
+    const samples = diqueSpan(course, from, to);
+    const footing = (p: TrackPoint, distance: number, y: number) => {
+      const point = diqueEdge(course, p, course.wallHalfAt(p.s, 1) + distance);
+      point.y = DIQUE_GROUND + y;
+      return point;
+    };
+    const lid = diqueStrip(samples, p => footing(p, 0.11, height), p => footing(p, outer, height));
+    const face = diqueStrip(samples, p => footing(p, outer, height), p => footing(p, outer, -0.026), 'longitudinal');
+    diquePart(parent, lid, material, false, 'Berma de inspección del dique');
+    diquePart(parent, face, material, true, 'Zapata del muro de contención');
+    for (const s of [from, to]) {
+      const p = course.sampleAt(s);
+      const q = footing(p, (outer + 0.11) / 2, height / 2);
+      box(parent, material, q.x, q.y, q.z, outer - 0.11, height, 0.036, false).rotation.y = Math.atan2(p.dx, p.dz);
+    }
+  }
+}
+
+function bridgePiers(parent: THREE.Group, course: Course, stone: THREE.Material, rim: THREE.Material,
+  glow: THREE.Material) {
+  const bearing = standard(0x494f51, 0.65, 0.35);
+  const iron = standard(0x685e4c, 0.74, 0.33);
+  const lamp = new THREE.MeshStandardMaterial({
+    color: 0xffcf8d, emissive: 0xff9a36, emissiveIntensity: 2.8, roughness: 0.4,
+  });
+  const pools: THREE.BufferGeometry[] = [];
+  for (const [s, offset] of [[355.75, -1.25], [382.25, -1.3]]) {
+    const p = course.sampleAt(s);
+    const q = diqueEdge(course, p, offset);
+    const pier = new THREE.Group();
+    pier.name = 'Pila del puente en terreno firme';
+    pier.position.set(q.x, DIQUE_GROUND, q.z);
+    pier.rotation.y = Math.atan2(p.dx, p.dz);
+    parent.add(pier);
+    const height = q.y - 0.60 - DIQUE_GROUND;
+    box(pier, rim, 0, 0.17, 0, 4.35, 0.34, 2.70);
+    box(pier, stone, 0, 0.40, 0, 3.84, 0.20, 2.38);
+    box(pier, stone, 0, (height - 0.17) / 2, 0, 3.16, height - 0.83, 2.02);
+    for (const x of [-1.36, 1.36]) {
+      box(pier, rim, x, height / 2 - 0.03, -1.05, 0.14, height - 1.22, 0.09, false);
+    }
+    for (const y of [0.74, height * 0.47, height * 0.68]) {
+      box(pier, bearing, 0, y, -1.01, 3.09, 0.034, 0.028, false);
+    }
+    box(pier, stone, -0.43, height - 0.47, 0, 4.67, 0.44, 2.18);
+    box(pier, rim, -0.43, height - 0.20, 0, 4.91, 0.15, 2.34);
+    for (const x of [-1.88, 0.88]) {
+      box(pier, bearing, x, height - 0.05, 0, 0.67, 0.17, 1.83);
+    }
+    box(pier, iron, 0, height - 0.92, -1.14, 0.61, 0.23, 0.23, false);
+    box(pier, lamp, 0, height - 0.98, -1.27, 0.46, 0.080, 0.085, false);
+    const geometry = new THREE.PlaneGeometry(3.08, height - 1.38)
+      .rotateY(Math.PI).translate(0, (height - 1.38) / 2 + 0.32, -1.027)
+      .rotateY(pier.rotation.y).translate(q.x, DIQUE_GROUND, q.z);
+    pools.push(geometry);
+  }
+  const batch = mergeGeometries(pools);
+  for (const pool of pools) pool.dispose();
+  if (batch) diquePart(parent, batch, glow, false, 'Luz de inspección en las pilas');
+}
+
 function retainingWalls(parent: THREE.Group, course: Course, concrete: THREE.Material) {
-  const beams = standard(0x716c60, 0.87, 0.16);
-  const topFace = standard(0x69675d, 0.89);
+  const beams = standard(0x8e8778, 0.79, 0.12);
+  const topFace = standard(0x686e70, 0.81, 0.20);
+  const weathered = castConcrete(true);
   const bridgeFrom = 349.5;
   const bridgeTo = 391.5;
   const makeRetaining = (from: number, to: number) => {
@@ -315,8 +494,17 @@ function retainingWalls(parent: THREE.Group, course: Course, concrete: THREE.Mat
       const panel = diqueStrip(samples, side > 0 ? cap : bottom, side > 0 ? bottom : cap, 'longitudinal');
       const normalUV = panel.getAttribute('uv');
       const coordinates = panel.getAttribute('position');
-      for (let i = 0; i < normalUV.count; i++) normalUV.setY(i, coordinates.getY(i) * 0.37);
-      diquePart(parent, panel, concrete, true, 'Muro de contención de hormigón');
+      for (const [index, p] of samples.entries()) {
+        normalUV.setXY(index * 2, p.s / 13.8, (coordinates.getY(index * 2) - DIQUE_GROUND) / 7.25);
+        normalUV.setXY(index * 2 + 1, p.s / 13.8, (coordinates.getY(index * 2 + 1) - DIQUE_GROUND) / 7.25);
+      }
+      diquePart(parent, panel, weathered, true, 'Muro de contención con juntas y marcas de humedad');
+      const cornice = (p: TrackPoint, depth: number, height: number) =>
+        diqueEdge(course, p, margin(p) + side * depth, height);
+      diquePart(parent, diqueStrip(samples, side > 0 ? p => cornice(p, 0, -0.040) : p => cornice(p, 0.16, -0.040),
+        side > 0 ? p => cornice(p, 0.16, -0.040) : p => cornice(p, 0, -0.040)), topFace);
+      diquePart(parent, diqueStrip(samples, side > 0 ? p => cornice(p, 0.16, -0.040) : p => cornice(p, 0.16, -0.18),
+        side > 0 ? p => cornice(p, 0.16, -0.18) : p => cornice(p, 0.16, -0.040)), beams);
       for (let s = from + 1.35; s < to - 1.0; s += 4.8) {
         const p = course.sampleAt(s);
         const q = cap(p);
@@ -329,6 +517,10 @@ function retainingWalls(parent: THREE.Group, course: Course, concrete: THREE.Mat
   // At the crossing the track is an open girder and its support is set outside the lower deck.
   makeRetaining(292, bridgeFrom);
   makeRetaining(bridgeTo, 566);
+  wallFootings(parent, course, concrete);
+  const glow = retainingGlow();
+  wallLamps(parent, course, glow);
+  bridgePiers(parent, course, weathered, beams, glow);
   const span = diqueSpan(course, bridgeFrom - 0.22, bridgeTo + 0.22);
   const deckEdge = (p: TrackPoint, side: number) => diqueEdge(course, p, side * (course.wallHalfAt(p.s, side) + 0.27), -0.60);
   diquePart(parent, diqueStrip(span, p => deckEdge(p, 1), p => deckEdge(p, -1)), topFace, true, 'Cara inferior del puente');

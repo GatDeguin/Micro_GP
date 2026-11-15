@@ -264,6 +264,10 @@ export function buildRaceSigns(parent: THREE.Object3D, course: Course = TALLER) 
   return { board, lights, flag };
 }
 
+export function overviewPlacardLimit(course: Course) {
+  return course.id === 'dique' ? 124 : 210;
+}
+
 export function placardLayout(width: number, height: number, maxSize = 210) {
   const size = Math.round(Math.min(maxSize, Math.max(94, height * 0.173), width * 0.40, height * 0.32));
   const margin = Math.max(12, Math.min(width, height) * 0.023);

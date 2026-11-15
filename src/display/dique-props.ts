@@ -15,6 +15,7 @@ const amber = standard(0xc99637, 0.63, 0.36);
 const oak = standard(0x9d7953, 0.84);
 const cylinder = new THREE.CylinderGeometry(1, 1, 1, 14);
 const tire = new THREE.TorusGeometry(0.67, 0.16, 7, 18);
+const lifeRing = new THREE.TorusGeometry(0.52, 0.102, 6, 20);
 
 function round(parent: THREE.Object3D, material: THREE.Material, x: number, y: number, z: number, radius: number, height: number, casts = false) {
   const mesh = diquePart(parent, cylinder, material, casts);
@@ -32,8 +33,8 @@ function dockLabel(parent: THREE.Object3D, title: string, subtitle: string, widt
 function poolMaterial(streaks = false) {
   const { canvas, context } = canvas2d(64, 64);
   const glaze = context.createRadialGradient(32, 32, 1, 32, 32, 32);
-  glaze.addColorStop(0, 'rgba(255,181,91,.84)');
-  glaze.addColorStop(0.40, 'rgba(254,143,53,.49)');
+  glaze.addColorStop(0, streaks ? 'rgba(255,181,91,.53)' : 'rgba(255,181,91,.84)');
+  glaze.addColorStop(0.40, streaks ? 'rgba(254,143,53,.26)' : 'rgba(254,143,53,.49)');
   glaze.addColorStop(1, 'rgba(220,111,25,0)');
   context.fillStyle = glaze;
   context.fillRect(0, 0, 64, 64);
@@ -46,7 +47,7 @@ function poolMaterial(streaks = false) {
       const y = 32 + Math.sin(angle) * radius * 0.78;
       const alpha = (1 - radius / 29) * (0.2 + rng() * 0.59);
       context.fillStyle = `rgba(255,204,141,${alpha})`;
-      context.fillRect(x, y, 0.7 + rng() * 3.6, 0.45 + rng() * 0.9);
+      context.fillRect(x, y, 0.8 + rng() * 4.1, 0.32 + rng() * 0.72);
     }
   }
   return new THREE.MeshBasicMaterial({ map: texture(canvas), transparent: true, depthWrite: false,
@@ -73,6 +74,50 @@ function tirePile(parent: THREE.Object3D, x: number, y: number, z: number, heigh
   }
 }
 
+function grateMaterial() {
+  const { canvas, context } = canvas2d(64, 64);
+  context.strokeStyle = '#a5a9a1';
+  context.lineWidth = 2.4;
+  for (let i = -64; i < 128; i += 16) {
+    context.beginPath();
+    context.moveTo(i, 0);
+    context.lineTo(i + 64, 64);
+    context.moveTo(i, 0);
+    context.lineTo(i - 64, 64);
+    context.stroke();
+  }
+  const map = texture(canvas);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(7, 2);
+  return new THREE.MeshStandardMaterial({ map, color: 0xb5b3a1, metalness: 0.25, roughness: 0.72, alphaTest: 0.36,
+    side: THREE.DoubleSide });
+}
+
+function boxServiceFence(parent: THREE.Group, course: Course, material: THREE.Material) {
+  for (const [s, face, ring] of [[course.pit.stalls[0] - 9, -1, true], [course.pit.stalls[3] + 9, 1, false]] as const) {
+    const road = course.sampleAt(s);
+    const at = diqueEdge(course, road, course.pit.stationOffset - 3.52);
+    if (!diqueRoadClear(course, at.x, at.z + 0.77, 2.28)) continue;
+    const fence = new THREE.Group();
+    fence.position.set(at.x, DIQUE_GROUND, at.z + 0.77);
+    fence.rotation.y = Math.atan2(-road.dz, road.dx);
+    parent.add(fence);
+    diquePart(fence, new THREE.PlaneGeometry(5.12, 1.62), material).position.y = 1.08;
+    for (const x of [-2.61, -0.06, 2.61]) box(fence, galvanized, x, 1.08, 0, 0.12, 1.79, 0.12, false);
+    for (const y of [0.27, 1.96]) box(fence, zinc, 0, y, 0, 5.25, 0.062, 0.063, false);
+    if (ring) {
+      const red = standard(0xbc392c, 0.56, 0.08);
+      diquePart(fence, lifeRing, red).position.set(-0.83, 1.28, 0.14);
+      for (const angle of [0, 2.094, 4.188]) {
+        const tape = box(fence, zinc, -0.83 + Math.cos(angle) * 0.52, 1.28 + Math.sin(angle) * 0.52, 0.226,
+          0.18, 0.12, 0.028, false);
+        tape.rotation.z = angle;
+      }
+    }
+    for (const x of [-1.36, -0.54, 0.21]) barrel(fence, face < 0 ? blue : oxide, x + face * 3.45, 0, -1.36);
+  }
+}
+
 function garage(parent: THREE.Group, course: Course, concrete: THREE.Material, where: number, number: number,
   light: THREE.Material, pool: THREE.Material, shadow: THREE.Material, model?: THREE.Object3D) {
   const p = course.sampleAt(where);
@@ -85,10 +130,19 @@ function garage(parent: THREE.Group, course: Course, concrete: THREE.Material, w
   const width = model ? 12.55 : 9.75;
   const depth = 5.8;
   dockLabel(bay, `BOX ${String(number).padStart(2, '0')}`, '', 2.40, 3.043, 4.119);
-  const glow = diquePart(bay, new THREE.PlaneGeometry(width - 0.71, 6.53).rotateX(-Math.PI / 2), pool);
-  glow.position.set(0, model ? 0.924 : 0.957, 0.67);
-  const rearGlow = diquePart(bay, new THREE.PlaneGeometry(10.5, 3.15), pool);
-  rearGlow.position.set(0, 2.15, -2.58);
+  const glow = diquePart(bay, new THREE.PlaneGeometry(width - 0.71, 6.78).rotateX(-Math.PI / 2), pool);
+  glow.position.set(0, model ? 0.924 : 0.957, 0.81);
+  diquePart(bay, new THREE.PlaneGeometry(10.5, 3.15), pool).position.set(0, 2.15, -2.58);
+  for (const side of [-1, 1]) {
+    const jamb = diquePart(bay, new THREE.PlaneGeometry(2.35, 2.63).rotateY(side * -Math.PI / 2), pool);
+    jamb.position.set(side * 5.20, 2.12, 1.08);
+    box(bay, iron, side * 4.93, 0.93, 3.17, 0.24, 0.15, 0.12, false);
+    round(bay, amber, side * 4.93, 1.18, 3.17, 0.074, 0.56);
+  }
+  if (number % 2 === 0) {
+    round(bay, oxide, -4.50, 1.20, 2.53, 0.15, 0.57);
+    round(bay, iron, -4.50, 1.49, 2.53, 0.10, 0.071);
+  }
   const floorContact = diquePart(bay, new THREE.PlaneGeometry(width + 0.5, depth + 0.9).rotateX(-Math.PI / 2), shadow);
   floorContact.position.set(0, 0.014, -0.17);
   if (model) {
@@ -177,6 +231,9 @@ function serviceYards(parent: THREE.Group, course: Course, concrete: THREE.Mater
     const yard = new THREE.Group();
     yard.position.set(at.x, DIQUE_GROUND, at.z);
     yard.rotation.y = 0.06 * (rng() - 0.5);
+    if ((i === 6 || i === 7 || i === 9) && diqueRoadClear(course, at.x, at.z, 5.05)) {
+      yard.scale.setScalar(1.31);
+    }
     parent.add(yard);
     box(yard, concrete, 0, 0.076, 0, 5.80, 0.15, 4.35, false);
     for (let j = 0; j < 4; j++) barrel(yard, [oxide, blue, iron][(j + i) % 3],
@@ -242,7 +299,7 @@ function craneFallback(parent: THREE.Group) {
   parent.add(hook);
 }
 
-function craneSite(parent: THREE.Group, course: Course, concrete: THREE.Material, lamp: THREE.Material) {
+function craneSite(parent: THREE.Group, course: Course, concrete: THREE.Material, lamp: THREE.Material, pool: THREE.MeshBasicMaterial) {
   const { x, z } = diquePlanPoint(233, 134.0);
   const base = new THREE.Group();
   base.name = 'Grúa del muelle';
@@ -250,32 +307,49 @@ function craneSite(parent: THREE.Group, course: Course, concrete: THREE.Material
   parent.add(base);
   const pad = new THREE.CylinderGeometry(6.68, 6.96, 0.75, 26);
   diquePart(base, pad, concrete, true).position.y = 0.36;
-  round(base, iron, 0, 0.743, 0, 5.08, 0.058);
+  const foundation = standard(0x66635a, 0.84, 0.03);
+  round(base, foundation, 0, 0.743, 0, 5.54, 0.058);
   const puddle = new THREE.MeshPhysicalMaterial({ color: 0x243641, roughness: 0.22, clearcoat: 0.86,
-    clearcoatRoughness: 0.14, polygonOffset: true, polygonOffsetFactor: -1 });
+    clearcoatRoughness: 0.14, transparent: true, opacity: 0.63, depthWrite: false,
+    alphaMap: pool.map, polygonOffset: true, polygonOffsetFactor: -1 });
   for (const [x, z, w, h] of [[4.1, 2.14, 1.65, 1.1], [-3.1, 3.1, 1.65, 0.79], [-2.4, -2.1, 2.9, 0.92]]) {
     const slick = diquePart(base, new THREE.CircleGeometry(1, 13).rotateX(-Math.PI / 2), puddle);
     slick.position.set(x, 0.786, z);
     slick.scale.set(w, 1, h);
   }
-  for (let i = 0; i < 11; i++) {
-    const angle = i * Math.PI * 2 / 11 + 0.17;
+  const profile = new THREE.Shape();
+  profile.moveTo(-0.40, 0);
+  profile.lineTo(0.40, 0);
+  profile.lineTo(0.40, 0.21);
+  profile.lineTo(0.22, 0.90);
+  profile.lineTo(-0.22, 0.90);
+  profile.lineTo(-0.40, 0.21);
+  profile.closePath();
+  const barrier = new THREE.ExtrudeGeometry(profile, { depth: 1.66, bevelEnabled: true, bevelSegments: 1,
+    bevelSize: 0.044, bevelThickness: 0.039, curveSegments: 3 }).translate(0, 0, -0.83);
+  const concreteBarrier = standard(0xb6aa95, 0.81, 0.01);
+  for (let i = 0; i < 14; i++) {
+    if (i === 8 || i === 9) continue;
+    const angle = i * Math.PI * 2 / 14 + 0.17;
     const offsetX = Math.cos(angle) * 6.78;
     const offsetZ = Math.sin(angle) * 6.78;
-    if (!diqueRoadClear(course, x + offsetX, z + offsetZ, 0.68)) continue;
-    box(base, concrete, offsetX, 0.29, offsetZ, 0.72, 0.59, 1.57).rotation.y = -angle;
+    if (!diqueRoadClear(course, x + offsetX, z + offsetZ, 0.96)) continue;
+    const block = diquePart(base, barrier, i % 3 === 1 ? concrete : concreteBarrier, true);
+    block.position.set(offsetX, 0.02, offsetZ);
+    block.rotation.y = -angle;
   }
   const crane = new THREE.Group();
   crane.name = 'Grúa de celosía';
   crane.position.y = 0.78;
-  crane.rotation.y = -0.94;
-  crane.scale.set(1.10, 1.35, 1.10);
+  crane.rotation.y = 1.90;
+  crane.scale.set(1.16, 1.72, 1.10);
   base.add(crane);
   const placeholder = new THREE.Group();
   crane.add(placeholder);
   craneFallback(placeholder);
   round(base, iron, 4.91, 1.10, 3.63, 0.26, 0.90);
   round(base, lamp, 4.91, 1.57, 3.63, 0.23, 0.12);
+  diquePart(base, new THREE.PlaneGeometry(5.4, 4.3).rotateX(-Math.PI / 2), pool).position.set(4.73, 0.796, 2.72);
   const plate = new THREE.Group();
   plate.position.set(3.2, 0.98, 4.98);
   base.add(plate);
@@ -284,34 +358,66 @@ function craneSite(parent: THREE.Group, course: Course, concrete: THREE.Material
   return { crane, placeholder };
 }
 
-function pumpingStation(parent: THREE.Group, concrete: THREE.Material, glass: THREE.Material) {
-  const { x, z } = diquePlanPoint(135.6, 32.9);
+function pumpingStation(parent: THREE.Group, concrete: THREE.Material, glass: THREE.Material, pool: THREE.Material) {
+  const { x, z } = diquePlanPoint(225, 27.5);
   const house = new THREE.Group();
   house.position.set(x, DIQUE_GROUND, z);
   house.rotation.y = -0.08;
   parent.add(house);
-  box(house, concrete, 0, 1.64, 0, 22.6, 3.26, 11.95);
-  box(house, galvanized, 0, 3.32, 0, 22.86, 0.18, 12.13);
-  box(house, concrete, -3.04, 4.86, -0.57, 11.54, 2.99, 5.82);
-  box(house, iron, -3.04, 6.53, -0.67, 12.20, 0.33, 6.41).rotation.x = -0.10;
-  for (let x = -8.94; x < 2.93; x += 0.187) box(house, galvanized, x, 6.69, -0.67, 0.096, 0.12, 6.37, false).rotation.x = -0.10;
+  box(house, concrete, 0, 2.19, 0, 28.8, 4.38, 13.70);
+  box(house, galvanized, 0, 4.42, 0, 29.02, 0.19, 13.89);
+  for (let x = -12.95; x <= 13; x += 4.3) {
+    box(house, concrete, x, 2.22, 6.91, 0.37, 4.42, 0.42);
+    for (const y of [0.4, 2.44]) box(house, iron, x + 0.65, y, 6.866, 0.36, 0.51, 0.057, false);
+  }
+  const shed = new THREE.Group();
+  shed.position.set(0, 1.09, -0.21);
+  house.add(shed);
+  box(shed, concrete, -3.04, 4.86, -0.57, 11.54, 2.99, 5.82);
+  for (let x = -8.73; x < 2.75; x += 0.37) box(shed, galvanized, x, 4.89, 2.348, 0.095, 2.86, 0.073, false);
+  box(shed, iron, -3.04, 6.53, -0.67, 12.20, 0.33, 6.41).rotation.x = -0.10;
+  for (let x = -8.94; x < 2.93; x += 0.218) box(shed, blue, x, 6.69, -0.67, 0.107, 0.12, 6.37, false).rotation.x = -0.10;
   for (const x of [-6.68, -3.83]) {
-    box(house, iron, x, 4.82, 2.38, 2.18, 1.39, 0.10, false);
-    box(house, glass, x, 4.84, 2.445, 1.97, 1.19, 0.041, false);
-    for (const divider of [-0.30, 0.31]) box(house, iron, x + divider, 4.84, 2.473, 0.052, 1.18, 0.045, false);
+    box(shed, iron, x, 4.82, 2.45, 2.18, 1.39, 0.10, false);
+    box(shed, glass, x, 4.84, 2.532, 1.97, 1.19, 0.041, false);
+    for (const divider of [-0.30, 0.31]) box(shed, iron, x + divider, 4.84, 2.555, 0.052, 1.18, 0.045, false);
+    box(shed, iron, x, 4.82, 2.555, 1.97, 0.065, 0.045, false);
   }
-  box(house, iron, -0.66, 4.52, 2.42, 1.64, 2.35, 0.15, false);
+  box(shed, iron, -0.66, 4.52, 2.45, 1.64, 2.35, 0.15, false);
+  box(shed, zinc, -0.18, 4.37, 2.55, 0.17, 0.052, 0.041, false);
   const sign = new THREE.Group();
-  sign.position.x = 6.33;
+  sign.position.x = 7.33;
   house.add(sign);
-  dockLabel(sign, 'VERTEDERO', 'CONTROL DE COMPUERTAS', 5.32, 6.067, 2.50);
-  for (let i = 0; i < 15; i++) box(house, amber, 3.3 + i * 0.44, 3.23 - i * 0.215, 4.1, 0.56, 0.105, 1.53, false);
-  for (const edge of [-1, 1]) {
-    diqueBeam(house, amber, new THREE.Vector3(3.17, 4.17, 4.1 + edge * 0.76), new THREE.Vector3(9.69, 1.18, 4.1 + edge * 0.76), 0.088, 0.087);
-    for (let i = 0; i < 4; i++) box(house, amber, 3.3 + i * 2.08, 3.71 - i * 1.018, 4.1 + edge * 0.76, 0.094, 0.94, 0.091, false);
+  dockLabel(sign, 'VERTEDERO', 'CONTROL DE COMPUERTAS', 5.32, 7.131, 2.85);
+  const stairStart = 1.18;
+  const stairEnd = 12.67;
+  const stairDepth = 7.92;
+  box(house, iron, stairStart - 1.33, 4.41, stairDepth - 0.43, 2.78, 0.22, 2.92);
+  for (let i = 0; i < 18; i++) {
+    box(house, amber, stairStart + i * (stairEnd - stairStart) / 17, 4.38 - i * 0.247, stairDepth, 0.72, 0.105, 1.72, false);
   }
-  for (const x of [3.0, 5.9, 8.8]) barrel(house, x > 7 ? oxide : blue, x, 3.45, -3.55);
-  pallet(house, -0.25, 3.41, 4.29);
+  for (const edge of [-1, 1]) {
+    const z = stairDepth + edge * 0.88;
+    diqueBeam(house, iron, new THREE.Vector3(stairStart, 4.25, z), new THREE.Vector3(stairEnd, -0.04, z), 0.105, 0.18);
+    diqueBeam(house, amber, new THREE.Vector3(stairStart, 5.52, z), new THREE.Vector3(stairEnd, 1.24, z), 0.088, 0.087);
+    for (let i = 0; i < 5; i++) {
+      box(house, amber, THREE.MathUtils.lerp(stairStart, stairEnd, i / 4), 5.0 - i * 1.045, z, 0.094, 1.02, 0.091, false);
+    }
+  }
+  for (const x of [-14.1, -11, -8, -5, -2, 4, 7, 10, 14.1]) {
+    box(house, galvanized, x, 5.0, 6.59, 0.12, 1.15, 0.11, false);
+  }
+  for (const y of [4.80, 5.53]) {
+    box(house, iron, -8.0, y, 6.59, 12.20, 0.075, 0.077, false);
+    box(house, iron, 8.8, y, 6.59, 10.7, 0.075, 0.077, false);
+  }
+  for (const x of [3.0, 5.9, 8.8]) barrel(house, x > 7 ? oxide : blue, x, 4.51, -3.55);
+  for (const x of [-11.8, -10.9, -9.98]) barrel(house, x < -11 ? oxide : blue, x, 0.055, 7.79);
+  pallet(house, -0.25, 4.54, 4.29);
+  const upperGlow = diquePart(house, new THREE.PlaneGeometry(12.0, 7.4).rotateX(-Math.PI / 2), pool);
+  upperGlow.position.set(-4.23, 4.535, 3.18);
+  const wallGlow = diquePart(house, new THREE.PlaneGeometry(15.4, 4.08), pool);
+  wallGlow.position.set(-5.5, 2.13, 7.124);
 }
 
 function brakingBoard(parent: THREE.Group, course: Course, distance: number, side: number, text: string, note: string) {
@@ -342,36 +448,55 @@ function lights(parent: THREE.Group, course: Course) {
     const margin = side * (course.wallHalfAt(s, side) + 1.25);
     const q = diqueEdge(course, p, margin);
     const foot = q.y > 1 ? q.y - 0.11 : DIQUE_GROUND;
-    const height = (i % 3 === 1 ? 5.45 : 4.68) + (q.y < 0.6 ? 0.25 : 0);
+    const tall = i === 3 || i === 4 || i === 7 || i === 8 || i === 10 || i === 12;
+    const height = tall ? 7.55 : 5.36;
     const postTop = foot + height;
     const yaw = Math.atan2(p.x - q.x, p.z - q.z);
-    box(parent, iron, q.x, foot + 0.13, q.z, 0.81, 0.30, 0.82);
-    box(parent, amber, q.x, foot + height / 2, q.z, 0.12, height, 0.14);
+    box(parent, iron, q.x, foot + 0.13, q.z, 0.93, 0.30, 0.82);
+    const tower = new THREE.Group();
+    tower.position.set(q.x, foot, q.z);
+    tower.rotation.y = yaw;
+    parent.add(tower);
+    if (tall) {
+      for (const x of [-0.16, 0.16]) box(tower, amber, x, height / 2, 0, 0.081, height, 0.108);
+      for (let rung = 0.48; rung < height - 0.35; rung += 0.62) {
+        box(tower, amber, 0, rung, 0.008, 0.34, 0.059, 0.086, false);
+        const brace = box(tower, galvanized, 0, rung + 0.31, 0.012, 0.046, 0.68, 0.048, false);
+        brace.rotation.z = Math.floor(rung / 0.62) % 2 ? 0.42 : -0.42;
+      }
+    } else box(tower, amber, 0, height / 2, 0, 0.19, height, 0.15);
     const head = new THREE.Group();
     head.position.set(q.x, postTop, q.z);
     head.rotation.set(-0.38, yaw, 0, 'YXZ');
+    head.scale.setScalar(tall ? 1.54 : 1.29);
     parent.add(head);
     box(head, iron, 0, 0, 0, 1.46, 0.68, 0.22);
     for (const y of [-0.155, 0.155]) for (const x of [-0.44, 0, 0.44]) {
       box(head, zinc, x, y, 0.129, 0.39, 0.26, 0.081, false);
       box(head, glass, x, y, 0.173, 0.31, 0.194, 0.045, false);
     }
-    // Use a wrapped high-resolution strip for the fixture beside the finish line.
-    const samples = s < 5.6 ? Array.from({ length: 29 }, (_, j) => ({ ...course.sampleAt(s - 5.6 + j * 0.4), s: s - 5.6 + j * 0.4 }))
-      : diqueSpan(course, s - 5.6, s + 5.6);
+    // Sample across the wrap near the finish, with an asymmetric footprint under the lens.
+    const poolLength = tall ? 14.2 : 10.4;
+    const from = s - poolLength * 0.43;
+    const to = from + poolLength;
+    const samples = from < 0 ? Array.from({ length: 31 }, (_, j) => ({ ...course.sampleAt(from + j * poolLength / 30), s: from + j * poolLength / 30 }))
+      : diqueSpan(course, from, to);
     const projection = (p: typeof samples[number], sign: number) => diqueEdge(course, p, sign * course.roadHalfAt(p.s), 0.018);
     const floor = diqueStrip(samples, p => projection(p, -1), p => projection(p, 1), 'longitudinal');
     const uv = floor.getAttribute('uv');
-    for (let j = 0; j < uv.count; j++) uv.setX(j, (samples[Math.floor(j / 2)].s - s) / 11.2 + 0.5);
+    for (let j = 0; j < uv.count; j++) {
+      const downtrack = (samples[Math.floor(j / 2)].s - from) / poolLength;
+      uv.setXY(j, downtrack + (j % 2 ? -0.08 : 0.08) * side, j % 2 ? 0.93 : 0.07);
+    }
     diquePart(parent, floor, glow);
     if (i === 0 || i === 4 || i === 7 || i === 10 || i === 12) {
       const haze = new THREE.Sprite(halo);
       haze.position.set(0, 0.01, 0.29);
-      haze.scale.set(2.8, 1.45, 1);
+      haze.scale.set(2.6, 1.12, 1);
       head.add(haze);
       const actual = new THREE.SpotLight(0xffb267, 21, 14.4, 0.58, 0.75, 2);
       actual.position.set(q.x, postTop, q.z);
-      actual.target.position.copy(diqueEdge(course, p, 0.25 * side));
+      actual.target.position.copy(diqueEdge(course, p, -0.42 * side));
       actual.layers.set(sceneryLights);
       parent.add(actual, actual.target);
       poles.push(actual);
@@ -388,11 +513,12 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   const service = new THREE.Group();
   parent.add(service);
   course.pit.stalls.forEach((s, i) => garage(service, course, concrete, s, i + 1, lamp, garageGlow, shadow, garageModel));
+  boxServiceFence(service, course, grateMaterial());
   if (garageModel) instanceStatic(service);
-  const crane = craneSite(parent, course, concrete, lamp);
+  const crane = craneSite(parent, course, concrete, lamp, garageGlow);
   containers(parent, course);
   serviceYards(parent, course, concrete);
-  pumpingStation(parent, concrete, lamp);
+  pumpingStation(parent, concrete, lamp, garageGlow);
   for (const [s, side, text, note] of [[125, 1, '100', 'GRÚA'], [141, 1, '50', 'GRÚA'],
     [222, 1, 'CHICANA', 'CONTENEDORES'], [335, -1, 'PUENTE', 'NIVEL ALTO'], [476, 1, 'FRENÁ', 'VERTEDERO'],
     [574, -1, 'TÚNEL', 'CARRIL BAJO'], [640, 1, 'MALECÓN', 'DOS CURVAS'], [20, -1, 'BOXES', 'DESPACIO']] as const) {
@@ -401,12 +527,12 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   return {
     ...crane,
     setNight(enabled: boolean) {
-      for (const light of poles) light.intensity = enabled ? 124 : 54;
-      glow.opacity = enabled ? 0.87 : 0.49;
+      for (const light of poles) light.intensity = enabled ? 181 : 81;
+      glow.opacity = enabled ? 0.83 : 0.56;
       garageGlow.opacity = enabled ? 0.95 : 0.75;
       halo.opacity = enabled ? 0.52 : 0.29;
-      bulb.emissiveIntensity = enabled ? 3.7 : 2.48;
-      lamp.emissiveIntensity = enabled ? 3.05 : 1.92;
+      bulb.emissiveIntensity = enabled ? 4.2 : 2.8;
+      lamp.emissiveIntensity = enabled ? 3.35 : 2.26;
     },
   };
 }

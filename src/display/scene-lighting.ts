@@ -160,26 +160,26 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     // A single shadow-casting key is shared by all views of a given frame.
     if (night) key.position.set(-12.0, 24.0, -17.0);
     else key.position.set(close ? -19.1 : -17.7, close ? 16.7 : 24.8, close ? 13.0 : -8.2);
-    if (dique) key.position.multiplyScalar(5.2);
+    if (dique) key.position.set(night ? -20 : -24, close ? 26 : 31, close ? 28 : 33).multiplyScalar(5.2);
     key.position.add(lightCenter);
     key.target.position.copy(lightCenter);
-    key.color.setHex(dique ? (night ? 0xa2bbef : 0xc1d1f0) : (night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9));
-    key.intensity = dique ? (night ? 0.96 : close ? 2.48 : 2.16) : (night ? 0.78 : close ? 3.10 : 2.94);
+    key.color.setHex(dique ? (night ? 0xc3cce4 : 0xd7d8df) : (night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9));
+    key.intensity = dique ? (night ? 1.86 : close ? 2.58 : 2.43) : (night ? 0.78 : close ? 3.10 : 2.94);
     fill.position.set(20.8, 11.5, close ? -7.2 : 13.7).add(lightCenter);
     fill.target.position.copy(lightCenter);
     fill.color.setHex(night ? 0x819ed4 : 0xe1eaff);
-    fill.intensity = night ? 0.28 : close ? 0.49 : 0.66;
+    fill.intensity = dique ? (night ? 0.39 : 0.70) : (night ? 0.28 : close ? 0.49 : 0.66);
     bounce.color.setHex(dique ? 0xaabfd9 : night ? 0x94acd3 : 0xffe9d7);
     bounce.groundColor.setHex(night ? 0x5a4045 : 0x4d4d54);
-    bounce.intensity = dique ? (night ? 0.30 : 0.44) : (night ? 0.24 : close ? 0.23 : 0.42);
+    bounce.intensity = dique ? (night ? 0.48 : 0.51) : (night ? 0.24 : close ? 0.23 : 0.42);
     benchLight.intensity = night ? 187 : 277;
     toolLight.intensity = night ? 164 : 254;
     for (const { light, day } of trackLamps) light.intensity = day * (night ? 3.8 : 1);
     if (finish && night) finish.intensity *= 1.30;
     for (const material of diffusers) material.emissiveIntensity = night ? 3.65 : 2.18;
     for (const material of halos) material.opacity = night ? 0.95 : 0.59;
-    scene.environmentIntensity = night ? 0.19 : close ? 0.42 : 0.38;
-    renderer.toneMappingExposure = night ? 1.01 : close ? 1.015 : 1.075;
+    scene.environmentIntensity = dique ? (night ? 0.38 : 0.48) : (night ? 0.19 : close ? 0.42 : 0.38);
+    renderer.toneMappingExposure = dique ? (night ? 1.10 : 1.06) : (night ? 1.01 : close ? 1.015 : 1.075);
     scene.background = night ? nightBackground : dique ? harborBackground : dayBackground;
     scene.backgroundIntensity = dayBackgroundIntensity * (night ? 0.64 : 1);
     if (!lowQuality) {

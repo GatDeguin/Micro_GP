@@ -21,7 +21,7 @@ import { buildRaceResults } from './results';
 import { buildSafetyBarriers } from './safety-barriers';
 import { buildSceneLighting } from './scene-lighting';
 import { readAudioSettings, readQuality } from './settings';
-import { buildPlacard, buildRaceSigns, placardLayout } from './signs';
+import { buildPlacard, buildRaceSigns, overviewPlacardLimit, placardLayout } from './signs';
 import { startSolo } from './solo';
 import { SnapshotClock } from './snapshot-clock';
 import { approachingCover } from './track-cover';
@@ -70,12 +70,13 @@ function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
   const target = new THREE.Vector3(-1.1, 0.11, -0.6);
   if (dique) {
     new THREE.Box3().setFromPoints(deck).getCenter(target);
-    target.z += 11;
+    target.z += 17.4;
   }
-  const eyeDirection = (dique ? new THREE.Vector3(-0.065, 0.717, 0.73) : new THREE.Vector3(-0.338, 0.779, 0.625)).normalize();
+  const eyeDirection = (dique ? new THREE.Vector3(0, 0.788, 0.616) : new THREE.Vector3(-0.338, 0.779, 0.625)).normalize();
+  const reservesPlacard = !dique || !pages;
   const point = new THREE.Vector3();
   return (width: number, height: number) => {
-    const qr = placardLayout(width, height);
+    const qr = placardLayout(width, height, overviewPlacardLimit(course));
     const qrLeft = 2 * (qr.left - 11) / width - 1;
     const qrTop = 1 - 2 * (qr.top - 11) / height;
     camera.near = dique ? 10 : 0.3;
@@ -85,7 +86,7 @@ function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
       camera.position.copy(target).addScaledVector(eyeDirection, distance);
       camera.lookAt(target);
       // The oblique view exposes the flanks while keeping the finish straight level.
-      camera.rotateZ(dique ? 0.011 : 0.383);
+      if (!dique) camera.rotateZ(0.383);
       camera.updateMatrixWorld();
     };
 
@@ -100,13 +101,13 @@ function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
       position(distance);
       const clips = deck.some(bounds => {
         point.copy(bounds).project(camera);
-        return Math.abs(point.x) > 0.986 || point.y < -0.80;
+        return Math.abs(point.x) > 0.986 || point.y < (dique ? -0.86 : -0.80);
       }) || fence.some(bounds => {
         point.copy(bounds).project(camera);
-        return Math.abs(point.x) > 0.991 || point.y > 0.827;
+        return Math.abs(point.x) > 0.991 || point.y > (dique ? 0.912 : 0.827);
       }) || road.some(bounds => {
         point.copy(bounds).project(camera);
-        return Math.abs(point.x) > 0.966 || (point.x > qrLeft && point.y < qrTop);
+        return Math.abs(point.x) > 0.966 || (reservesPlacard && point.x > qrLeft && point.y < qrTop);
       });
       if (clips) near = distance;
       else far = distance;
@@ -206,7 +207,7 @@ async function bootstrap() {
     height = Math.max(1, canvas.clientHeight);
     resizeBuffer();
     fit(width, height);
-    placard.resize(camera, width, height);
+    placard.resize(camera, width, height, undefined, overviewPlacardLimit(stage.course));
   }
   resize();
   renderer.shadowMap.autoUpdate = false;
@@ -521,7 +522,7 @@ async function bootstrap() {
         lightShot(false);
         renderer.shadowMap.needsUpdate = true;
         replayShot?.stop();
-        placard.resize(camera, width, height);
+        placard.resize(camera, width, height, undefined, overviewPlacardLimit(stage.course));
       }
       listener = renderViews(scene, mode, interpolated, slots, width, height, dt);
     }

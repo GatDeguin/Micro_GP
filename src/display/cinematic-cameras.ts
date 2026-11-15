@@ -17,6 +17,9 @@ const dique = [
 
 export function cinematicStation(s: number, course: Course = TALLER) {
   if (approachingCover(s, 4, course) > 0.08) return undefined;
+  if (course.id === 'dique' && s >= 636 && s <= 646) {
+    return { id: 'tunnel-outfall', at: 640, range: 6, x: -22.5, y: 3.3, z: -70.9 };
+  }
   const stations = course.id === 'dique' ? dique : taller;
   let best = 1;
   let selected: (typeof stations)[number] | undefined;
