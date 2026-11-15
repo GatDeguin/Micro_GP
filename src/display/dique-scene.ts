@@ -4,6 +4,7 @@ import type { Course } from '../shared/courses';
 import type { RaceSnapshot } from '../shared/protocol';
 import { instanceStatic, mergeStatic } from './batches';
 import { buildCompactScenery } from './compact-scenery';
+import { buildDiqueArchitecture } from './dique-architecture';
 import { buildDiqueCargoShip } from './dique-cargo-ship';
 import { buildDiqueCraneActivity } from './dique-crane-activity';
 import { buildDiqueHarbor, buildDiqueTunnel } from './dique-harbor';
@@ -23,9 +24,10 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
     });
     return scene;
   }).catch(() => undefined);
-  const [crane, kit] = await Promise.all([
+  const [crane, kit, buildings] = await Promise.all([
     load(new URL('./assets/dique-grua.glb', import.meta.url)),
     load(new URL('./assets/dique-infraestructura.glb', import.meta.url)),
+    load(new URL('./assets/dique-edificios.glb', import.meta.url)),
   ]);
   const bridge = ['Puente_1', 'Puente_2', 'Puente_3'].map(name => kit?.getObjectByName(name));
   const garage = kit?.getObjectByName('Box');
@@ -45,6 +47,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   const tunnel = buildDiqueTunnel(infrastructure, course, concrete);
   const equipment = buildDiqueProps(props, course, concrete, garage);
   const terminal = buildDiqueTerminal(props, freight, course, concrete);
+  const architecture = buildDiqueArchitecture(props, course, concrete, buildings);
 
   if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, equipment.crane]));
   mergeStatic(dock, new Set([harbor.backWall]), 45);
@@ -64,6 +67,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       tunnel.setNight(night);
       equipment.setNight(night);
       terminal.setNight(night);
+      architecture.setNight(night);
       ship.setNight(night);
       yard.setNight(night);
       craneActivity?.setNight?.(night);

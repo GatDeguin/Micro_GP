@@ -291,7 +291,7 @@ function serviceStores(parent: THREE.Group, course: Course) {
   }
   const contacts: THREE.Vector3[] = [];
   for (const [px, pz, height] of [[40, 139, 4], [43.3, 139, 3], [106, 137, 4],
-    [110, 138, 5], [114, 138, 2], [222, 98, 5], [225, 101, 3], [108, 37, 4]]) {
+    [110, 138, 5], [114, 138, 2], [222, 98, 5], [225, 101, 3], [50.7, 95.8, 4]]) {
     const { x, z } = diquePlanPoint(px, pz);
     if (!diqueRoadClear(course, x, z, 1.05)) continue;
     box(parent, wood, x, floor + 0.032, z, 1.37, 0.063, 1.37, false);

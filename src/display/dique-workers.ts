@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { diquePlanPoint, type Course } from '../shared/courses.ts';
 import type { RaceSnapshot } from '../shared/protocol.ts';
+import { DIQUE_BUILDING_PAD, diqueBuildingPoint, diqueBuildings, type DiqueBuilding } from './dique-architecture-layout';
 import { DIQUE_GROUND, diqueEdge, diqueRoadClear } from './dique-geometry';
 import { freightLane } from './dique-terminal-layout';
 import { standard } from './materials';
@@ -97,6 +98,14 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   const marshal = [0x353946, 0xed711c, 0xf8c18a, 0xe4ab86] as const;
   const workwear = [0x293d49, 0xd6ac36, 0xefc944, 0xae7455] as const;
   const inspector = [0x40545b, 0xa0aa55, 0xe4e7de, 0xd49574] as const;
+  function buildingCrew(site: DiqueBuilding, role: Role, from: number, to: number, inset: number,
+    facing: number, colors: Worker['colors']) {
+    const point = (localX: number) => {
+      const { x, z } = diqueBuildingPoint(site, localX, site.depth / 2 + inset);
+      return new THREE.Vector3(x, DIQUE_GROUND + DIQUE_BUILDING_PAD, z);
+    };
+    add(role, point(from), point(to), facing + site.yaw, colors);
+  }
   for (const [i, stall] of [course.pit.stalls[0], course.pit.stalls[2]].entries()) {
     const point = course.sampleAt(stall + (i ? -0.95 : 0.72));
     const from = diqueEdge(course, point, course.pit.stationOffset - 1.49, -0.026);
@@ -109,7 +118,11 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   add('gate', gate, gate, 0.24, inspector, gateApproach);
 
   add('dock', plan(162.0, 163.35), plan(165.2, 163.35), 0.55, workwear);
-  add('clerk', plan(232.0, 59.0), plan(235.1, 59.55), 2.55, inspector);
+  buildingCrew(diqueBuildings.depot, 'clerk', -3.1, 2.7, 2.09, -0.30, inspector);
+  buildingCrew(diqueBuildings.workshop, 'mechanic', -1.52, -1.52, 0.82, 0.16, mechanic);
+  buildingCrew(diqueBuildings.pumps, 'clerk', 0.55, 1.45, 1.06, 0.49, inspector);
+  buildingCrew(diqueBuildings.station, 'clerk', -0.94, 0.65, 1.03, Math.PI + 0.29, workwear);
+  buildingCrew(diqueBuildings.timing, 'clerk', 0.73, 0.73, 1.04, 0.27, marshal);
   add('rigger', plan(214.2, 137.7), plan(214.6, 139.6), Math.PI / 2, workwear);
   add('clerk', plan(183.0, 136.0), plan(185.0, 136.0), 0.22, workwear);
 
