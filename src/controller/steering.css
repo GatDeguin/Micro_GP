@@ -1,0 +1,85 @@
+.steering {
+  position: relative;
+  display: block;
+  inline-size: min(100%, var(--lever-size));
+  min-inline-size: 64px;
+  min-block-size: 64px;
+  aspect-ratio: .84;
+  border-radius: 34%;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.steering > * { pointer-events: none; }
+.steering:focus-visible { outline: 2px solid #f8dcab; outline-offset: 4px; }
+.steering[aria-disabled="true"] { cursor: default; }
+
+.steering-socket {
+  position: absolute;
+  inset: 30% 1% 0;
+  border: 1px solid #61574a;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 49% 46%, #2f2c27 0 54%, #100e0d 66%, #26221e 69%, #322b24 78%);
+  box-shadow: inset 0 1px 1px #8c7a5e66, inset 0 -2px 3px #070706, 0 4px 0 -1px #0d0b09, 1px 8px 13px #080706bc;
+}
+
+.steering-socket::before {
+  content: "";
+  position: absolute;
+  inset: 7.5%;
+  border-radius: 50%;
+  box-shadow: inset 0 4px 7px #070605, 0 1px 0 #88765865;
+}
+
+.steering-boot {
+  position: absolute;
+  inset: 13% 14% 12%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 49%, #090807 22%, #2d2823 25%, #433b31 34%, #1d1915 45%,
+    #151210 52%, #392f26 61%, #24201b 69%, #0c0b0a 83%);
+  box-shadow: inset 1px 3px 6px #55473767, 0 3px 5px #080706;
+  transform: translateX(calc(var(--steer, 0) * 7%));
+  transition: transform 65ms ease-out;
+}
+
+.steering-arm {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 67%;
+  transform: rotate(calc(var(--steer, 0) * 22deg));
+  transition: transform 65ms ease-out;
+}
+
+.steering-shaft {
+  position: absolute;
+  inset: 34% 39.5% 24%;
+  border-radius: 28% / 14%;
+  background: linear-gradient(0deg, #100e0de8 0%, transparent 34%, #1d18136e 90%),
+    repeating-linear-gradient(0deg, #d5b8980d 0 1px, transparent 1px 3px),
+    linear-gradient(90deg, #15120f 0%, #807056 32%, #655743 50%, #302822 74%, #141110 96%);
+  box-shadow: 4px 5px 7px #070605cf;
+}
+
+.steering-knob {
+  position: absolute;
+  inset: 0 17% auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 37% 24%, #fff0cc 1%, #f5dcad 42%, #ddba83 74%, #b18a56 98%);
+  box-shadow: inset 0 2px 2px #fff9e9bc, inset 0 -4px 6px #78503138, 1px 8px 14px #0c0907ad;
+}
+
+.steering-knob::after {
+  content: "";
+  position: absolute;
+  inset: 14% 17% auto 19%;
+  block-size: 23%;
+  transform: rotate(-18deg);
+  border-radius: 58% 53% 20% 24%;
+  background: linear-gradient(110deg, #fff8e470 0 20%, #fff8e412 22% 49%, #fff9e892 51% 82%, #fff8e438 84%);
+  filter: blur(.35px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .steering-arm, .steering-boot { transition: none; }
+}

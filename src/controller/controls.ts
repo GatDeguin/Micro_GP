@@ -13,7 +13,7 @@ type Controls = { steering: HTMLElement; brake: HTMLButtonElement; gas: HTMLButt
 type Control = keyof Controls;
 type KeyAction = "left" | "right" | "brake" | "gas";
 
-export function bindControls(controls: Controls, canPress: () => boolean, sendEdge: (input: DriveInput) => void) {
+export function bindControls(controls: Controls, canPress: () => boolean, sendEdge?: (input: DriveInput) => void) {
   const pointers = new Map<Control, number>();
   const keys = new Map<string, KeyAction>();
   const { steering, brake, gas } = controls;
@@ -37,7 +37,7 @@ export function bindControls(controls: Controls, canPress: () => boolean, sendEd
     if (next.gas !== input.gas) gas.setAttribute("aria-pressed", String(next.gas));
     const steeringEdge = (input.x === 0) !== (x === 0);
     input = next;
-    if (edge || steeringEdge) sendEdge(input);
+    if (edge || steeringEdge) sendEdge?.(input);
   }
 
   function reset() {

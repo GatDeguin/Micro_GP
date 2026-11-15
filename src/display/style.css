@@ -1,3 +1,5 @@
+@import '../controller/steering.css';
+
 .race-qr {
   position: fixed;
   z-index: 0;
@@ -303,11 +305,20 @@
 @media (any-pointer: coarse) {
   .solo-hint { display: none; }
   .solo-pedals:not([hidden]) {
+    --lever-size: clamp(70px, 20vmin, 88px);
     display: flex;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 0.4rem;
     margin-top: 0.5rem;
   }
-  .solo-pedals > div { display: flex; gap: 0.35rem; }
-  .solo-pedals button { touch-action: none; user-select: none; min-height: 50px; }
+  .solo-pedals > div:last-child { display: flex; gap: 0.35rem; }
+  .solo-pedals :is(.steering, button) {
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .solo-pedals button { min-height: 50px; }
+  .solo-pedals button[aria-pressed="true"] { background: #55402e; }
 }

@@ -1,3 +1,4 @@
+import { bindControls } from '../controller/controls';
 import { CAR_SPECS, COURSE_OPTIONS, isCourseId, normalizeRaceConfig, type CourseId, type DriveInput, type Driver, type Livery, type RaceSnapshot } from '../shared/protocol';
 import { advanceLiveryProgress, bestSectorsFor, LIVERIES, normalizeLiveryProgress, unlockedLiveries } from '../shared/liveries';
 import { Race } from '../sim/race';
@@ -67,13 +68,18 @@ export function startSolo(
       <p class="solo-hint">Flechas o WASD · Cámaras 1 a 4</p>
     </div>
     <div class="solo-pedals" aria-label="Mandos táctiles" hidden>
-      <div>
-        <button type="button" data-action="left" aria-label="Girar a la izquierda">◀</button>
-        <button type="button" data-action="right" aria-label="Girar a la derecha">▶</button>
+      <div class="steering" tabindex="-1" role="slider" aria-label="Giro"
+        aria-orientation="horizontal" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"
+        aria-valuetext="Centro" aria-disabled="true">
+        <span class="steering-socket" aria-hidden="true"><span class="steering-boot"></span></span>
+        <span class="steering-arm" aria-hidden="true">
+          <span class="steering-shaft"></span>
+          <span class="steering-knob"></span>
+        </span>
       </div>
       <div>
-        <button type="button" data-action="brake">Freno</button>
-        <button type="button" data-action="gas">Gas</button>
+        <button type="button" data-action="brake" aria-pressed="false" disabled>Freno</button>
+        <button type="button" data-action="gas" aria-pressed="false" disabled>Gas</button>
       </div>
     </div>`;
   document.body.append(panel);
@@ -102,7 +108,11 @@ export function startSolo(
   const driver: Driver = { owned: false, input };
   const drivers: (Driver | undefined)[] = [];
   const heldKeys = new Set<string>();
-  const heldPointers = new Map<number, Action>();
+  const touch = bindControls({
+    steering: pedals.querySelector<HTMLElement>('.steering')!,
+    brake: pedals.querySelector<HTMLButtonElement>('[data-action=brake]')!,
+    gas: pedals.querySelector<HTMLButtonElement>('[data-action=gas]')!,
+  }, () => driver.owned);
   let elapsed = 0;
   let ticks = 0;
   let phase: RaceSnapshot['phase'] = 'demo';
@@ -177,7 +187,12 @@ export function startSolo(
 
   function resetInput() {
     heldKeys.clear();
-    heldPointers.clear();
+    touch.reset();
+  }
+
+  function showTouch(visible: boolean) {
+    pedals.hidden = !visible;
+    touch.setEnabled(visible);
   }
 
   function start(config: ReturnType<typeof normalizeRaceConfig>, slot: number) {
@@ -194,7 +209,7 @@ export function startSolo(
     showSetup(false);
     prepare.hidden = true;
     toggle.textContent = 'Volver a exhibición';
-    pedals.hidden = false;
+    showTouch(true);
   }
 
   setup.addEventListener('submit', event => {
@@ -216,7 +231,8 @@ export function startSolo(
     race.returnToDemo();
     toggle.textContent = 'Jugar';
     prepare.hidden = false;
-    pit.hidden = practiceNote.hidden = pedals.hidden = unlock.hidden = true;
+    showTouch(false);
+    pit.hidden = practiceNote.hidden = unlock.hidden = true;
   });
   pitCar.addEventListener('change', () => { pitSwap.disabled = Number(pitCar.value) === garage.slot; });
   pitSwap.addEventListener('click', () => {
@@ -249,22 +265,8 @@ export function startSolo(
   addEventListener('pagehide', resetInput);
   document.addEventListener('visibilitychange', resetInput);
 
-  for (const button of pedals.querySelectorAll<HTMLButtonElement>('[data-action]')) {
-    const action = button.dataset.action as Action;
-    button.addEventListener('pointerdown', event => {
-      if (!driver.owned || event.button !== 0) return;
-      event.preventDefault();
-      button.setPointerCapture(event.pointerId);
-      heldPointers.set(event.pointerId, action);
-    });
-    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
-      button.addEventListener(event, pointer => heldPointers.delete(pointer.pointerId));
-    }
-  }
-
   function held(action: Action) {
     for (const key of heldKeys) if (keys.get(key) === action) return true;
-    for (const pointer of heldPointers.values()) if (pointer === action) return true;
     return false;
   }
 
@@ -272,7 +274,7 @@ export function startSolo(
     onState(snapshot, now);
     if (phase !== snapshot.phase) {
       phase = snapshot.phase;
-      pedals.hidden = !driver.owned || phase === 'results';
+      showTouch(driver.owned && phase !== 'results');
       if (phase === 'practice') practiceNote.textContent = 'Entrá al carril interior de boxes y detenete en una plaza para cambiar de auto.';
       practiceNote.hidden = phase !== 'practice';
     }
@@ -313,9 +315,9 @@ export function startSolo(
     advance(dt: number, now?: number) {
       elapsed += dt;
       if (elapsed < step) return;
-      input.x = Number(held('right')) - Number(held('left'));
-      input.gas = held('gas');
-      input.brake = held('brake');
+      input.x = touch.input.x || Number(held('right')) - Number(held('left'));
+      input.gas = touch.input.gas || held('gas');
+      input.brake = touch.input.brake || held('brake');
       while (elapsed >= step) {
         race.step(step, drivers);
         elapsed -= step;
