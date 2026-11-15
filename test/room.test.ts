@@ -167,6 +167,48 @@ test("a host can end free practice and reuse connected seats for the next heat",
   assert.equal(room.lobby().canLaunch, false);
 });
 
+test("the host can opt in to Arcade from the lobby without mixing its records with classic sessions", () => {
+  const room = new Room<string>();
+  room.addDisplay("host", true);
+  room.addDisplay("viewer", false);
+  const player = room.join("phone", undefined, 0)!;
+  const config = { laps: 1, bots: 0, difficulty: "club", mode: "practice", night: false };
+
+  assert.equal(room.lobby().config.arcade, undefined);
+  assert.ok(room.control("viewer", { type: "configure", config: { ...config, arcade: true } }, 0));
+  assert.ok(room.control("host", { type: "configure", config: { ...config, arcade: "true" } }, 0));
+  assert.equal(room.lobby().config.arcade, undefined);
+
+  function start(arcade: boolean) {
+    assert.equal(room.control("host", { type: "configure", config: { ...config, arcade } }, 0), null);
+    assert.equal(room.lobby().config.arcade, arcade ? true : undefined);
+    assert.equal(room.ready(player.slot, "phone", true, 0), null);
+    assert.equal(room.control("host", { type: "launch" }, 0), null);
+    room.receive(player.slot, "phone", { ...accelerate, seq: arcade ? 1 : 2 }, 0);
+    room.step(1 / 60, 0);
+    const snapshot = room.snapshot();
+    assert.equal(snapshot.config?.arcade, arcade ? true : undefined);
+    assert.equal(room.controllerView(player.slot, room.lobby(), snapshot)?.lobby.config.arcade, snapshot.config?.arcade);
+    return snapshot;
+  }
+
+  function practiceRecords(arcade: boolean) {
+    const snapshot = start(arcade);
+    room.recordProgress(snapshot);
+    for (const time of [31, 30]) {
+      const cars = snapshot.cars.map((car, index) => index === player.car
+        ? { ...car, lastLap: time, cleanLap: true, sectorTimes: [time / 4, 8, 8, 8] }
+        : car);
+      room.recordProgress({ ...snapshot, cars });
+    }
+    return room.controllerView(player.slot, room.lobby(), snapshot)?.unlocked;
+  }
+
+  assert.deepEqual(practiceRecords(true), ["original"]);
+  assert.equal(room.control("host", { type: "return" }, 0), null);
+  assert.deepEqual(practiceRecords(false), ["original", "clean", "sector"]);
+});
+
 test("a practice swap requires fresh input before the replacement car moves", () => {
   const room = new Room<string>();
   room.addDisplay("host", true);

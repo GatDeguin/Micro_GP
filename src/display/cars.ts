@@ -703,6 +703,7 @@ export function buildCars(parent: THREE.Object3D) {
         const pitch = -Math.atan(slope);
         const roll = view.suspension?.roll ?? 0;
         const heave = view.suspension?.heave ?? 0;
+        shadow.position.y = -(view.arcade?.jump ?? 0);
         shadow.rotation.x = axles.rotation.x = headlights.rotation.x = pitch;
         shadow.rotation.z = axles.rotation.z = headlights.rotation.z = bankRoll;
         chassis.rotation.x = pitch + (view.suspension?.pitch ?? 0);

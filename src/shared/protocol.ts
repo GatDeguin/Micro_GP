@@ -1,3 +1,5 @@
+import type { ArcadeCarView, ArcadeView } from './arcade.ts';
+
 export const CAR_SPECS = [
   { number: "07", color: "#2DC5D8", name: "Compacto" },
   { number: "21", color: "#EF5546", name: "Cupé" },
@@ -26,6 +28,7 @@ export interface RaceConfig {
   difficulty: Difficulty;
   mode: 'race' | 'practice';
   night: boolean;
+  arcade?: boolean;
 }
 
 export const defaultRaceConfig: RaceConfig = {
@@ -45,6 +48,7 @@ export function normalizeRaceConfig(value: unknown): RaceConfig & { course: Cour
     difficulty: config.difficulty === 'rookie' || config.difficulty === 'pro' ? config.difficulty : 'club',
     mode: config.mode === 'practice' ? 'practice' : 'race',
     night: config.night === true,
+    ...(config.arcade === true ? { arcade: true } : {}),
   };
 }
 
@@ -119,6 +123,7 @@ export interface CarView {
   cleanLap?: boolean;
   sectorTimes?: (number | null)[];
   gap?: number | null;
+  arcade?: ArcadeCarView;
 }
 
 export interface RaceResult {
@@ -136,6 +141,7 @@ export interface RaceSnapshot {
   order: number[];
   cars: CarView[];
   impacts?: RaceImpact[];
+  arcade?: ArcadeView;
   config?: RaceConfig;
   results?: RaceResult[];
   time?: number;

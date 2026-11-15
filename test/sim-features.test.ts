@@ -211,7 +211,7 @@ test('the compact turns sooner while the bólido pulls ahead on a straight', () 
 });
 
 test('each model gains at least ten percent in fifth and can still brake within the straight', () => {
-  const priorTopSpeeds = [12.30, 12.36, 13.38, 12.42];
+  const priorTopSpeeds = [13.70, 13.76, 14.78, 13.82];
   const topSpeeds = priorTopSpeeds.map((previous, slot) => {
     const { race, inputs } = ready(slot);
     let previousTickSpeed = 0;
@@ -223,7 +223,7 @@ test('each model gains at least ten percent in fifth and can still brake within 
     });
     const car = race.snapshot().cars[slot];
     assert.equal(car.transmission?.gear, 5);
-    assert.ok(car.speed <= previous * 1.15, `car ${slot}: ${car.speed}`);
+    assert.ok(car.speed <= previous * 1.12, `car ${slot}: ${car.speed}`);
     assert.ok(car.transmission.rev > 0.85 && car.transmission.rev < 1);
 
     const brake = { owned: true, input: { ...NEUTRAL, brake: true } };
@@ -233,7 +233,7 @@ test('each model gains at least ten percent in fifth and can still brake within 
       return state.cars[slot].speed === 0;
     });
     const stoppedCar = race.snapshot().cars[slot];
-    assert.ok(stoppedCar.distance! - car.distance! < 6.3);
+    assert.ok(stoppedCar.distance! - car.distance! < 7.2);
     return car.speed;
   });
   assert.ok(topSpeeds[2] > Math.max(topSpeeds[0], topSpeeds[1], topSpeeds[3]));

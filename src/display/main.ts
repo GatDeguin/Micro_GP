@@ -10,6 +10,8 @@ import { buildCollectorBackdrop, disposeCollectorBackdrop } from './collector-ba
 import { buildCompactScenery } from './compact-scenery';
 import { frameBudget } from './frame-budget';
 import { buildGrandstands } from './grandstands';
+import { buildImpactSparks } from './impact-sparks';
+import { buildArcadeScene } from './arcade-scene';
 import { buildInfield } from './infield';
 import { buildMultiplayerLobby } from './lobby';
 import { BENCH_SURFACE, plankMap } from './materials';
@@ -38,6 +40,7 @@ type CourseStage = {
   barriers: ReturnType<typeof buildSafetyBarriers>;
   tyreMarks: ReturnType<typeof buildTyreMarks>;
   signs: ReturnType<typeof buildRaceSigns>;
+  arcade?: ReturnType<typeof buildArcadeScene>;
   observe?(snapshot: RaceSnapshot): void;
   update(now: number): void;
   setNight(night: boolean): void;
@@ -174,6 +177,7 @@ async function bootstrap() {
   const { lightShot, setNight, setCourse, restoreReflections } = buildSceneLighting(scene, renderer, lowQuality);
   if (!lowQuality) infield.captureReflections(renderer, scene);
   const cars = buildCars(scene);
+  const impactSparks = buildImpactSparks(scene);
   const placard = buildPlacard(scene, !pages);
   const audioSettings = readAudioSettings();
   const audio = raceAudio(audioSettings);
@@ -245,6 +249,7 @@ async function bootstrap() {
 
   function activateCourse(next: CourseStage) {
     scene.remove(stage.root);
+    impactSparks.reset();
     stage = next;
     scene.add(stage.root);
     // The Dique floodlights have baked pools for the overview and direct beams for closer views.
@@ -490,6 +495,9 @@ async function bootstrap() {
           heave: THREE.MathUtils.lerp(from.suspension.heave, car.suspension.heave, alpha),
         };
       }
+      if (car.arcade && from.arcade) {
+        view.arcade = { ...car.arcade, jump: THREE.MathUtils.lerp(from.arcade.jump, car.arcade.jump, alpha) };
+      }
       const road = view.distance === undefined
         ? course.locate(view.x, view.z, { y: view.y }) : course.sampleAt(view.distance);
       const lateral = (view.z - road.z) * road.dx - (view.x - road.x) * road.dz;
@@ -497,7 +505,11 @@ async function bootstrap() {
       const across = road.dx * Math.cos(yaw) - road.dz * Math.sin(yaw);
       const bank = course.bankAt(road.s);
       const grade = (course.heightAt(road.s + 0.75, lateral) - course.heightAt(road.s - 0.75, lateral)) / 1.5;
-      const slope = grade * along + bank * across;
+      const airChange = (car.arcade?.jump ?? 0) - (from.arcade?.jump ?? 0);
+      const interval = (toState.frame - fromState.frame) / 60;
+      const jumpGrade = airChange !== 0 && interval > 0 && !jump
+        ? THREE.MathUtils.clamp(airChange / (interval * Math.max(4, Math.abs(car.speed))), -0.33, 0.28) : 0;
+      const slope = grade * along + bank * across + jumpGrade;
       const bankRoll = Math.atan(grade * across - bank * along);
       interpolated[i] = view;
       const closeView = mode !== 'general' && slots.length <= 2 && slots.includes(i);
@@ -507,6 +519,15 @@ async function bootstrap() {
       if (moment?.slot === i) focus = view;
       if (partnerSlot === i) partner = view;
     });
+    impactSparks.update({
+      course, from: fromState, to: toState, cars: interpolated, tick, now,
+      replayClip: moment?.clip, reduced: lowQuality || reduceMotion.matches,
+    });
+    if (toState.arcade && !stage.arcade) {
+      stage.arcade = buildArcadeScene(stage.root, course);
+      lastShadow = -Infinity;
+    }
+    stage.arcade?.update(toState, interpolated, tick, dt, !!moment);
     stage.barriers(moment?.from ?? display, tick, dt, !!moment);
     stage.tyreMarks(interpolated, display.heat, !!moment);
     stage.signs.flag(toState.flag, now / 1000);

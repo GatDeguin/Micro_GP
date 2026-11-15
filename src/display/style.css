@@ -248,8 +248,9 @@
   font: inherit;
 }
 
-.solo-setup .solo-night { display: flex; margin: 0.55rem 0; min-height: 38px; }
-.solo-night input { accent-color: #e4bb82; }
+.solo-setup :is(.solo-night, .solo-arcade) { display: flex; min-height: 38px; }
+.solo-setup input[type="checkbox"] { accent-color: #e4bb82; }
+.solo-arcade-hint { margin: 0 0 .55rem 1.45rem; color: #d8bea0; font-size: .75rem; }
 .solo-challenges { margin: 0.35rem 0; color: #d8bea0; font-size: 0.75rem; }
 .solo button:disabled { opacity: 0.5; cursor: default; }
 .solo-practice-note { font-size: 0.78rem; pointer-events: none; }

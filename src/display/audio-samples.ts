@@ -285,6 +285,51 @@ export function buildAudioSamples<T extends MonoBuffer>(context: BufferWriter<T>
       strike(samples, 0.024 + i * 0.005, 509 + i * 53, 1050, 6300, 0.60, 117);
       strike(samples, 0.051 + i * 0.009, 804 + i * 57, 910, 5190, 0.37, 117);
     }),
+    spark: variants(context, [0.128, 0.152, 0.138], 0.61, (samples, i) => {
+      for (let tick = 0; tick < 4; tick++) {
+        strike(samples, 0.012 + tick * (0.012 + i * 0.002), 432 + tick * 97 + i * 83,
+          1460 + tick * 160, 6400, 0.9 ** tick, 163 + tick * 18);
+      }
+    }),
+    arcadeTurbo: variants(context, [0.312, 0.346], 0.66, (samples, i) => {
+      strike(samples, 0, 590 + i, 530, 4900, 0.83, 14);
+      ring(samples, 0.022, 226 + i * 16, 0.49, 10, 630);
+      ring(samples, 0.025, 443 + i * 28, 0.30, 12, 1100);
+      strike(samples, 0.056, 950 + i * 17, 570, 5100, 0.34, 13);
+    }),
+    arcadeShield: variants(context, [0.178, 0.201], 0.62, (samples, i) => {
+      strike(samples, 0, 280 + i * 31, 680, 7600, 0.78, 153);
+      ring(samples, 0.012, 720 + i * 54, 0.59, 38, 92);
+      ring(samples, 0.014, 1410 + i * 36, 0.32, 44, -260);
+      ring(samples, 0.037, 2080 + i * 76, 0.28, 67, -230);
+    }),
+    arcadeDrop: variants(context, [0.118, 0.140], 0.60, (samples, i) => {
+      strike(samples, 0, 260 + i * 75, 350, 4400, 0.85, 141);
+      strike(samples, 0.027 + i * 0.010, 530 + i * 45, 610, 6150, 0.69, 150);
+      ring(samples, 0.03, 390 + i * 78, 0.36, 65, -710);
+    }),
+    arcadeSlip: variants(context, [0.209, 0.240], 0.62, (samples, i) => {
+      strike(samples, 0.011, 432 + i * 57, 920, 2590, 0.79, 19);
+      ring(samples, 0.024, 1020 + i * 90, 0.45, 15, -1800);
+      strike(samples, 0.059, 854 + i * 43, 360, 2650, 0.40, 22);
+    }),
+    arcadeBlast: variants(context, [0.278, 0.293, 0.317], 0.74, (samples, i) => {
+      strike(samples, 0, 342 + i * 89, 340, 6800, 1.02, 74);
+      ring(samples, 0, 142 + i * 13, 0.70, 18, -340);
+      ring(samples, 0.008, 470 + 39 * i, 0.25, 38, -570);
+      strike(samples, 0.024, 621 + i * 48, 190, 2900, 0.59, 17);
+      strike(samples, 0.066, 773 + i * 63, 550, 3740, 0.27, 27);
+    }),
+    arcadeJump: variants(context, [0.159, 0.176], 0.58, (samples, i) => {
+      strike(samples, 0, 291 + i * 82, 310, 3120, 0.99, 95);
+      ring(samples, 0.008, 215 + i * 22, 0.59, 35, 700);
+      ring(samples, 0.016, 440 + i * 20, 0.28, 43, -240);
+    }),
+    arcadeLand: variants(context, [0.144, 0.171], 0.65, (samples, i) => {
+      strike(samples, 0, 452 + i * 41, 163, 2890, 1, 107);
+      ring(samples, 0, 182 + i * 14, 0.61, 49, -470);
+      strike(samples, 0.029, 717 + i * 52, 360, 2100, 0.42, 83);
+    }),
     relay: variants(context, [0.103, 0.118], 0.65, (samples, i) => {
       strike(samples, 0, 912 + i * 91, 1160, 8100, 1.02, 219);
       ring(samples, 0, 730 + 115 * i, 0.41, 171);

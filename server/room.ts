@@ -9,6 +9,7 @@ function validConfig(value: unknown, course: Config["course"]): Config | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Partial<Config>;
   if ("course" in candidate && !isCourseId(candidate.course)) return null;
+  if ("arcade" in candidate && typeof candidate.arcade !== "boolean") return null;
   const config = normalizeRaceConfig({ ...candidate, course: candidate.course ?? course });
   return candidate.laps === config.laps && candidate.bots === config.bots &&
     candidate.difficulty === config.difficulty && candidate.mode === config.mode && candidate.night === config.night
@@ -121,6 +122,7 @@ export class Room<Peer> {
   }
 
   recordProgress(snapshot: RaceSnapshot) {
+    if (this.config.arcade) return;
     if (this.phase === "race" || this.phase === "practice" || this.phase === "results") {
       this.seats.recordLiveryProgress(snapshot.cars, this.drivers, snapshot.config?.course ?? this.config.course);
     }

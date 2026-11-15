@@ -309,10 +309,10 @@ test('the automatic box shifts through fifth with a short torque break', async (
       cutFrames--;
     }
     before = car;
-    if (car.speed >= 13.69) break;
+    if (car.speed >= 15.24) break;
   }
   assert.deepEqual(gears, [1, 2, 3, 4, 5]);
-  assert.ok(before.speed >= 13.69 && before.speed <= 13.70);
+  assert.ok(before.speed >= 15.24 && before.speed <= 15.25);
 });
 
 test('cars at the same map position only touch when their height overlaps', async () => {
@@ -391,7 +391,7 @@ test('a sharp steering input at full pace scrubs speed and turns progressively',
   const stopped = { owned: true, input: NEUTRAL };
   const accelerating = { owned: true, input: { ...NEUTRAL, gas: true } };
   step(race, 3, [stopped, stopped, stopped, stopped]);
-  step(race, 1.8, [accelerating, stopped, stopped, stopped]);
+  runUntil(race, 2.6, [accelerating, stopped, stopped, stopped], () => race.snapshot().cars[0].speed >= 15.24);
   const before = race.snapshot().cars[0];
   step(race, 0.20, [{ owned: true, input: { ...accelerating.input, x: 1 } }, stopped, stopped, stopped]);
   const after = race.snapshot().cars[0];

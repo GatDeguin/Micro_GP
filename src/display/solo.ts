@@ -51,6 +51,8 @@ export function startSolo(
         <label>Librea <select name="livery"></select></label>
         <p data-challenges class="solo-challenges"></p>
         <label class="solo-night"><input name="night" type="checkbox"> Sesión nocturna</label>
+        <label class="solo-arcade"><input name="arcade" type="checkbox" aria-describedby="solo-arcade-hint"> Modo Arcade</label>
+        <p id="solo-arcade-hint" class="solo-arcade-hint">Recogé las cajas para activar su efecto. El aceite y los petardos quedan atrás.</p>
         <button type="submit">Salir a pista</button>
       </form>
       <div class="solo-pit" aria-label="Boxes" hidden>
@@ -90,6 +92,7 @@ export function startSolo(
   const mode = setup.querySelector<HTMLSelectElement>('[name=mode]')!;
   const laps = setup.querySelector<HTMLInputElement>('[name=laps]')!;
   const night = setup.querySelector<HTMLInputElement>('[name=night]')!;
+  const arcade = setup.querySelector<HTMLInputElement>('[name=arcade]')!;
   const bots = setup.querySelector<HTMLSelectElement>('[name=bots]')!;
   const difficulty = setup.querySelector<HTMLSelectElement>('[name=difficulty]')!;
   const challenges = setup.querySelector<HTMLParagraphElement>('[data-challenges]')!;
@@ -119,6 +122,10 @@ export function startSolo(
       return option;
     }));
     livery.value = garage.liveries[slot];
+    if (arcade.checked) {
+      challenges.textContent = 'Los récords y las libreas se consiguen en modo clásico.';
+      return;
+    }
     const clean = progress.clean ? 'Vuelta limpia desbloqueada.' : 'Completá una vuelta limpia.';
     const sector = progress.sector ? 'Récord de sector desbloqueado.'
       : bestSectorsFor(progress, garage.config.course).some(time => time !== null) ? 'Mejorá un parcial propio por 0,05 s.'
@@ -140,6 +147,7 @@ export function startSolo(
   difficulty.value = garage.config.difficulty;
   laps.value = String(garage.config.laps);
   night.checked = garage.config.night;
+  arcade.checked = garage.config.arcade === true;
   syncMode();
   showLiveries();
   carSelect.addEventListener('change', showLiveries);
@@ -160,6 +168,7 @@ export function startSolo(
     update(race.snapshot());
   });
   mode.addEventListener('change', syncMode);
+  arcade.addEventListener('change', showLiveries);
   livery.addEventListener('change', () => { garage.liveries[Number(carSelect.value)] = livery.value as Livery; });
   prepare.addEventListener('click', () => {
     if (setup.hidden) void preferLandscape();
@@ -191,7 +200,8 @@ export function startSolo(
   setup.addEventListener('submit', event => {
     event.preventDefault();
     start(normalizeRaceConfig({
-      course: course.value, mode: mode.value, laps: laps.valueAsNumber, bots: Number(bots.value), difficulty: difficulty.value, night: night.checked,
+      course: course.value, mode: mode.value, laps: laps.valueAsNumber, bots: Number(bots.value), difficulty: difficulty.value,
+      night: night.checked, arcade: arcade.checked,
     }), Number(carSelect.value));
   });
   toggle.addEventListener('click', () => {
@@ -279,6 +289,7 @@ export function startSolo(
     }
     pit.hidden = !parked;
     practiceNote.hidden = phase !== 'practice' || parked;
+    if (garage.config.arcade) return;
     const previous = garage.progress[garage.slot];
     const record = advanceLiveryProgress(previous, car, snapshot.config?.course ?? garage.config.course);
     if (record !== previous) {

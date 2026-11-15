@@ -76,6 +76,7 @@ function render() {
   const car = latest?.car;
   const selection = car === undefined ? null : lobby?.slots[car];
   const course = COURSE_OPTIONS[lobby?.config.course ?? "taller"].label;
+  const event = lobby?.config.arcade ? `${course} · Arcade` : course;
   const connected = status === "connected" && !!selection;
   const inPit = connected && phase === "practice" && latest?.pitReady === true;
   if (!inPit) garageOpen = false;
@@ -105,7 +106,7 @@ function render() {
     detail.textContent = owned ? "Tu auto" : reserved ? reserved.connected ? "Ocupado" : "Reservado" : "Libre";
   }
   garageStatus.textContent = connected ? phase === "practice" ? "Elegí un auto libre para salir de boxes."
-    : selection?.ready ? `${course} · Listo para la salida.` : `${course} · Elegí tu auto y marcate como listo.`
+    : selection?.ready ? `${event} · Listo para la salida.` : `${event} · Elegí tu auto y marcate como listo.`
     : status === "in-progress" ? "Podés unirte al volver a la sala." : labels[status];
   const wasDriving = driving;
   const canDrive = connected && !garageOpen && (phase === "race" || phase === "practice");

@@ -37,8 +37,9 @@
 .lan-lobby :is(button, select), .lan-lobby-return button { min-height: 40px; border: 1px solid var(--lobby-edge); border-radius: .28rem; padding: .25rem .45rem; background: #3a2c23; color: inherit; font: 650 .8rem/1.2 system-ui, sans-serif; }
 .lan-lobby :is(a, button, select, input):focus-visible, .lan-lobby-return button:focus-visible { outline: 2px solid var(--lobby-gold); outline-offset: 2px; }
 .lan-lobby-config select { width: 100%; }
-.lan-lobby-config .lan-lobby-night { display: flex; grid-column: 1 / -1; align-items: center; gap: .3rem; min-height: 32px; }
-.lan-lobby-night input { accent-color: var(--lobby-gold); }
+.lan-lobby-config :is(.lan-lobby-night, .lan-lobby-arcade) { display: flex; grid-column: 1 / -1; align-items: center; gap: .3rem; min-height: 32px; }
+.lan-lobby-config input[type="checkbox"] { accent-color: var(--lobby-gold); }
+.lan-lobby-arcade-hint { grid-column: 1 / -1; margin: 0 0 .15rem 1.35rem; color: #d4c4af; font-size: .72rem; }
 .lan-lobby-slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .35rem; padding: 0; margin: .75rem 0; list-style: none; }
 .lan-lobby-slots li { min-width: 0; padding: .3rem .4rem; border: 1px solid #675444; border-radius: .28rem; background: #2e2520; }
 .lan-lobby-slots strong { display: block; color: var(--lobby-car); font: 800 1.05rem/1.15 ui-monospace, monospace; }

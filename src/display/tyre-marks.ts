@@ -83,6 +83,10 @@ export function buildTyreMarks(parent: THREE.Object3D, course: Course = TALLER) 
       const slip = car.sound?.slip ?? 0;
       const braking = car.braking ? THREE.MathUtils.smoothstep(car.speed, 3.1, 8.9) * 0.92 : 0;
       const demand = Math.max(slip, braking);
+      if ((car.arcade?.jump ?? 0) > 0.08) {
+        previous[slot] = undefined;
+        continue;
+      }
       if (!from || car.active === false || car.speed < 2.3 || car.blink || demand < 0.32) {
         previous[slot] = car;
         continue;

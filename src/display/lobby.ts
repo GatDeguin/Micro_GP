@@ -27,6 +27,8 @@ export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => v
         <label>Bots<select name="bots">${Array.from({ length: 4 }, (_, i) => `<option>${i}</option>`).join('')}</select></label>
         <label>Dificultad<select name="difficulty"><option value="rookie">Principiante</option><option value="club">Club</option><option value="pro">Pro</option></select></label>
         <label class="lan-lobby-night"><input name="night" type="checkbox"> Iluminación nocturna</label>
+        <label class="lan-lobby-arcade"><input name="arcade" type="checkbox" aria-describedby="lan-lobby-arcade-hint"> Modo Arcade</label>
+        <p id="lan-lobby-arcade-hint" class="lan-lobby-arcade-hint">Recogé las cajas para activar su efecto. El aceite y los petardos quedan atrás.</p>
       </fieldset>
     </div>
     <ul class="lan-lobby-slots" aria-label="Plazas" aria-live="polite" aria-atomic="true"></ul>
@@ -50,6 +52,7 @@ export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => v
   const difficulty = config.querySelector<HTMLSelectElement>('[name="difficulty"]')!;
   const mode = config.querySelector<HTMLSelectElement>('[name="mode"]')!;
   const night = config.querySelector<HTMLInputElement>('[name="night"]')!;
+  const arcade = config.querySelector<HTMLInputElement>('[name="arcade"]')!;
   const status = panel.querySelector<HTMLElement>('[role="status"]')!;
   const roster = panel.querySelector<HTMLUListElement>('ul')!;
   const launch = panel.querySelector<HTMLButtonElement>('button')!;
@@ -97,6 +100,7 @@ export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => v
     difficulty.value = lobby.config.difficulty;
     mode.value = lobby.config.mode;
     night.checked = lobby.config.night;
+    arcade.checked = lobby.config.arcade === true;
 
     const players = lobby.slots.filter(slot => slot !== null);
     const ready = players.filter(slot => slot.connected && slot.ready).length;
@@ -123,7 +127,7 @@ export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => v
     }
     const settings: RaceConfig = {
       laps: Number(laps.value), bots: Number(bots.value), difficulty: difficulty.value as RaceConfig['difficulty'],
-      mode: mode.value as RaceConfig['mode'], night: night.checked,
+      mode: mode.value as RaceConfig['mode'], night: night.checked, arcade: arcade.checked,
     };
     send({ type: 'configure', config: settings });
   });

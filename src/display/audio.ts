@@ -1,5 +1,6 @@
 import { Vector3, type Camera } from 'three';
 import type { CarView, RaceSnapshot } from '../shared/protocol';
+import type { ArcadeEventKind } from '../shared/arcade';
 import type { SectorId } from '../shared/track';
 import { DIQUE, TALLER, diquePlanPoint, getCourse } from '../shared/courses';
 import firstTrack from '../../Musica/01.mp3?url';
@@ -197,6 +198,11 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
   effects.connect(master);
 
   const voices = engines.map((clips, slot) => carVoice(context, master, samples, clips, slot));
+  const arcadeClips = {
+    turbo: samples.arcadeTurbo, shield: samples.arcadeShield, oil: samples.arcadeDrop, pop: samples.arcadeDrop,
+    slip: samples.arcadeSlip, explosion: samples.arcadeBlast, jump: samples.arcadeJump,
+    land: samples.arcadeLand, block: samples.arcadeShield,
+  } satisfies Record<ArcadeEventKind, AudioBuffer[]>;
   const river = emitter(context, effects);
   const pond = emitter(context, effects);
   const crowd = emitter(context, effects);
@@ -221,6 +227,7 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
   let timeline: View | undefined;
   let previousState: RaceSnapshot | undefined;
   let lastImpact = -1;
+  let lastArcade = -1;
   let crowdUntil = 0;
   let variation = 0;
   let transients = 0;
@@ -244,11 +251,11 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
     loudness = wide ? limit(1.02 - distance / 105, 0.46, 0.83) : 1 / (1 + (distance / 11) ** 1.55);
   }
 
-  function play(buffers: readonly AudioBuffer[], level: number, side: number, id = variation++) {
+  function play(buffers: readonly AudioBuffer[], level: number, side: number, id = variation++, pitch = 1) {
     if (transients >= 18 || level < 0.012) return;
     const source = context.createBufferSource();
     source.buffer = buffers[id % buffers.length];
-    source.playbackRate.value = 0.94 + ((id * 13) % 11) * 0.012;
+    source.playbackRate.value = (0.94 + ((id * 13) % 11) * 0.012) * pitch;
     const output = emitter(context, effects);
     output.gain.value = level;
     output.pan.value = side;
@@ -281,9 +288,13 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
     if (reset) {
       previousState = state;
       lastImpact = -1;
+      lastArcade = -1;
       crowdUntil = 0;
       for (const hit of state.impacts ?? []) {
         if (hit.frame <= tick) lastImpact = Math.max(lastImpact, hit.id);
+      }
+      for (const event of state.arcade?.events ?? []) {
+        if (event.frame < tick - 3) lastArcade = Math.max(lastArcade, event.id);
       }
     }
     if (previousState !== state) {
@@ -303,7 +314,19 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
       if (hit.id <= lastImpact || hit.frame > tick) continue;
       lastImpact = hit.id;
       locate(camera, hit.x, hit.y, hit.z, wide);
-      play(samples[hit.kind], loudness * (0.10 + 0.38 * limit(hit.strength)), pan, hit.id);
+      const strength = limit(hit.strength) ** 0.78;
+      play(samples[hit.kind], loudness * (0.065 + 0.53 * strength), pan, hit.id, 1.04 - strength * 0.17);
+      if (hit.kind !== 'wall' && strength > 0.41) {
+        play(samples.spark, loudness * (strength - 0.31) * 0.23, pan, hit.id + 2);
+      }
+    }
+    for (const event of state.arcade?.events ?? []) {
+      if (event.id <= lastArcade || event.frame > tick) continue;
+      lastArcade = event.id;
+      locate(camera, event.x, event.y, event.z, wide);
+      const level = event.kind === 'explosion' ? 0.62 : event.kind === 'land' ? 0.32 : 0.36;
+      play(arcadeClips[event.kind], loudness * level * (0.46 + 0.54 * limit(event.strength)), pan, event.id,
+        event.kind === 'block' ? 0.89 : 1);
     }
 
     const setMix = now >= nextMix || changedView || reset;
@@ -325,7 +348,7 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
         continue;
       }
       const speed = Math.abs(car.speed);
-      const motion = limit(speed / 14.8);
+      const motion = limit(speed / 16.35);
       const throttle = limit(car.sound?.throttle ?? (car.braking ? 0 : motion * 0.8));
       const curb = limit(car.sound?.curb ?? 0);
       const runoff = limit(car.sound?.runoff ?? 0);
