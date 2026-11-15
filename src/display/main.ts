@@ -261,6 +261,7 @@ async function bootstrap() {
     const shown = (current.config?.course ?? 'taller') === stage.course.id ? current : preview;
     stage.signs.board(shown);
     stage.signs.lights(shown.lights);
+    stage.observe?.(shown);
     fit = cameraFit(camera, stage.course);
     renderViews = viewsFor(stage);
     lastShadow = -Infinity;

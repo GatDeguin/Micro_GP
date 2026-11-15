@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { Course } from '../shared/courses';
+import type { RaceSnapshot } from '../shared/protocol';
 import { instanceStatic, mergeStatic } from './batches';
 import { buildCompactScenery } from './compact-scenery';
+import { buildDiqueCraneActivity } from './dique-crane-activity';
 import { buildDiqueHarbor, buildDiqueTunnel } from './dique-harbor';
 import { buildDiqueLandscape } from './dique-landscape';
 import { buildDiqueProps } from './dique-props';
 import { buildDiqueTrack, diqueConcrete } from './dique-track';
+import { buildDiqueWorkers } from './dique-workers';
+import { buildDiqueYard } from './dique-yard';
 
 export async function buildDiqueScene(parent: THREE.Group, course: Course, wood: THREE.Texture, compactEnabled = false) {
   parent.name = 'Gran Premio del Dique';
@@ -40,11 +44,11 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   mergeStatic(dock, new Set([harbor.backWall]), 45);
   mergeStatic(infrastructure, undefined, 48);
   mergeStatic(props, new Set([equipment.crane]), 33);
-  if (crane) {
-    crane.name = 'Grúa del Dique modelada en Blender';
-    equipment.placeholder.removeFromParent();
-    equipment.crane.add(crane);
-  } else instanceStatic(equipment.placeholder);
+  const yard = buildDiqueYard(parent, course);
+  const workers = buildDiqueWorkers(parent, course);
+  const craneActivity = crane ? buildDiqueCraneActivity(equipment.crane, course, crane) : undefined;
+  if (craneActivity) equipment.placeholder.removeFromParent();
+  else instanceStatic(equipment.placeholder);
 
   return {
     backWall: harbor.backWall,
@@ -52,7 +56,23 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       harbor.setNight(night);
       tunnel.setNight(night);
       equipment.setNight(night);
+      yard.setNight(night);
+      craneActivity?.setNight?.(night);
+      workers.setNight(night);
     },
-    update(now: number) { harbor.update(now); },
+    setDetail(detail: boolean) {
+      craneActivity?.setDetail?.(detail);
+      workers.setDetail(detail);
+    },
+    observe(snapshot: RaceSnapshot) {
+      yard.observe(snapshot);
+      workers.observe(snapshot);
+    },
+    update(now: number) {
+      harbor.update(now);
+      yard.update(now);
+      craneActivity?.update(now);
+      workers.update(now);
+    },
   };
 }

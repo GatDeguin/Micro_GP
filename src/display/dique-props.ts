@@ -118,8 +118,32 @@ function boxServiceFence(parent: THREE.Group, course: Course, material: THREE.Ma
   }
 }
 
+function garageFloor() {
+  const { canvas, context } = canvas2d(512, 256);
+  const rng = random(4292);
+  const stain = context.createRadialGradient(263, 142, 4, 263, 142, 189);
+  stain.addColorStop(0, 'rgba(30,31,29,.46)');
+  stain.addColorStop(1, 'rgba(31,30,28,0)');
+  context.fillStyle = stain;
+  context.fillRect(0, 0, 512, 256);
+  for (const x of [164, 328]) {
+    for (let i = 0; i < 142; i++) {
+      context.fillStyle = rng() > 0.28 ? 'rgba(35,34,31,.12)' : 'rgba(158,143,119,.16)';
+      context.fillRect(x + (rng() - 0.5) * 30, 32 + rng() * 190, 0.6 + rng() * 4, 1 + rng() * 21);
+    }
+  }
+  context.fillStyle = 'rgba(208,171,106,.53)';
+  for (const x of [31, 474]) context.fillRect(x, 28, 4, 177);
+  context.fillStyle = 'rgba(151,143,122,.39)';
+  for (const y of [35, 212]) context.fillRect(41, y, 431, 1);
+  return new THREE.MeshStandardMaterial({
+    map: texture(canvas), roughness: 0.63, metalness: 0.13, transparent: true, depthWrite: false,
+  });
+}
+
 function garage(parent: THREE.Group, course: Course, concrete: THREE.Material, where: number, number: number,
-  light: THREE.Material, pool: THREE.Material, shadow: THREE.Material, model?: THREE.Object3D) {
+  light: THREE.Material, pool: THREE.Material, bounce: THREE.Material, shadow: THREE.Material,
+  floorFinish: THREE.Material, model?: THREE.Object3D) {
   const p = course.sampleAt(where);
   const q = diqueEdge(course, p, course.pit.stationOffset - 3.35);
   const bay = new THREE.Group();
@@ -129,13 +153,17 @@ function garage(parent: THREE.Group, course: Course, concrete: THREE.Material, w
   parent.add(bay);
   const width = model ? 12.55 : 9.75;
   const depth = 5.8;
+  const finish = diquePart(bay, new THREE.PlaneGeometry(width - 1.1, 5.72).rotateX(-Math.PI / 2), floorFinish);
+  finish.position.set(0, model ? 0.913 : 0.948, -0.029);
   dockLabel(bay, `BOX ${String(number).padStart(2, '0')}`, '', 2.40, 3.043, 4.119);
-  const glow = diquePart(bay, new THREE.PlaneGeometry(width - 0.71, 6.78).rotateX(-Math.PI / 2), pool);
-  glow.position.set(0, model ? 0.924 : 0.957, 0.81);
-  diquePart(bay, new THREE.PlaneGeometry(10.5, 3.15), pool).position.set(0, 2.15, -2.58);
+  const glow = diquePart(bay, new THREE.PlaneGeometry(width - 1.18, 5.62).rotateX(-Math.PI / 2), pool);
+  glow.position.set(0, model ? 0.924 : 0.957, 1.45);
+  diquePart(bay, new THREE.PlaneGeometry(10.5, 3.35), bounce).position.set(0, 2.25, -2.58);
+  box(bay, iron, 0.09, 3.12, -2.556, 2.19, 0.127, 0.18, false);
+  box(bay, light, 0.09, 3.04, -2.536, 1.96, 0.053, 0.113, false);
   for (const side of [-1, 1]) {
-    const jamb = diquePart(bay, new THREE.PlaneGeometry(2.35, 2.63).rotateY(side * -Math.PI / 2), pool);
-    jamb.position.set(side * 5.20, 2.12, 1.08);
+    const jamb = diquePart(bay, new THREE.PlaneGeometry(4.1, 2.68).rotateY(side * -Math.PI / 2), bounce);
+    jamb.position.set(side * (model ? 5.20 : 4.29), 2.65, 1.55);
     box(bay, iron, side * 4.93, 0.93, 3.17, 0.24, 0.15, 0.12, false);
     round(bay, amber, side * 4.93, 1.18, 3.17, 0.074, 0.56);
   }
@@ -509,10 +537,14 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   const lamp = new THREE.MeshStandardMaterial({ color: 0xffd59b, emissive: 0xf99335, emissiveIntensity: 1.25, roughness: 0.52 });
   const { poles, glow, halo, bulb } = lights(parent, course);
   const garageGlow = poolMaterial();
+  const wallBounce = garageGlow.clone();
+  wallBounce.color.setHex(0xe9d0b2);
+  wallBounce.opacity = 0.40;
   const shadow = horizontalShadow();
+  const floorFinish = garageFloor();
   const service = new THREE.Group();
   parent.add(service);
-  course.pit.stalls.forEach((s, i) => garage(service, course, concrete, s, i + 1, lamp, garageGlow, shadow, garageModel));
+  course.pit.stalls.forEach((s, i) => garage(service, course, concrete, s, i + 1, lamp, garageGlow, wallBounce, shadow, floorFinish, garageModel));
   boxServiceFence(service, course, grateMaterial());
   if (garageModel) instanceStatic(service);
   const crane = craneSite(parent, course, concrete, lamp, garageGlow);
@@ -530,6 +562,7 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
       for (const light of poles) light.intensity = enabled ? 181 : 81;
       glow.opacity = enabled ? 0.83 : 0.56;
       garageGlow.opacity = enabled ? 0.95 : 0.75;
+      wallBounce.opacity = enabled ? 0.57 : 0.33;
       halo.opacity = enabled ? 0.52 : 0.29;
       bulb.emissiveIntensity = enabled ? 4.2 : 2.8;
       lamp.emissiveIntensity = enabled ? 3.35 : 2.26;
