@@ -11,7 +11,7 @@ const previewDistances = [1, 2, 3, 4, 5, 6].map(step => step * previewStep);
 const behavior = {
   rookie: { pace: 0.86, diquePace: 1.11, reaction: 0.30, precision: 1.66, prediction: 0.33, room: 0.17, lateral: 10.3 },
   club: { pace: 1.0, diquePace: 1.11, reaction: 0.16, precision: 1.85, prediction: 0.43, room: 0.10, lateral: 12.2 },
-  pro: { pace: 1.105, diquePace: 1.048, reaction: 0.085, precision: 2.07, prediction: 0.56, room: 0.06, lateral: 13.7 },
+  pro: { pace: 1.105, diquePace: 1.067, reaction: 0.085, precision: 2.07, prediction: 0.56, room: 0.06, lateral: 13.7 },
 } satisfies Record<Difficulty, Record<string, number>>;
 
 export function angleDifference(angle: number) {

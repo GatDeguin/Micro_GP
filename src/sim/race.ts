@@ -166,7 +166,8 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
   const traction = car.transmission.step(car.speed, fullPower, input.brake, car.reversing, dt);
 
   if (input.brake) {
-    const brakeForce = 17.8 * (0.34 + 0.66 * grip) * (0.59 + 0.41 * car.brakePressure);
+    const highSpeedBraking = clamp((car.speed - 10.5) * 0.25, 0, 1) * 3.2;
+    const brakeForce = (17.8 + highSpeedBraking) * (0.34 + 0.66 * grip) * (0.59 + 0.41 * car.brakePressure);
     const braking = Math.max(0.6, brakeForce + surface.drag * 0.30 + uphill - 1.10 * cornerLoad);
     car.speed = car.reversing
       ? Math.max(-1.9, car.speed - (3.5 * grip + uphill) * dt)
@@ -174,9 +175,9 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
   } else if (input.gas) {
     car.reverseReady = false;
     const driveGrip = grip * (1 - 0.09 * cornerLoad);
-    const engine = (8.6 - 4.95 * Math.min(1, speedRatio) ** 1.22) * car.throttle * driveGrip * traction * exitTraction;
+    const engine = (9.65 - 4.55 * Math.min(1, speedRatio) ** 1.22) * car.throttle * driveGrip * traction * exitTraction;
     const acceleration = car.speed > speedLimit
-      ? 5 + surface.drag + 2.4 * cornerLoad + uphill
+      ? 5 + surface.drag + 3.4 * style.cornerDrag * cornerLoad + uphill
       : Math.max(0, engine - uphill - surface.drag * 0.30 - 1.35 * cornerLoad);
     car.speed = approach(car.speed, speedLimit, acceleration * dt);
   } else if (car.speed > 0) {

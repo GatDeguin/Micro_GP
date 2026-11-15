@@ -275,9 +275,9 @@ test('GAS gives a strong launch and builds speed without a jump', async () => {
   step(race, TICK, drivers);
   assert.ok(race.snapshot().cars[0].speed > 0 && race.snapshot().cars[0].speed < 0.18);
   step(race, 29 * TICK, drivers);
-  assert.ok(race.snapshot().cars[0].speed > 3.4);
+  assert.ok(race.snapshot().cars[0].speed > 4.0);
   step(race, 1.05, drivers);
-  assert.ok(race.snapshot().cars[0].speed > 7.8);
+  assert.ok(race.snapshot().cars[0].speed > 10);
 });
 
 test('the automatic box shifts through fifth with a short torque break', async () => {
@@ -290,6 +290,7 @@ test('the automatic box shifts through fifth with a short torque break', async (
   assert.equal(before.transmission?.gear, 0);
 
   const gears: number[] = [];
+  let cutFrames = 0;
   for (let i = 0; i < 185; i++) {
     race.step(TICK, [accelerating, stopped, stopped, stopped]);
     const car = race.snapshot().cars[0];
@@ -299,15 +300,19 @@ test('the automatic box shifts through fifth with a short torque break', async (
       gears.push(box.gear);
       assert.equal(box.shift, (before.transmission?.shift ?? 0) + 1);
       if (box.gear > 1) {
-        assert.ok(car.speed - before.speed < 0.033, 'torque falls when the box shifts up');
-        assert.ok(box.rev < before.transmission!.rev, 'engine revs drop as the longer ratio engages');
+        assert.ok(car.speed - before.speed < 0.006, 'torque falls when the box shifts up');
+        assert.ok(box.rev < before.transmission!.rev - 0.14, 'engine revs drop as the longer ratio engages');
+        cutFrames = 2;
       }
+    } else if (cutFrames > 0) {
+      assert.ok(car.speed - before.speed < 0.006, 'the torque cut is perceptible beyond the first physics tick');
+      cutFrames--;
     }
     before = car;
-    if (car.speed >= 12.29) break;
+    if (car.speed >= 13.69) break;
   }
   assert.deepEqual(gears, [1, 2, 3, 4, 5]);
-  assert.ok(before.speed >= 12.29 && before.speed <= 12.30);
+  assert.ok(before.speed >= 13.69 && before.speed <= 13.70);
 });
 
 test('cars at the same map position only touch when their height overlaps', async () => {
@@ -371,6 +376,8 @@ test('fifth coasts through its overlap and downshifts on a fresh request for pow
   assert.equal(fourth.gear, 4);
   assert.equal(fourth.shift, fifth.shift + 1);
   assert.ok(fourth.rev > coasting.rev + 0.08);
+  const matchingRevs = 0.15 + 0.85 * race.snapshot().cars[0].speed / 10.10;
+  assert.ok(fourth.rev > matchingRevs + 0.04, 'the lower gear adds a brief throttle blip above its matched revs');
   step(race, 0.12, gas);
   assert.equal(race.snapshot().cars[0].transmission?.gear, 4);
   runUntil(race, 0.65, gas, () => race.snapshot().cars[0].transmission?.gear === 5);

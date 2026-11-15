@@ -206,8 +206,10 @@ test('full throttle into the closed connector meets the live barrier and the dri
 
   for (let frame = 0; frame < 12; frame++) race.step(TICK, [parked]);
   const released = race.snapshot().cars[0];
+  let recoveredFrames = 0;
   for (let frame = 0; frame < 150; frame++) {
     const car = race.snapshot().cars[0];
+    if (car.distance! > touched.distance! + 8 && car.speed > released.speed + 2) recoveredFrames++;
     const road = DIQUE.locate(car.x, car.z, { s: car.distance, y: car.y });
     assert.ok(Math.abs(road.offset) < DIQUE.wallHalfAt(road.s, Math.sign(road.offset)));
     const aim = DIQUE.sampleAt(road.s + 1.95 + Math.max(0, car.speed) * 0.213);
@@ -216,7 +218,7 @@ test('full throttle into the closed connector meets the live barrier and the dri
     race.step(TICK, [{ owned: true, input: { x: steer, gas: true, brake: false } }]);
   }
   const recovered = race.snapshot().cars[0];
-  assert.ok(recovered.speed > released.speed + 2);
+  assert.ok(recoveredFrames >= 12, 'regain speed for at least 0.2 s before the next turn');
   assert.ok(recovered.distance! > touched.distance! + 15 && recovered.distance! < apex);
   assert.equal(recovered.sectorTimes?.[0], null);
 });

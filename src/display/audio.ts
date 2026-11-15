@@ -22,13 +22,14 @@ interface RaceMix {
 }
 
 const limit = (value: number, low = 0, high = 1) => Math.max(low, Math.min(high, value));
+const motorPitch = 0.94;
 // Compacto, Cupé, Bólido, Cuña. Each has its own motor sweep and gear whine.
 const motorStyles = [
   { idle: 70, sweep: 239, mesh: 2.12, color: 0.70, harmonics: [1, 0.48, 0.22, 0.18, 0.08, 0.06] },
   { idle: 82, sweep: 258, mesh: 2.42, color: 1.05, harmonics: [1, 0.66, 0.40, 0.27, 0.15, 0.11] },
   { idle: 89, sweep: 278, mesh: 2.77, color: 0.82, harmonics: [1, 0.34, 0.13, 0.23, 0.08, 0.04] },
   { idle: 77, sweep: 271, mesh: 2.28, color: 0.98, harmonics: [1, 0.28, 0.50, 0.18, 0.18, 0.08] },
-];
+].map(style => ({ ...style, idle: style.idle * motorPitch, sweep: style.sweep * motorPitch }));
 const motorSamples = motorStyles.map(({ idle, sweep, harmonics }, slot) => ({
   roots: [0.13, 0.48, 0.88].map(rev => 2 * Math.round((idle + sweep * rev) / 2)),
   harmonics, seed: 419 + slot * 97,
@@ -324,7 +325,7 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
         continue;
       }
       const speed = Math.abs(car.speed);
-      const motion = limit(speed / 12.8);
+      const motion = limit(speed / 14.8);
       const throttle = limit(car.sound?.throttle ?? (car.braking ? 0 : motion * 0.8));
       const curb = limit(car.sound?.curb ?? 0);
       const runoff = limit(car.sound?.runoff ?? 0);
@@ -352,8 +353,9 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
         voice.shiftDirection = driveGear ? Math.sign(transmission.gear - previousGear) : 0;
         voice.shiftAt = now;
         const shiftSamples = voice.shiftDirection < 0 || transmission.gear === -1 ? samples.downshift : samples.upshift;
-        const strike = driveGear ? 0.17 + 0.12 * motion : 0.11;
-        play(shiftSamples, loudness * strike, pan, transmission.shift + slot);
+        const engage = throttle * 0.65 + motion * 0.35;
+        const strike = driveGear ? (dominant ? 0.23 : 0.15) + 0.14 * engage : 0.075;
+        play(shiftSamples, loudness * strike * settings.engines, pan, transmission.shift + slot);
       }
       voice.gear = transmission?.gear;
       voice.shift = transmission?.shift;
@@ -389,15 +391,18 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
       const voiceLevel = (wide ? loudness * 0.89 : dominant ? 0.96 : loudness * 0.68) * (state.phase === 'demo' ? 0.72 : 1);
       const doppler = wide || view === 'chase' ? 1 : 1 + approaching * 0.0027;
       const shiftAge = now - voice.shiftAt;
-      const lift = voice.shiftDirection > 0 ? limit(1 - shiftAge / 0.13) : 0;
-      const blip = voice.shiftDirection < 0 ? limit(shiftAge / 0.024) * limit(1 - shiftAge / 0.19) ** 1.25 : 0;
+      // The upshift cuts immediately, then feeds power back in. A downshift
+      // builds into the re-engagement before the throttle falls away.
+      const lift = voice.shiftDirection > 0 ? 1 - limit((shiftAge - 0.035) / 0.13) : 0;
+      const blip = voice.shiftDirection < 0
+        ? limit(shiftAge / 0.031) * (1 - limit((shiftAge - 0.031) / 0.19)) ** 1.6 : 0;
       const coastLoad = transmission?.gear === 0 ? 0.30 : 0.24 - 0.20 * motion;
-      const load = Math.max((coastLoad + (1 - coastLoad) * throttle) * (1 - 0.95 * lift), blip);
-      const engineLevel = 0.5625 * settings.engines * (1 - 0.68 * lift);
-      const revAccent = limit(rev - 0.09 * lift + 0.28 * blip, 0, 1.10);
+      const load = Math.max((coastLoad + (1 - coastLoad) * throttle) * (1 - lift), blip);
+      const engineLevel = 0.5625 * settings.engines * (1 - 0.83 * lift);
+      const revAccent = limit(rev - 0.12 * lift + 0.25 * blip, 0, 1.14);
       const pitch = (voice.style.idle + voice.style.sweep * revAccent) * doppler;
       const energized = limit(motion * 1.6 + load * 1.2);
-      const response = shiftAge < 0.19 ? 0.018 : 0.062;
+      const response = shiftAge < 0.222 ? 0.012 : 0.062;
       const lowFade = limit((revAccent - 0.19) / 0.18) * Math.PI / 2;
       const highFade = limit((revAccent - 0.62) / 0.21) * Math.PI / 2;
       const bands = [Math.cos(lowFade), Math.sin(lowFade) * Math.cos(highFade), Math.sin(highFade)];

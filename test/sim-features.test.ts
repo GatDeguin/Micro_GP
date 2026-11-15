@@ -101,7 +101,10 @@ test('two cars side by side report a zero gap between progress samples', () => {
   race.configure(config);
   race.launch();
   tick(race, [stopped, stopped], 3);
-  tick(race, [gas, gas], 52 * TICK);
+  waitFor(race, [gas, gas], 1, () => {
+    const distance = race.snapshot().cars[0].distance!;
+    return distance > 0 && distance < 0.85;
+  });
   const [first, second] = race.snapshot().cars;
   assert.ok(first.distance! > 0 && first.distance! < 0.85);
   assert.equal(first.distance, second.distance);
@@ -208,20 +211,29 @@ test('the compact turns sooner while the bólido pulls ahead on a straight', () 
 });
 
 test('each model gains at least ten percent in fifth and can still brake within the straight', () => {
-  const priorTopSpeeds = [10.90, 10.96, 11.98, 11.02];
+  const priorTopSpeeds = [12.30, 12.36, 13.38, 12.42];
   const topSpeeds = priorTopSpeeds.map((previous, slot) => {
     const { race, inputs } = ready(slot);
-    tick(race, inputs(gas), 3.05);
+    let previousTickSpeed = 0;
+    waitFor(race, inputs(gas), 3.05, () => {
+      const speed = race.snapshot().cars[slot].speed;
+      const heldTop = speed >= previous * 1.10 && speed === previousTickSpeed;
+      previousTickSpeed = speed;
+      return heldTop;
+    });
     const car = race.snapshot().cars[slot];
     assert.equal(car.transmission?.gear, 5);
-    assert.ok(car.speed >= previous * 1.10 && car.speed <= previous * 1.15, `car ${slot}: ${car.speed}`);
+    assert.ok(car.speed <= previous * 1.15, `car ${slot}: ${car.speed}`);
     assert.ok(car.transmission.rev > 0.85 && car.transmission.rev < 1);
 
     const brake = { owned: true, input: { ...NEUTRAL, brake: true } };
-    tick(race, inputs(brake), 0.9);
+    waitFor(race, inputs(brake), 0.9, () => {
+      const state = race.snapshot();
+      assert.equal(state.impacts, undefined);
+      return state.cars[slot].speed === 0;
+    });
     const stoppedCar = race.snapshot().cars[slot];
-    assert.equal(stoppedCar.speed, 0);
-    assert.ok(stoppedCar.distance! - car.distance! < 5.8);
+    assert.ok(stoppedCar.distance! - car.distance! < 6.3);
     return car.speed;
   });
   assert.ok(topSpeeds[2] > Math.max(topSpeeds[0], topSpeeds[1], topSpeeds[3]));
