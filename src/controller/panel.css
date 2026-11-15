@@ -6,6 +6,7 @@
   font-family: system-ui, sans-serif;
   background: #141211;
   color: var(--ivory);
+  touch-action: manipulation;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
