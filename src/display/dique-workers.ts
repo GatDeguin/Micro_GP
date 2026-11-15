@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { diquePlanPoint, type Course } from '../shared/courses.ts';
 import type { RaceSnapshot } from '../shared/protocol.ts';
 import { DIQUE_GROUND, diqueEdge, diqueRoadClear } from './dique-geometry';
+import { freightLane } from './dique-terminal-layout';
 import { standard } from './materials';
 import { marshalSignal, nearestCar } from './world-cues';
 
 type Point = readonly [number, number, number];
-type Role = 'mechanic' | 'marshal' | 'gate' | 'dock' | 'clerk' | 'rigger';
+type Role = 'mechanic' | 'marshal' | 'gate' | 'dock' | 'clerk' | 'rigger' | 'mooring' | 'dispatcher';
 type Signal = ReturnType<typeof marshalSignal>;
 
 interface Worker {
@@ -120,6 +121,21 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   }
   add('clerk', onPlant(-11.05, 4.78), onPlant(-8.55, 4.78), Math.PI + plantYaw, inspector);
 
+  const atGround = (x: number, z: number) => new THREE.Vector3(x, DIQUE_GROUND + 0.038, z);
+  add('mooring', atGround(13.20, 14.67), atGround(13.20, 14.67), 0.40, workwear);
+  add('clerk', atGround(21.48, 14.71), atGround(22.66, 14.71), -0.35, inspector);
+  const dispatch = atGround(freightLane.gate.x - 4.10, freightLane.gate.z);
+  add('dispatcher', dispatch, dispatch, Math.PI - 0.45, inspector);
+  add('mechanic', plan(56.55, 124.4), plan(56.55, 124.4), Math.PI - 0.25, mechanic);
+  add('dock', plan(199.6, 71.8), plan(203.1, 71.82), 1.55, workwear);
+  function spillwayWalk(px: number, pz: number, yaw: number, from: number, to: number, look: number) {
+    const center = plan(px, pz, -0.744);
+    const along = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    add('clerk', center.clone().addScaledVector(along, from), center.clone().addScaledVector(along, to), look, inspector);
+  }
+  spillwayWalk(73.1, 81.4, 0.39, -1.72, 0.69, Math.PI / 2);
+  spillwayWalk(92.45, 103, -0.29, -0.96, 0.91, -Math.PI / 2);
+
   const marshalPosts = [6.1, 460.0].map((s, i) => {
     const lane = course.sampleAt(s);
     const side = 1;
@@ -135,13 +151,14 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   const accents = standard(0xffffff, 0.56, 0.12);
   accents.emissive.setHex(0x665034);
   accents.emissiveIntensity = 0.08;
-  const box = batch(group, 'Uniformes, equipo y pasarela', new THREE.BoxGeometry(1, 1, 1), coated, 170);
-  const joint = batch(group, 'Mangas y pantalones', new THREE.CapsuleGeometry(0.5, 0.01, 2, 6), coated, 110);
-  const round = batch(group, 'Caras y guantes', new THREE.SphereGeometry(0.5, 8, 5), coated, 40);
-  const chest = batch(group, 'Torsos de los operarios', new THREE.CylinderGeometry(0.5, 0.39, 1, 7), coated, 20);
-  const brim = batch(group, 'Viseras de protección', new THREE.CylinderGeometry(0.5, 0.5, 1, 9), coated, 20);
-  const helmet = batch(group, 'Cascos', new THREE.SphereGeometry(0.5, 9, 5, 0, 2 * Math.PI, 0, Math.PI / 2), coated, 20);
-  const detailBox = batch(group, 'Cintas reflectantes y detalle del uniforme', new THREE.BoxGeometry(1, 1, 1), accents, 130);
+  const people = workers.length;
+  const box = batch(group, 'Uniformes, equipo y pasarela', new THREE.BoxGeometry(1, 1, 1), coated, people * 14 + 20);
+  const joint = batch(group, 'Mangas y pantalones', new THREE.CapsuleGeometry(0.5, 0.01, 2, 6), coated, people * 8);
+  const round = batch(group, 'Caras y guantes', new THREE.SphereGeometry(0.5, 8, 5), coated, people * 4);
+  const chest = batch(group, 'Torsos de los operarios', new THREE.CylinderGeometry(0.5, 0.39, 1, 7), coated, people);
+  const brim = batch(group, 'Viseras de protección', new THREE.CylinderGeometry(0.5, 0.5, 1, 9), coated, people * 2);
+  const helmet = batch(group, 'Cascos', new THREE.SphereGeometry(0.5, 9, 5, 0, 2 * Math.PI, 0, Math.PI / 2), coated, people);
+  const detailBox = batch(group, 'Cintas reflectantes y detalle del uniforme', new THREE.BoxGeometry(1, 1, 1), accents, people * 6);
   const flagPlane = new THREE.PlaneGeometry(1, 1);
   const flag = batch(group, 'Banderas de pista', flagPlane, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), 6);
   const checker = batch(group, 'Bandera a cuadros', flagPlane, new THREE.MeshBasicMaterial({
@@ -149,7 +166,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   }), 4);
   const shadows = batch(group, 'Contacto de los operarios', new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ map: contactMap(), transparent: true, opacity: 0.72, depthWrite: false, polygonOffset: true,
-      polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 20);
+      polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), people);
   const batches = [box, joint, round, chest, brim, helmet, detailBox, flag, checker, shadows];
   const root = new THREE.Object3D();
   const part = new THREE.Object3D();
@@ -165,6 +182,8 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   let lastFrame = -1;
   let lastPhase: RaceSnapshot['phase'] | undefined;
   let detail = true;
+  let vesselHandling = false;
+  let truckInspection = false;
 
   function write(target: Batch, hex: number) {
     part.updateMatrix();
@@ -246,7 +265,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
     const settle = Math.sin(clock * 2.05) * 0.009 + Math.abs(lift) * 0.018 - tinkering * 0.23;
     const lean = tinkering * 0.14;
     const flagsUp = role === 'marshal' && (signal === 'red' || signal === 'yellow' || signal === 'checkered' || worker.look);
-    const signaling = role === 'gate' && worker.look !== undefined;
+    const signaling = (role === 'gate' && worker.look !== undefined) || (role === 'mooring' && vesselHandling);
     const armWave = Math.sin(clock * (signal === 'checkered' ? 7.2 : 5.0));
     const radio = role === 'rigger' && Math.sin(clock * 1.23) > -0.28;
     let rightHand: Point = [0, 0, 0];
@@ -272,9 +291,10 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
       const shoulder: Point = [side * 0.206, 1.071 + settle, lean];
       let elbow: Point = [side * 0.25, 0.873 + settle, lean + side * stride * -0.075];
       let hand: Point = [side * 0.243, 0.704 + settle, lean + side * stride * -0.155 + 0.025];
-      if (role === 'dock' || role === 'clerk') {
+      if (role === 'dock' || role === 'clerk' || role === 'dispatcher') {
         elbow = [side * 0.225, 0.845 + settle, 0.113];
-        hand = [side * (role === 'dock' ? 0.199 : 0.133), 0.815 + settle, 0.287];
+        const writing = role === 'dispatcher' && truckInspection && side > 0 ? Math.sin(clock * 5.2) * 0.034 : 0;
+        hand = [side * (role === 'dock' ? 0.199 : 0.133) + writing, 0.815 + settle, 0.287];
       } else if (role === 'mechanic') {
         elbow = [side * 0.19, 0.871 + settle, 0.13 + lean];
         hand = [side * 0.17, 0.738 + settle + Math.sin(clock * 5) * 0.021 * tinkering,
@@ -305,7 +325,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
       for (const x of [-0.11, 0.11]) {
         shape(box, [x, 0.85 + settle, 0.438], [0.021, 0.175, 0.014], 0xb09370);
       }
-    } else if (role === 'clerk') {
+    } else if (role === 'clerk' || role === 'dispatcher') {
       shape(box, [0, 0.838 + settle, 0.313], [0.259, 0.039, 0.194], 0x4e5b59, -0.28);
       shape(box, [0, 0.86 + settle, 0.302], [0.214, 0.011, 0.145], 0xc8bea0, -0.28);
     } else if (role === 'mechanic') {
@@ -316,10 +336,11 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
       const [x, y, z] = rightHand;
       shape(box, [x + 0.009, y + 0.036, z + 0.038], [0.061, 0.099, 0.039], 0x283238, 0.05, 0.14, -0.17);
       shape(box, [x + 0.033, y + 0.094, z + 0.035], [0.012, 0.068, 0.012], 0x464a42, 0, 0, -0.16);
-    } else if (role === 'gate') {
+    } else if (role === 'gate' || role === 'mooring') {
       const [x, y, z] = rightHand;
       shape(box, [x, y + 0.045, z], [0.05, 0.21, 0.052], 0x454649);
-      shape(box, [x, y + 0.139, z], [0.127, 0.097, 0.043], signaling ? 0x77c9a3 : 0xdcb05a);
+      const activeTint = role === 'mooring' ? 0xe8ba69 : 0x77c9a3;
+      shape(box, [x, y + 0.139, z], [0.127, 0.097, 0.043], signaling ? activeTint : 0xdcb05a);
     } else {
       const [x, y, z] = rightHand;
       const sweep = flagsUp ? armWave * 0.48 - 0.36 : -0.46;
@@ -379,6 +400,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   render(0, 1 / 60);
   return {
     observe,
+    setPortActivity(vessel: boolean, truck: boolean) { vesselHandling = vessel; truckInspection = truck; },
     update(now: number) {
       startedAt ??= now;
       const dt = previousTime === undefined ? 1 / 60 : THREE.MathUtils.clamp((now - previousTime) / 1000, 0, 0.1);

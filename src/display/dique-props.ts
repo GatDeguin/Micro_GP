@@ -205,11 +205,44 @@ function garage(parent: THREE.Group, course: Course, concrete: THREE.Material, w
   tirePile(bay, 2.75, 0.94, -0.21, 3);
 }
 
-function shippingContainer(parent: THREE.Group, x: number, z: number, yaw: number, material: THREE.Material, stacked = false) {
+const cargoPaint = new WeakMap<THREE.MeshStandardMaterial, THREE.MeshStandardMaterial>();
+let cargoWear: THREE.CanvasTexture | undefined;
+
+function wornCargoPaint(base: THREE.MeshStandardMaterial) {
+  const cached = cargoPaint.get(base);
+  if (cached) return cached;
+  if (!cargoWear) {
+    const { canvas, context } = canvas2d(256, 112);
+    const wear = random(804);
+    const glaze = context.createLinearGradient(0, 0, 0, 112);
+    glaze.addColorStop(0, '#f5eee2');
+    glaze.addColorStop(0.26, '#d9d0c4');
+    glaze.addColorStop(0.72, '#f1e8d6');
+    glaze.addColorStop(1, '#aba092');
+    context.fillStyle = glaze;
+    context.fillRect(0, 0, 256, 112);
+    for (let i = 0; i < 290; i++) {
+      const x = wear() * 256;
+      const y = i % 3 === 0 ? wear() * 112 : (i % 2 ? 104 - wear() * 17 : wear() * 21);
+      context.fillStyle = i % 4 ? 'rgba(118,82,59,.24)' : 'rgba(71,53,41,.38)';
+      context.fillRect(x, y, 1 + wear() ** 2 * 8, 0.4 + wear() ** 3 * 9);
+    }
+    for (let i = 0; i < 64; i++) {
+      context.fillStyle = 'rgba(255,243,219,.25)';
+      context.fillRect(2 + wear() * 252, 3 + wear() * 106, 1 + wear() ** 2 * 12, 0.83);
+    }
+    cargoWear = texture(canvas);
+  }
+  const finish = base.clone();
+  finish.map = cargoWear;
+  finish.name = 'Pintura de contenedor erosionada en los cantos';
+  cargoPaint.set(base, finish);
+  return finish;
+}
+
+export function containerShell(paint: THREE.MeshStandardMaterial) {
   const cargo = new THREE.Group();
-  cargo.position.set(x, DIQUE_GROUND + (stacked ? 2.67 : 0), z);
-  cargo.rotation.y = yaw;
-  parent.add(cargo);
+  const material = wornCargoPaint(paint);
   const width = 8.0;
   const depth = 3.0;
   const height = 2.65;
@@ -227,6 +260,14 @@ function shippingContainer(parent: THREE.Group, x: number, z: number, yaw: numbe
     box(cargo, zinc, 4.055, height / 2, z, 0.076, height - 0.23, 0.038, false);
     box(cargo, iron, 4.083, 1.02, z + 0.098, 0.035, 0.052, 0.26, false);
   }
+  return cargo;
+}
+
+function shippingContainer(parent: THREE.Group, x: number, z: number, yaw: number, material: THREE.MeshStandardMaterial, stacked = false) {
+  const cargo = containerShell(material);
+  cargo.position.set(x, DIQUE_GROUND + (stacked ? 2.67 : 0), z);
+  cargo.rotation.y = yaw;
+  parent.add(cargo);
 }
 
 function containers(parent: THREE.Group, course: Course) {
@@ -234,12 +275,16 @@ function containers(parent: THREE.Group, course: Course) {
   const stacks = [[173, 88, -0.19, blue], [155, 133, -0.04, oxide], [194, 123, 0.11, blue],
     [201.5, 132.6, -0.06, oxide], [125.2, 130.0, -0.19, blue], [52.6, 68.7, 0, blue],
     [169.1, 67, -0.12, oxide], [166, 74, -0.07, blue], [184.1, 65.8, -0.11, amber],
-    [212, 71, 0.03, blue], [221.6, 76, 0.14, oxide], [138, 127, -0.08, blue]] as const;
+    [212, 71, 0.03, blue], [221.6, 76, 0.14, oxide], [138, 127, -0.08, blue],
+    [197.5, 62.5, -0.12, oxide], [233.8, 75.6, 0.03, blue], [197, 79, 0.12, blue],
+    [104, 132.7, -0.12, oxide], [121, 119.6, 0.16, blue], [151.5, 30.8, -0.07, blue]] as const;
   for (const [i, [x, z, yaw, color]] of stacks.entries()) {
     const anchor = diquePlanPoint(x, z);
     if (!diqueRoadClear(course, anchor.x, anchor.z, 4.35)) continue;
     shippingContainer(parent, anchor.x, anchor.z, yaw, color);
-    if (i === 4 || i === 7) shippingContainer(parent, anchor.x + 0.15, anchor.z + 0.038, yaw + 0.018, i === 4 ? oxide : blue, true);
+    if ([4, 7, 12, 13].includes(i)) {
+      shippingContainer(parent, anchor.x + 0.15, anchor.z + 0.038, yaw + 0.018, i % 3 === 0 ? amber : blue, true);
+    }
     for (let j = 0; j < 4; j++) {
       const x = anchor.x + (j - 2) * 0.67 + (i % 2 ? 5.21 : -4.31);
       const z = anchor.z + 1.91 + rng() * 0.54;
@@ -252,7 +297,7 @@ function containers(parent: THREE.Group, course: Course) {
 function serviceYards(parent: THREE.Group, course: Course, concrete: THREE.Material) {
   const rng = random(44611);
   const stations = [[45, 83], [58, 109], [102, 33], [154, 41], [130, 81],
-    [158, 78], [207, 74], [230, 87], [174, 133], [219, 129]] as const;
+    [158, 78], [207, 74], [226.5, 96.5], [174, 133], [219, 129]] as const;
   for (const [i, [x, z]] of stations.entries()) {
     const at = diquePlanPoint(x, z);
     if (!diqueRoadClear(course, at.x, at.z, 3.75)) continue;
