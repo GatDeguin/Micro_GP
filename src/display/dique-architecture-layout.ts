@@ -10,10 +10,10 @@ function site(model: string, title: string, caption: string, plan: readonly [num
 
 export const diqueBuildings = {
   depot: site('DiqueDeposito', 'Depósito 03', 'Carga y despacho', [238, 62], [15.8, 8.9], 3.42, -0.018),
-  workshop: site('DiqueTaller', 'Taller oeste', 'Mantenimiento', [43, 91], [10.8, 6.7], 2.24, 0.018),
-  pumps: site('DiqueBombas', 'Casa de bombas', 'Servicio del canal', [64, 105], [6.25, 5.1], 1.88, -0.020),
+  workshop: site('DiqueTaller', 'Taller oeste', 'Mantenimiento', [45.4, 91], [10.8, 6.7], 2.24, 0.018),
+  pumps: site('DiqueBombas', 'Casa de bombas', 'Servicio de la depuradora', [54.1, 103], [6.25, 5.1], 1.88, -0.020),
   station: site('DiqueSubestacion', 'Subestación', 'Acceso técnico', [112, 34.5], [7.7, 5.4], 1.97, 0.045),
-  timing: site('DiqueCronometraje', 'Cronometraje', 'Gran Premio del Dique', [60, 143], [6.6, 4.3], 1.62, -0.026),
+  timing: site('DiqueCronometraje', 'Cronometraje', 'Gran Premio del Dique', [59, 145], [6.6, 4.3], 1.62, -0.026),
 };
 
 export type DiqueBuilding = ReturnType<typeof site>;

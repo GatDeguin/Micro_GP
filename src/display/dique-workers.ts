@@ -139,7 +139,11 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   add('clerk', atGround(21.48, 14.71), atGround(22.66, 14.71), -0.35, inspector);
   const dispatch = atGround(freightLane.gate.x - 4.10, freightLane.gate.z);
   add('dispatcher', dispatch, dispatch, Math.PI - 0.45, inspector);
-  add('mechanic', plan(56.55, 124.4), plan(56.55, 124.4), Math.PI - 0.25, mechanic);
+  const maintenance = course.treatmentDetour ? plan(46.8, 110.3) : plan(56.55, 124.4);
+  add('mechanic', maintenance, maintenance, Math.PI - 0.25, mechanic);
+  if (course.treatmentDetour) {
+    add('clerk', plan(54.5, 123.8), plan(58.5, 123.8), 0.22, workwear);
+  }
   add('dock', plan(216.9, 79.8), plan(220.3, 79.9), 1.55, workwear);
   add('clerk', plan(222.3, 73.4), plan(225.2, 73.2), 1.78, inspector);
   function spillwayWalk(px: number, pz: number, yaw: number, from: number, to: number, look: number) {

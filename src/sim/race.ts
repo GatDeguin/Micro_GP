@@ -8,7 +8,7 @@ import { safetyPanelSpacing } from '../shared/safety.ts';
 import type { TrackLocation } from '../shared/track.ts';
 import { angleDifference, botDrive, type BotPlan } from './bot.ts';
 import { capsule, contactBetween } from './contact.ts';
-import { BASE_TOP_SPEED, HANDLING, loadSuspension, settledSuspension, type Handling, type Suspension } from './handling.ts';
+import { BASE_TOP_SPEED, HANDLING, STRAIGHT_SPEED_GAIN, loadSuspension, settledSuspension, type Handling, type Suspension } from './handling.ts';
 import { arcDelta, LapProgress } from './progress.ts';
 import { barrierTangent, slopeFor, tireLoad } from './road-contact.ts';
 import { RaceTiming } from './timing.ts';
@@ -150,7 +150,8 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
   const cornerLoad = steerLoad ** 2;
   car.exitLoad = Math.max(steerLoad, car.exitLoad - dt * 1.25);
   const exitTraction = 1 + (car.exitLoad - steerLoad) * style.exitTraction;
-  const top = BASE_TOP_SPEED + style.straightBonus * (1 - Math.min(1, steerLoad * 3.2));
+  const straightLine = 1 - clamp(steerLoad * 3.2, 0, 1);
+  const top = BASE_TOP_SPEED + (STRAIGHT_SPEED_GAIN + style.straightBonus) * straightLine;
   const limit = top - surface.speedLoss - 1.42 * style.cornerDrag * cornerLoad;
   const speedLimit = inPit ? Math.min(course.pit.speedLimit, limit) : limit;
 

@@ -192,9 +192,11 @@ function waterMaterial() {
         float gold = reflections * quay * (0.045 + 0.74 * sparkle * detail) * (0.38 + 0.84 * harborNight);
         float shadow = darkPiling * (1.0 - smoothstep(16.0, 19.73, q.y)) * smoothstep(15.5, 16.2, q.y);
         float riverShade = smoothstep(-4.7, -2.75, diqueWorld.y);
-        outgoingLight = outgoingLight * teal * (1.0 - 0.51 * shadow) * (0.65 + 0.35 * riverShade)
+        float ridge = smoothstep(0.19, 0.93, breakup * crossing + 0.54 * breakup);
+        outgoingLight = outgoingLight * teal * (1.0 - 0.51 * shadow) * (0.55 + 0.45 * riverShade)
           + vec3(0.010, 0.033, 0.052) * (0.7 + grazing)
-          + (0.022 + 0.042 * grazing) * sparkle * detail * vec3(0.44, 0.82, 1.0)
+          + (0.014 + 0.037 * grazing) * sparkle * detail * mix(1.0, 0.36 + 0.64 * ridge, river)
+            * vec3(0.44, 0.82, 1.0)
           + gold * vec3(1.0, 0.58, 0.27);
         #include <opaque_fragment>
       `);
@@ -446,9 +448,21 @@ function tunnelPortal(parent: THREE.Group, course: Course, distance: number, out
   }
   box(portal, concrete, 0, archClearance + 0.41, 0.02, 2 * half + 1.66, .76, .97);
   box(portal, facing, 0, archClearance + .76, .12, 2 * half + 1.88, .17, 1.39);
-  const plate = new THREE.MeshStandardMaterial({ map: diqueSign(['TÚNEL'], '#262d2c', '#dfd2af'), roughness: .69 });
+  const hasPlant = outgoing && course.treatmentDetour;
+  const plate = new THREE.MeshStandardMaterial({
+    map: diqueSign(hasPlant ? ['DEPURADORA', 'DESVÍO POR EL RIACHO'] : ['TÚNEL'], '#262d2c', '#dfd2af'), roughness: .69,
+  });
   const roadSign = diquePart(portal, new THREE.PlaneGeometry(2.54, .50), plate);
   roadSign.position.set(0, archClearance + .48, .833);
+  if (hasPlant) {
+    const map = diqueSign(['←  DEPURADORA', 'SEGUÍ LAS BALIZAS ÁMBAR'], '#352e22', '#ffe1a0', '#bd955e');
+    const station = course.sampleAt(distance - 4.2);
+    const side = 1;
+    const guide = diquePart(parent, new THREE.PlaneGeometry(2.64, 0.58),
+      new THREE.MeshStandardMaterial({ map, emissiveMap: map, emissive: 0xffbd78, emissiveIntensity: 1.04 }));
+    guide.position.copy(diqueEdge(course, station, side * (course.wallHalfAt(station.s, side) + 0.103), 1.59));
+    guide.rotation.y = Math.atan2(side * station.dz, -side * station.dx);
+  }
 }
 
 function tunnelReflections() {

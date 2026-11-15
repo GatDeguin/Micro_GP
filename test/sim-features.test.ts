@@ -207,14 +207,21 @@ test('the compact turns sooner while the bólido pulls ahead on a straight', () 
   assert.ok(straightRacer.race.snapshot().cars[2].speed > straightCompact.race.snapshot().cars[0].speed + 0.35);
 });
 
-test('each model reaches fifth gear and gains 12 to 17 percent straight-line speed', () => {
-  const priorTopSpeeds = [9.5, 9.5, 10.32, 9.56];
+test('each model gains at least ten percent in fifth and can still brake within the straight', () => {
+  const priorTopSpeeds = [10.90, 10.96, 11.98, 11.02];
   const topSpeeds = priorTopSpeeds.map((previous, slot) => {
     const { race, inputs } = ready(slot);
     tick(race, inputs(gas), 3.05);
     const car = race.snapshot().cars[slot];
     assert.equal(car.transmission?.gear, 5);
-    assert.ok(car.speed >= previous * 1.12 && car.speed <= previous * 1.17);
+    assert.ok(car.speed >= previous * 1.10 && car.speed <= previous * 1.15, `car ${slot}: ${car.speed}`);
+    assert.ok(car.transmission.rev > 0.85 && car.transmission.rev < 1);
+
+    const brake = { owned: true, input: { ...NEUTRAL, brake: true } };
+    tick(race, inputs(brake), 0.9);
+    const stoppedCar = race.snapshot().cars[slot];
+    assert.equal(stoppedCar.speed, 0);
+    assert.ok(stoppedCar.distance! - car.distance! < 5.8);
     return car.speed;
   });
   assert.ok(topSpeeds[2] > Math.max(topSpeeds[0], topSpeeds[1], topSpeeds[3]));
@@ -256,7 +263,7 @@ test('cornering rolls the body and braking pitches the nose down', () => {
 
 test('full braking builds pressure and stops a fifth-gear car within the braking zone', () => {
   const { race, inputs } = ready(0);
-  tick(race, inputs(gas), 2.3);
+  waitFor(race, inputs(gas), 2.3, () => race.snapshot().cars[0].speed >= 10.8);
   const entry = race.snapshot().cars[0];
   assert.equal(entry.transmission?.gear, 5);
   const brake = inputs({ owned: true, input: { ...NEUTRAL, brake: true } });

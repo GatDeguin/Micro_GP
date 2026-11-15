@@ -18,12 +18,19 @@ dique.push(
   { id: 'port-entry', at: DIQUE.detour.from + 18, lead: -2.2, side: 1, lift: 4.8, range: 19 },
   { id: 'port-crates', at: DIQUE.detour.apex, lead: 1.5, side: 1, lift: 4.65, range: 20 },
   { id: 'port-return', at: DIQUE.detour.to - 17, lead: 2.4, side: -1, lift: 4.3, range: 20 },
+  { id: 'riverbank', at: DIQUE.treatmentDetour.from + 46, lead: 3.6, side: -1, lift: 3.05, range: 28 },
+  { id: 'treatment-outfall', at: DIQUE.treatmentDetour.apex, lead: 2.7, side: -1, lift: 4.9, range: 28 },
+  { id: 'filter-house', at: DIQUE.treatmentDetour.to - 47, lead: 3.7, side: 1, lift: 3.35, range: 26 },
 );
 
 export function cinematicStation(s: number, course: Course = TALLER) {
   if (approachingCover(s, 4, course) > 0.08) return undefined;
-  if (course.id === 'dique' && s >= diqueRoadDistance(636) && s <= diqueRoadDistance(646)) {
-    return { id: 'tunnel-outfall', at: diqueRoadDistance(640), range: 6, x: -22.5, y: 3.3, z: -70.9 };
+  if (course.id === 'dique' && s >= DIQUE.treatmentDetour.from + 4 && s <= DIQUE.treatmentDetour.from + 19) {
+    const at = DIQUE.treatmentDetour.from + 12.4;
+    const point = course.sampleAt(at);
+    const offset = course.wallHalfAt(at, 1) + 1.50;
+    return { id: 'tunnel-outfall', at, range: 8, x: point.x - point.dz * offset,
+      y: course.heightAt(at, offset) + 4.5, z: point.z + point.dx * offset };
   }
   const stations = course.id === 'dique' ? dique : taller;
   let best = 1;

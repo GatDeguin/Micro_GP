@@ -14,6 +14,7 @@ import { buildDiqueProps } from './dique-props';
 import { buildDiqueRoadworks } from './dique-roadworks';
 import { buildDiqueTerminal } from './dique-terminal';
 import { buildDiqueTrack, diqueConcrete } from './dique-track';
+import { buildDiqueTreatment } from './dique-treatment';
 import { buildDiqueWorkers } from './dique-workers';
 import { buildDiqueYard } from './dique-yard';
 
@@ -45,18 +46,21 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   const concrete = diqueConcrete();
   const harbor = buildDiqueHarbor(dock, course, wood, concrete, quay, pier);
   buildDiqueLandscape(dock, course, concrete);
-  buildDiqueTrack(infrastructure, course, concrete, bridge.every(part => part !== undefined) ? bridge : undefined);
+  const track = buildDiqueTrack(infrastructure, course, concrete, bridge.every(part => part !== undefined) ? bridge : undefined);
   const tunnel = buildDiqueTunnel(infrastructure, course, concrete);
   const equipment = buildDiqueProps(props, course, concrete, garage);
   const terminal = buildDiqueTerminal(props, freight, course, concrete);
   const architecture = buildDiqueArchitecture(props, course, concrete, buildings);
   const detour = buildDiqueDetourLook(infrastructure, course);
   const roadworks = buildDiqueRoadworks(infrastructure, course);
+  const treatment = buildDiqueTreatment(props, course, concrete);
 
-  if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, equipment.crane]));
+  const movingProps = new Set<THREE.Object3D>([equipment.crane]);
+  if (treatment) movingProps.add(treatment.animated);
+  if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, ...movingProps]));
   mergeStatic(dock, new Set([harbor.backWall]), 45);
   mergeStatic(infrastructure, undefined, 48);
-  mergeStatic(props, new Set([equipment.crane]), 33);
+  mergeStatic(props, movingProps, 33);
   const yard = buildDiqueYard(parent, course);
   const workers = buildDiqueWorkers(parent, course);
   const craneActivity = crane ? buildDiqueCraneActivity(equipment.crane, course, crane) : undefined;
@@ -68,12 +72,14 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
     backWall: harbor.backWall,
     setNight(night: boolean) {
       harbor.setNight(night);
+      track.setNight(night);
       tunnel.setNight(night);
       equipment.setNight(night);
       terminal.setNight(night);
       architecture.setNight(night);
       detour?.setNight(night);
       roadworks.setNight(night);
+      treatment?.setNight(night);
       ship.setNight(night);
       yard.setNight(night);
       craneActivity?.setNight?.(night);
@@ -91,6 +97,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
     update(now: number) {
       harbor.update(now);
       roadworks.update(now);
+      treatment?.update(now);
       yard.update(now);
       craneActivity?.update(now);
       terminal.update(now);

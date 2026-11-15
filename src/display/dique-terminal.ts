@@ -318,7 +318,7 @@ export function buildDiqueTerminal(fixed: THREE.Group, parent: THREE.Group, cour
   const station = weighStation(fixed, concrete);
   const service = new THREE.Group();
   service.name = 'Camión de mantenimiento estacionado';
-  const layby = diquePlanPoint(55.8, 119.8);
+  const layby = course.treatmentDetour ? diquePlanPoint(44.6, 106.2) : diquePlanPoint(55.8, 119.8);
   if (diqueRoadClear(course, layby.x, layby.z, 4.2)) {
     service.position.set(layby.x, floor, layby.z);
     service.rotation.y = Math.PI / 2;

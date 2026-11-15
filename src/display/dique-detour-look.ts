@@ -55,8 +55,21 @@ export function buildDiqueDetourLook(target: THREE.Group, course: Course) {
     roadwaySign(root, course, apex + 2.6, 1, 2.04, 1.95, ['◀  ◀  ◀'], 12),
     roadwaySign(root, course, to + 5.6, -1, 1.89, 2.16, ['FIN DEL DESVÍO'], 7),
   ];
-  for (const [s, bend] of [[from - 4.3, 5.0], [from + 9.0, 5.7], [from + length * 0.31, 4.2],
-    [apex - 9, 4.6], [apex + 3.7, 4.6], [to - 23.4, 4.1], [to - 8.0, 4.6]]) {
+  const arrows = [[from - 4.3, 5.0], [from + 9.0, 5.7], [from + length * 0.31, 4.2],
+    [apex - 9, 4.6], [apex + 3.7, 4.6], [to - 23.4, 4.1], [to - 8.0, 4.6]];
+  const plant = course.treatmentDetour;
+  if (plant) {
+    panels.push(
+      roadwaySign(root, course, plant.from + 6.3, 1, 2.64, 2.19, ['← DESVÍO', 'RIACHO Y DEPURADORA'], 9),
+      roadwaySign(root, course, plant.apex - 10.2, -1, 2.26, 1.99, ['DESAGÜE', 'MARGEN DEL RIACHO'], 10),
+      roadwaySign(root, course, plant.to - 54, -1, 2.33, 1.98, ['DEPURADORA', 'SALIDA AL MALECÓN'], 10),
+      roadwaySign(root, course, plant.to + 8.8, 1, 2.13, 1.98, ['MALECÓN', 'FIN DEL DESVÍO'], 10),
+    );
+    arrows.push([course.tunnel.to - 5.8, 7.1], [plant.from + 3.8, 5.3], [plant.from + 20.5, 4.7],
+      [plant.from + 47.0, 4.2], [plant.apex - 9.3, 4.3], [plant.apex + 8.9, 4.3],
+      [plant.to - 54, 5.5], [plant.to - 34, 5.2], [plant.to - 17.2, 5.3]);
+  }
+  for (const [s, bend] of arrows) {
     const p = course.sampleAt(s);
     const next = course.sampleAt(s + bend);
     const marking = diquePart(root, stencil, paint, false, 'Flecha pintada en el pavimento');
@@ -65,12 +78,14 @@ export function buildDiqueDetourLook(target: THREE.Group, course: Course) {
   }
   const reflector = new THREE.MeshStandardMaterial({ color: 0xd9a244, emissive: 0xea8e23, emissiveIntensity: 0.24,
     roughness: 0.46, metalness: 0.12 });
-  for (const side of [-1, 1]) {
-    for (let s = from + 3.1; s < to - 3.0; s += 2.9) {
-      const p = course.sampleAt(s);
-      const edge = diqueEdge(course, p, side * (course.roadHalfAt(s) - 0.23), 0.018);
-      const marker = box(root, reflector, edge.x, edge.y, edge.z, 0.105, 0.019, 0.19, false);
-      marker.rotation.set(0, Math.atan2(p.dx, p.dz), -Math.atan(course.bankAt(p.s)), 'YXZ');
+  for (const [start, end, step] of [[from, to, 2.9], ...(plant ? [[plant.from, plant.to, 4.2]] : [])]) {
+    for (const side of [-1, 1]) {
+      for (let s = start + 3.1; s < end - 3.0; s += step) {
+        const p = course.sampleAt(s);
+        const edge = diqueEdge(course, p, side * (course.roadHalfAt(s) - 0.23), 0.018);
+        const marker = box(root, reflector, edge.x, edge.y, edge.z, 0.105, 0.019, 0.19, false);
+        marker.rotation.set(0, Math.atan2(p.dx, p.dz), -Math.atan(course.bankAt(p.s)), 'YXZ');
+      }
     }
   }
   return {

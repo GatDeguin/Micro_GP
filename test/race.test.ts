@@ -304,10 +304,10 @@ test('the automatic box shifts through fifth with a short torque break', async (
       }
     }
     before = car;
-    if (car.speed >= 10.89) break;
+    if (car.speed >= 12.29) break;
   }
   assert.deepEqual(gears, [1, 2, 3, 4, 5]);
-  assert.ok(before.speed >= 10.89 && before.speed <= 10.90);
+  assert.ok(before.speed >= 12.29 && before.speed <= 12.30);
 });
 
 test('cars at the same map position only touch when their height overlaps', async () => {

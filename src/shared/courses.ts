@@ -6,10 +6,18 @@ import { DIQUE } from './dique-track.ts';
 export { DIQUE, diquePlanPoint, diqueRoadDistance } from './dique-track.ts';
 export type CourseSector = (typeof TRACK_SECTORS)[number];
 
+interface DiqueDetour {
+  from: number;
+  to: number;
+  apex: number;
+  closedSamples: readonly TrackPoint[];
+}
+
 export interface Course extends Omit<typeof TRACK, 'anchors' | 'crossing'> {
   id: CourseId;
   crossing: Omit<typeof TRACK.crossing, 'x' | 'z'> & { x: number; z: number };
-  detour?: { from: number; to: number; apex: number; closedSamples: readonly TrackPoint[] };
+  detour?: DiqueDetour;
+  treatmentDetour?: DiqueDetour;
   pit: {
     entry: number;
     full: number;

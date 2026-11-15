@@ -13,7 +13,9 @@ export interface LiveryProgress {
   bestSectors: (number | null)[];
   /** Archived timings for the Dique layout before the port detour. */
   diqueBestSectors?: (number | null)[];
+  /** Archived timings for the Dique with the port detour alone. */
   diqueDetourBestSectors?: (number | null)[];
+  diqueTreatmentBestSectors?: (number | null)[];
 }
 
 const emptySectors = [null, null, null, null] as const;
@@ -31,11 +33,12 @@ export function normalizeLiveryProgress(value: unknown): LiveryProgress {
   const record: LiveryProgress = { clean: saved.clean === true, sector: saved.sector === true, bestSectors: times(saved.bestSectors) };
   if (Array.isArray(saved.diqueBestSectors)) record.diqueBestSectors = times(saved.diqueBestSectors);
   if (Array.isArray(saved.diqueDetourBestSectors)) record.diqueDetourBestSectors = times(saved.diqueDetourBestSectors);
+  if (Array.isArray(saved.diqueTreatmentBestSectors)) record.diqueTreatmentBestSectors = times(saved.diqueTreatmentBestSectors);
   return record;
 }
 
 export function bestSectorsFor(progress: LiveryProgress, course: CourseId): readonly (number | null)[] {
-  return course === 'dique' ? progress.diqueDetourBestSectors ?? emptySectors : progress.bestSectors;
+  return course === 'dique' ? progress.diqueTreatmentBestSectors ?? emptySectors : progress.bestSectors;
 }
 
 export function advanceLiveryProgress(previous: LiveryProgress, car: CarView, course: CourseId = 'taller'): LiveryProgress {
@@ -50,7 +53,7 @@ export function advanceLiveryProgress(previous: LiveryProgress, car: CarView, co
     return time;
   });
   if (!changed) return previous;
-  return course === 'dique' ? { ...previous, clean, sector, diqueDetourBestSectors: bestSectors }
+  return course === 'dique' ? { ...previous, clean, sector, diqueTreatmentBestSectors: bestSectors }
     : { ...previous, clean, sector, bestSectors };
 }
 

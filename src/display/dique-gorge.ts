@@ -393,6 +393,34 @@ function channelFlow(parent: THREE.Group, bank: readonly { point: THREE.Vector2;
   if (ribbons) diquePart(parent, ribbons, foam, false, 'Corriente y estelas pegadas a la roca');
 }
 
+function treatmentOutfall(parent: THREE.Group, concrete: THREE.Material, foam: THREE.Material) {
+  const pipe = standard(0x444e49, 0.64, 0.38);
+  const plate = standard(0x252f2c, 0.89);
+  const at = diquePlanPoint(77.2, 129.5);
+  const outlet = new THREE.Group();
+  outlet.name = 'Desagüe de la depuradora al riacho';
+  outlet.position.set(at.x, -2.41, at.z);
+  outlet.rotation.y = Math.PI / 2;
+  parent.add(outlet);
+  box(outlet, concrete, 0, -0.57, -0.40, 2.46, 1.92, 0.83);
+  box(outlet, concrete, 0, 0.46, -0.20, 2.76, 0.24, 1.12);
+  box(outlet, plate, 0, 0.09, 0.039, 1.45, 0.61, 0.07, false);
+  for (const x of [-0.55, -0.29, 0, 0.29, 0.55]) box(outlet, pipe, x, 0.095, 0.091, 0.061, 0.68, 0.075, false);
+  box(outlet, pipe, 0, -0.23, 0.16, 1.74, 0.10, 0.31, false);
+
+  const flow = waterRibbon([
+    [at.x + 0.14, -2.60, at.z, 0.64, 0.59, 0.62],
+    [at.x + 0.40, -2.72, at.z, 0.59, 0.95, 0.76],
+    [at.x + 0.68, -3.04, at.z + 0.04, 0.58, 0.96, 0.79],
+    [at.x + 0.90, -3.54, at.z + 0.07, 0.56, 0.96, 0.82],
+    [at.x + 1.10, waterLevel + 0.04, at.z + 0.10, 0.73, 1, 0.94, 1],
+    [at.x + 1.53, waterLevel + 0.03, at.z + 0.29, 1.21, 0.67, 0.86, 0.65],
+    [at.x + 2.53, waterLevel + 0.025, at.z + 0.87, 1.69, 0.31, 0.43, 0.21],
+    [at.x + 3.49, waterLevel + 0.022, at.z + 1.88, 1.87, 0, 0.19],
+  ], true, 1.4);
+  diquePart(parent, flow, foam, false, 'Caudal de la depuradora y espuma en el riacho');
+}
+
 function outwardRipples(point: THREE.Vector2, inward: THREE.Vector2, seed: number): RiverSection[] {
   const tangent = new THREE.Vector2(-inward.y, inward.x);
   if (tangent.y < 0) tangent.negate();
@@ -460,6 +488,7 @@ export function buildDiqueGorge(parent: THREE.Group, course: Course, boundary: r
   diquePart(gorge, diquePlane(boundary), water, false, 'Cauce encajado entre terrazas').position.y = waterLevel;
   const foam = currentMaterial(time, night);
   channelFlow(gorge, bank, foam);
+  if (course.treatmentDetour) treatmentOutfall(gorge, concrete, foam);
   const cutoff = diquePlanPoint(86.0, 136.2);
   const drain = box(gorge, concrete, cutoff.x, waterLevel + .73, cutoff.z, 4.92, 1.55, .49);
   drain.rotation.y = -.09;

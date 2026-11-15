@@ -1,4 +1,5 @@
 export const BASE_TOP_SPEED = 10.90;
+export const STRAIGHT_SPEED_GAIN = 1.40;
 
 export const HANDLING = [
   // Compacto, Cupé, Bólido and Cuña in grid order.

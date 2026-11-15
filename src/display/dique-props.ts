@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses';
-import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
+import { box, canvas2d, horizontalShadow, noiseField, random, standard, texture } from './materials';
 import { instanceStatic } from './batches';
 import { sceneryLights } from './render-layers';
 import { DIQUE_GROUND, diqueBeam, diqueEdge, diquePart, diqueRoadClear, diqueSign, diqueSpan, diqueStrip } from './dique-geometry';
@@ -30,28 +30,43 @@ function dockLabel(parent: THREE.Object3D, title: string, subtitle: string, widt
   label.position.set(0, y, z);
 }
 
-function poolMaterial(streaks = false) {
+function poolMaterial() {
   const { canvas, context } = canvas2d(64, 64);
   const glaze = context.createRadialGradient(32, 32, 1, 32, 32, 32);
-  glaze.addColorStop(0, streaks ? 'rgba(255,181,91,.53)' : 'rgba(255,181,91,.84)');
-  glaze.addColorStop(0.40, streaks ? 'rgba(254,143,53,.26)' : 'rgba(254,143,53,.49)');
+  glaze.addColorStop(0, 'rgba(255,181,91,.84)');
+  glaze.addColorStop(0.40, 'rgba(254,143,53,.49)');
   glaze.addColorStop(1, 'rgba(220,111,25,0)');
   context.fillStyle = glaze;
   context.fillRect(0, 0, 64, 64);
-  if (streaks) {
-    const rng = random(5256);
-    for (let i = 0; i < 130; i++) {
-      const angle = rng() * Math.PI * 2;
-      const radius = Math.sqrt(rng()) * 27;
-      const x = 32 + Math.cos(angle) * radius;
-      const y = 32 + Math.sin(angle) * radius * 0.78;
-      const alpha = (1 - radius / 29) * (0.2 + rng() * 0.59);
-      context.fillStyle = `rgba(255,204,141,${alpha})`;
-      context.fillRect(x, y, 0.8 + rng() * 4.1, 0.32 + rng() * 0.72);
-    }
-  }
   return new THREE.MeshBasicMaterial({ map: texture(canvas), transparent: true, depthWrite: false,
     opacity: 0.29, blending: THREE.AdditiveBlending });
+}
+
+function floodlightPool() {
+  const width = 128;
+  const height = 64;
+  const { canvas, context } = canvas2d(width, height);
+  const pattern = context.createImageData(width, height);
+  const aggregate = noiseField(88, 51, random(5256));
+  const wear = noiseField(12, 10, random(5257));
+  for (let y = 0; y < height; y++) {
+    const v = (y + 0.5) / height;
+    for (let x = 0; x < width; x++) {
+      const u = (x + 0.5) / width;
+      const longitudinal = (u - 0.50) / (0.5 - 0.12 * v);
+      const transverse = (v - 0.39) / (v < 0.39 ? 0.39 : 0.61);
+      const footprint = Math.max(0, 1 - longitudinal * longitudinal - transverse * transverse) ** 1.85;
+      const stone = aggregate(u, v);
+      const reflect = THREE.MathUtils.smoothstep(stone, 0.61, 0.97) * footprint;
+      const i = (y * width + x) * 4;
+      pattern.data[i] = 255;
+      pattern.data[i + 1] = 154 + 54 * reflect;
+      pattern.data[i + 2] = 73 + 71 * reflect;
+      pattern.data[i + 3] = 223 * footprint * (0.49 + 0.32 * wear(u, v) + 0.41 * reflect);
+    }
+  }
+  context.putImageData(pattern, 0, 0);
+  return new THREE.MeshBasicMaterial({ map: texture(canvas), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 }
 
 function barrel(parent: THREE.Object3D, material: THREE.Material, x: number, y: number, z: number) {
@@ -206,58 +221,115 @@ function garage(parent: THREE.Group, course: Course, concrete: THREE.Material, w
 }
 
 const cargoPaint = new WeakMap<THREE.MeshStandardMaterial, THREE.MeshStandardMaterial>();
-let cargoWear: THREE.CanvasTexture | undefined;
 
 function wornCargoPaint(base: THREE.MeshStandardMaterial) {
   const cached = cargoPaint.get(base);
   if (cached) return cached;
-  if (!cargoWear) {
-    const { canvas, context } = canvas2d(256, 112);
-    const wear = random(804);
-    const glaze = context.createLinearGradient(0, 0, 0, 112);
-    glaze.addColorStop(0, '#f5eee2');
-    glaze.addColorStop(0.26, '#d9d0c4');
-    glaze.addColorStop(0.72, '#f1e8d6');
-    glaze.addColorStop(1, '#aba092');
-    context.fillStyle = glaze;
-    context.fillRect(0, 0, 256, 112);
-    for (let i = 0; i < 290; i++) {
-      const x = wear() * 256;
-      const y = i % 3 === 0 ? wear() * 112 : (i % 2 ? 104 - wear() * 17 : wear() * 21);
-      context.fillStyle = i % 4 ? 'rgba(118,82,59,.24)' : 'rgba(71,53,41,.38)';
-      context.fillRect(x, y, 1 + wear() ** 2 * 8, 0.4 + wear() ** 3 * 9);
+  const width = 512;
+  const height = 192;
+  const { canvas, context } = canvas2d(width, height);
+  const rng = random(804 + base.color.getHex());
+  const pigment = '#' + base.color.getHexString();
+  context.fillStyle = pigment;
+  context.fillRect(0, 0, width, height);
+  const glaze = context.createLinearGradient(0, 0, 0, height);
+  glaze.addColorStop(0, 'rgba(255,220,174,.12)');
+  glaze.addColorStop(0.27, 'rgba(214,185,157,.02)');
+  glaze.addColorStop(0.72, 'rgba(49,38,32,.09)');
+  glaze.addColorStop(1, 'rgba(45,29,19,.35)');
+  context.fillStyle = glaze;
+  context.fillRect(0, 0, width, height);
+  for (let i = 0; i < 51; i++) {
+    const x = 3 + rng() * (width - 6);
+    const y = rng() ** 2 * height * 0.73;
+    const run = 6 + rng() ** 2 * (height - y) * 0.82;
+    const drip = context.createLinearGradient(x, y, x, y + run);
+    drip.addColorStop(0, 'rgba(141,74,38,.61)');
+    drip.addColorStop(0.31, 'rgba(103,60,38,.28)');
+    drip.addColorStop(1, 'rgba(89,58,43,0)');
+    context.fillStyle = drip;
+    context.fillRect(x, y, 0.65 + 2.8 * rng() ** 2, run);
+  }
+  for (let i = 0; i < 388; i++) {
+    const x = rng() * width;
+    const y = i % 3 === 0 ? rng() * height : i % 2 ? height - rng() * 26 : rng() * 19;
+    const chipWidth = 0.4 + rng() ** 3 * 7.5;
+    const chipHeight = 0.45 + rng() ** 2 * 4.2;
+    context.fillStyle = i % 4 === 0 ? 'rgba(189,109,59,.49)' : 'rgba(55,35,26,.44)';
+    context.fillRect(x, y, chipWidth, chipHeight);
+    if (i % 5 === 0) {
+      context.fillStyle = 'rgba(230,219,192,.43)';
+      context.fillRect(x, y + chipHeight, chipWidth * 0.75, 0.47);
     }
-    for (let i = 0; i < 64; i++) {
-      context.fillStyle = 'rgba(255,243,219,.25)';
-      context.fillRect(2 + wear() * 252, 3 + wear() * 106, 1 + wear() ** 2 * 12, 0.83);
-    }
-    cargoWear = texture(canvas);
   }
   const finish = base.clone();
-  finish.map = cargoWear;
-  finish.name = 'Pintura de contenedor erosionada en los cantos';
+  finish.map = texture(canvas);
+  finish.color.setHex(0xffffff);
+  finish.metalness *= 0.48;
+  finish.roughness = THREE.MathUtils.clamp(base.roughness - 0.055, 0.51, 0.73);
+  finish.name = 'Acero corrugado con pintura cuarteada y óxido';
   cargoPaint.set(base, finish);
   return finish;
 }
 
+const cargoWidth = 8;
+const cargoDepth = 3;
+const cargoHeight = 2.65;
+
+function corrugatedSteel() {
+  const positions: number[] = [];
+  const uv: number[] = [];
+  const indices: number[] = [];
+  const half = cargoWidth / 2;
+  const profile = [-0.08, -0.043, 0.043, 0.08];
+  const lips = [0.006, 0.079, 0.079, 0.006];
+  const ridges: { x: number; lift: number }[] = [{ x: -half + 0.11, lift: 0.006 }];
+  for (let x = -3.74; x < 3.80; x += 0.238) {
+    profile.forEach((offset, i) => ridges.push({ x: x + offset, lift: lips[i] }));
+  }
+  ridges.push({ x: half - 0.11, lift: 0.006 });
+  for (let face = 0; face < 3; face++) {
+    const base = positions.length / 3;
+    ridges.forEach(({ x, lift }, i) => {
+      const u = (x + half) / cargoWidth;
+      if (face < 2) {
+        const front = face === 0;
+        const z = (front ? 1 : -1) * (cargoDepth / 2 + lift);
+        positions.push(x, 0.106, z, x, cargoHeight - 0.12, z);
+        uv.push(front ? u : 1 - u, 0.04, front ? u : 1 - u, 0.95);
+      } else {
+        const y = cargoHeight + lift * 0.66;
+        positions.push(x, y, -1.42, x, y, 1.42);
+        uv.push(u, 0.97, u, 0.03);
+      }
+      const k = base + i * 2;
+      if (i === ridges.length - 1) return;
+      if (face !== 0) indices.push(k, k + 1, k + 2, k + 2, k + 1, k + 3);
+      else indices.push(k, k + 2, k + 1, k + 2, k + 3, k + 1);
+    });
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+const cargoPanels = corrugatedSteel();
+
 export function containerShell(paint: THREE.MeshStandardMaterial) {
   const cargo = new THREE.Group();
   const material = wornCargoPaint(paint);
-  const width = 8.0;
-  const depth = 3.0;
-  const height = 2.65;
-  box(cargo, material, 0, height / 2, 0, width, height, depth);
+  box(cargo, material, 0, cargoHeight / 2, 0, cargoWidth, cargoHeight, cargoDepth);
+  diquePart(cargo, cargoPanels, material, false);
   for (const side of [-1, 1]) {
-    box(cargo, iron, 0, 0.083, side * 1.52, width + 0.04, 0.11, 0.14, false);
-    box(cargo, material, 0, height - 0.068, side * 1.53, width + 0.04, 0.13, 0.127, false);
-    for (let x = -3.77; x < 3.89; x += 0.238) {
-      box(cargo, material, x, height / 2, side * 1.524, 0.104, height - 0.22, 0.111, false);
-    }
-    for (const z of [-1.43, 1.43]) box(cargo, zinc, side * 4.014, height / 2, z, 0.116, height, 0.092, false);
+    box(cargo, iron, 0, 0.083, side * 1.52, cargoWidth + 0.04, 0.11, 0.14, false);
+    box(cargo, paint, 0, cargoHeight - 0.068, side * 1.53, cargoWidth + 0.04, 0.13, 0.127, false);
+    for (const z of [-1.43, 1.43]) box(cargo, zinc, side * 4.014, cargoHeight / 2, z, 0.116, cargoHeight, 0.092, false);
   }
-  for (let x = -3.79; x < 3.93; x += 0.25) box(cargo, material, x, height + 0.023, 0, 0.093, 0.052, depth - 0.21, false);
   for (const z of [-0.84, -0.26, 0.26, 0.84]) {
-    box(cargo, zinc, 4.055, height / 2, z, 0.076, height - 0.23, 0.038, false);
+    box(cargo, zinc, 4.055, cargoHeight / 2, z, 0.076, cargoHeight - 0.23, 0.038, false);
     box(cargo, iron, 4.083, 1.02, z + 0.098, 0.035, 0.052, 0.26, false);
   }
   return cargo;
@@ -518,20 +590,30 @@ function brakingBoard(parent: THREE.Group, course: Course, distance: number, sid
 }
 
 function lights(parent: THREE.Group, course: Course) {
-  const glass = new THREE.MeshStandardMaterial({ color: 0xffde92, emissive: 0xffa94c, emissiveIntensity: 1.65, roughness: 0.38 });
-  const glow = poolMaterial(true);
+  const glass = new THREE.MeshStandardMaterial({ color: 0xffe7b4, emissive: 0xffaf61, emissiveIntensity: 1.65, roughness: 0.38 });
+  const glow = floodlightPool();
   const halo = new THREE.SpriteMaterial({ color: 0xffc08c, map: poolMaterial().map, blending: THREE.AdditiveBlending,
     transparent: true, opacity: 0.28, depthWrite: false });
   const poles: THREE.SpotLight[] = [];
-  const stations = [[4, 1], [44, 1], [92, 1], [136, -1], [171, 1], [238, 1], [279, -1],
-    [325, -1], [395, 1], [445, 1], [494, -1], [555, -1], [644, -1], [692, 1], [735, -1]] as const;
-  for (const [i, [at, side]] of stations.entries()) {
-    const s = diqueRoadDistance(at);
+  const stations = ([[4, 1], [44, 1], [92, 1], [136, -1], [171, 1], [238, 1], [279, -1],
+    [325, -1], [395, 1], [445, 1], [494, -1], [555, -1], [644, -1], [692, 1], [735, -1]] as const)
+    .map(([at, side], i) => ({ s: diqueRoadDistance(at), side, tall: [3, 4, 7, 8, 10, 12].includes(i),
+      dynamic: [0, 4, 5, 10, 12].includes(i) }));
+  const treatment = course.treatmentDetour;
+  if (treatment) for (const [s, preferredSide] of [[treatment.from + 29, -1], [treatment.apex - 4, 1], [treatment.to - 43, -1]] as const) {
+    const p = course.sampleAt(s);
+    const sides = [preferredSide, -preferredSide] as (1 | -1)[];
+    const side = sides.find(side => {
+      const foot = diqueEdge(course, p, side * (course.wallHalfAt(s, side) + 1.25));
+      return diqueRoadClear(course, foot.x, foot.z, 0.91);
+    });
+    if (side) stations.push({ s, side, tall: false, dynamic: false });
+  }
+  for (const { s, side, tall, dynamic } of stations) {
     const p = course.sampleAt(s);
     const margin = side * (course.wallHalfAt(s, side) + 1.25);
     const q = diqueEdge(course, p, margin);
     const foot = q.y > 1 ? q.y - 0.11 : DIQUE_GROUND;
-    const tall = i === 3 || i === 4 || i === 7 || i === 8 || i === 10 || i === 12;
     const height = tall ? 7.55 : 5.36;
     const postTop = foot + height;
     const yaw = Math.atan2(p.x - q.x, p.z - q.z);
@@ -550,9 +632,10 @@ function lights(parent: THREE.Group, course: Course) {
     } else box(tower, amber, 0, height / 2, 0, 0.19, height, 0.15);
     const head = new THREE.Group();
     head.position.set(q.x, postTop, q.z);
-    head.rotation.set(-0.38, yaw, 0, 'YXZ');
     head.scale.setScalar(tall ? 1.54 : 1.29);
     parent.add(head);
+    const aim = diqueEdge(course, p, -0.42 * side);
+    head.lookAt(aim);
     box(head, iron, 0, 0, 0, 1.46, 0.68, 0.22);
     for (const y of [-0.155, 0.155]) for (const x of [-0.44, 0, 0.44]) {
       box(head, zinc, x, y, 0.129, 0.39, 0.26, 0.081, false);
@@ -569,17 +652,17 @@ function lights(parent: THREE.Group, course: Course) {
     const uv = floor.getAttribute('uv');
     for (let j = 0; j < uv.count; j++) {
       const downtrack = (samples[Math.floor(j / 2)].s - from) / poolLength;
-      uv.setXY(j, downtrack + (j % 2 ? -0.08 : 0.08) * side, j % 2 ? 0.93 : 0.07);
+      uv.setXY(j, downtrack + (j % 2 ? -0.05 : 0.05) * side, (j % 2 ? 1 : -1) === side ? 0.93 : 0.07);
     }
     diquePart(parent, floor, glow);
-    if (i === 0 || i === 4 || i === 7 || i === 10 || i === 12) {
+    if (dynamic) {
       const haze = new THREE.Sprite(halo);
       haze.position.set(0, 0.01, 0.29);
-      haze.scale.set(2.6, 1.12, 1);
+      haze.scale.set(2.25, 0.95, 1);
       head.add(haze);
-      const actual = new THREE.SpotLight(0xffb267, 21, 14.4, 0.58, 0.75, 2);
+      const actual = new THREE.SpotLight(0xffb571, 21, 15.6, 0.63, 0.79, 2);
       actual.position.set(q.x, postTop, q.z);
-      actual.target.position.copy(diqueEdge(course, p, -0.42 * side));
+      actual.target.position.copy(aim);
       actual.layers.set(sceneryLights);
       parent.add(actual, actual.target);
       poles.push(actual);
@@ -614,12 +697,12 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   return {
     ...crane,
     setNight(enabled: boolean) {
-      for (const light of poles) light.intensity = enabled ? 181 : 81;
-      glow.opacity = enabled ? 0.83 : 0.56;
+      for (const light of poles) light.intensity = enabled ? 221 : 63;
+      glow.opacity = enabled ? 0.84 : 0.43;
       garageGlow.opacity = enabled ? 0.95 : 0.75;
       wallBounce.opacity = enabled ? 0.57 : 0.33;
-      halo.opacity = enabled ? 0.52 : 0.29;
-      bulb.emissiveIntensity = enabled ? 4.2 : 2.8;
+      halo.opacity = enabled ? 0.44 : 0.21;
+      bulb.emissiveIntensity = enabled ? 3.60 : 2.35;
       lamp.emissiveIntensity = enabled ? 3.35 : 2.26;
     },
   };
