@@ -2,6 +2,7 @@ import { CAR_SPECS, COURSE_OPTIONS, isCourseId, type CourseId, type RaceConfig }
 import { LIVERIES } from '../shared/liveries.ts';
 import type { DisplayLobbyPacket } from '../shared/lobby.ts';
 import { placardLayout } from './signs';
+import { preferLandscape } from './landscape';
 import './lobby.css';
 
 export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => void) {
@@ -29,6 +30,7 @@ export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => v
       </fieldset>
     </div>
     <ul class="lan-lobby-slots" aria-label="Plazas" aria-live="polite" aria-atomic="true"></ul>
+    <p class="landscape-hint">Girá el celular para ver la carrera en horizontal.</p>
     <footer class="lan-lobby-footer">
       <p role="status">Conectando con la sala…</p>
       <button type="button" disabled>Confirmar salida</button>
@@ -127,6 +129,7 @@ export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => v
   });
   launch.addEventListener('click', () => {
     launch.disabled = true;
+    void preferLandscape();
     send({ type: 'launch' });
   });
   returnButton.addEventListener('click', () => {

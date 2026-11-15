@@ -1,6 +1,7 @@
 import { CAR_SPECS, COURSE_OPTIONS, isCourseId, normalizeRaceConfig, type CourseId, type DriveInput, type Driver, type Livery, type RaceSnapshot } from '../shared/protocol';
 import { advanceLiveryProgress, bestSectorsFor, LIVERIES, normalizeLiveryProgress, unlockedLiveries } from '../shared/liveries';
 import { Race } from '../sim/race';
+import { preferLandscape } from './landscape';
 
 type Action = 'left' | 'right' | 'gas' | 'brake';
 const keys = new Map<string, Action>([
@@ -60,6 +61,7 @@ export function startSolo(
       <p class="solo-practice-note" data-unlock role="status" hidden></p>
       <button type="button" class="solo-prepare" aria-controls="solo-setup" aria-expanded="false">Preparar partida</button>
       <button type="button" class="solo-toggle">Jugar</button>
+      <p class="landscape-hint">Girá el celular para jugar en horizontal.</p>
       <p class="solo-hint">Flechas o WASD · Cámaras 1 a 4</p>
     </div>
     <div class="solo-pedals" aria-label="Mandos táctiles" hidden>
@@ -159,7 +161,10 @@ export function startSolo(
   });
   mode.addEventListener('change', syncMode);
   livery.addEventListener('change', () => { garage.liveries[Number(carSelect.value)] = livery.value as Livery; });
-  prepare.addEventListener('click', () => showSetup(setup.hidden));
+  prepare.addEventListener('click', () => {
+    if (setup.hidden) void preferLandscape();
+    showSetup(setup.hidden);
+  });
 
   function resetInput() {
     heldKeys.clear();
@@ -168,6 +173,7 @@ export function startSolo(
 
   function start(config: ReturnType<typeof normalizeRaceConfig>, slot: number) {
     if (!race.configure(config) || !race.launch()) return;
+    void preferLandscape();
     garage.config = config;
     garage.lapsByCourse[config.course] = config.laps;
     garage.slot = slot;
