@@ -59,6 +59,6 @@ El puerto predeterminado es 4173. `PORT` y `HOST` permiten cambiarlo. Para un de
 - `npm run dev` sirve el código fuente con Vite y mantiene la misma ruta de conexión para el teléfono.
 - `npm test` ejecuta las pruebas del trazado, las reglas de carrera y el enlace de los mandos.
 - `npm run build` verifica tipos y genera las dos pantallas en `dist`.
-- El diseño inicial está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. El trazado y el perfil del Dique se documentan en `referencias/gran-premio-del-dique/`. La grúa del puerto se modeló en Blender y se exportó a GLB.
+- El diseño inicial está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. El trazado y el perfil del Dique se documentan en `referencias/gran-premio-del-dique/`. La grúa, las celosías del puente, los boxes y el muelle se modelaron en Blender y se exportaron a GLB. En esa carpeta están los dos modelos editables.
 
 La verificación en Chrome cubre partida individual, cámaras, pantalla dividida, lectura del QR y mandos con emulación móvil. Las pruebas de red también comprueban las cuatro plazas, la reconexión del mando y el relevo del anfitrión tras un corte silencioso.

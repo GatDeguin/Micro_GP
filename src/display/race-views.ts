@@ -128,11 +128,13 @@ export function buildRaceViews(
 
     const room = scene.background;
     const roomBlur = scene.backgroundBlurriness;
+    const roomIntensity = scene.backgroundIntensity;
     const collector = mode === 'general' ? undefined : backdrop.build();
     const draw = (camera: THREE.PerspectiveCamera, following: boolean) => {
       const background = following ? collector : undefined;
       scene.background = background ?? room;
       scene.backgroundBlurriness = background ? 0.05 : roomBlur;
+      scene.backgroundIntensity = background && course.id === 'dique' ? roomIntensity * 0.74 : roomIntensity;
       backdrop.wall.visible = background === undefined;
       renderer.render(scene, camera);
     };
@@ -190,6 +192,7 @@ export function buildRaceViews(
     }
     scene.background = room;
     scene.backgroundBlurriness = roomBlur;
+    scene.backgroundIntensity = roomIntensity;
     backdrop.wall.visible = true;
 
     renderer.autoClear = false;

@@ -37,11 +37,12 @@ function field() {
   const blade = noiseField(107, 175, rng);
   for (let y = 0; y < 320; y++) for (let x = 0; x < 320; x++) {
     const weather = moss(x / 320, y / 320);
+    const growth = THREE.MathUtils.smoothstep(weather, 0.44, 0.67);
     const grain = (blade(x / 320, y / 320) - 0.5) * 28 + 10 * (rng() - 0.5);
     const index = (y * 320 + x) * 4;
-    pixels.data[index] = 63 + 48 * weather + grain;
-    pixels.data[index + 1] = 102 + 28 * weather + grain;
-    pixels.data[index + 2] = 53 + 15 * weather + grain * 0.76;
+    pixels.data[index] = 104 - 47 * growth + grain;
+    pixels.data[index + 1] = 104 - 22 * growth + grain;
+    pixels.data[index + 2] = 94 - 49 * growth + grain * 0.76;
     pixels.data[index + 3] = 255;
   }
   context.putImageData(pixels, 0, 0);
@@ -100,12 +101,12 @@ function loadYards(parent: THREE.Group, concrete: THREE.MeshStandardMaterial) {
 function plants(parent: THREE.Group, course: Course, islands: readonly (readonly THREE.Vector2[])[]) {
   const rng = random(7213);
   const bark = standard(0x5a5544, 0.96);
-  const greens = [0x445a37, 0x627247, 0x55683e, 0x75824a, 0x596c43];
+  const greens = [0x4c5940, 0x657047, 0x566347, 0x747754, 0x565f48];
   const stones = [0x676a68, 0x74746a, 0x8c8370, 0x565b49];
   const leaves: { x: number; y: number; z: number; size: number; tint: number }[] = [];
   const rocks: { x: number; z: number; size: number; tint: number }[] = [];
-  const grove = [[38, 100], [35, 113], [49, 129], [61, 134], [59, 96], [67, 112], [65, 85],
-    [89, 35], [102, 32], [113, 36], [152, 39], [162, 34], [112, 88]] as const;
+  const grove = [[38, 100], [61, 134], [59, 96], [67, 112], [65, 85], [89, 35],
+    [113, 36], [152, 39], [162, 34], [112, 88]] as const;
   for (let i = 0; i < grove.length; i++) {
     const [x, z] = grove[i];
     const q = diquePlanPoint(x, z);
@@ -130,7 +131,7 @@ function plants(parent: THREE.Group, course: Course, islands: readonly (readonly
       const dx = center.x + Math.cos(angle) * rx * spread;
       const dz = center.z + Math.sin(angle) * rz * spread;
       if (!islands.some(outline => contains(outline, dx, dz)) || !diqueRoadClear(course, dx, dz, 0.74)) continue;
-      if (i % 4 === 0) rocks.push({ x: dx, z: dz, size: 0.25 + rng() * 0.59, tint: stones[i % stones.length] });
+      if (i % 3 === 0) rocks.push({ x: dx, z: dz, size: 0.35 + rng() * 0.91, tint: stones[(i + count) % stones.length] });
       else leaves.push({ x: dx, y: DIQUE_GROUND + 0.13, z: dz, size: 0.16 + rng() ** 1.8 * 0.56, tint: greens[i % greens.length] });
     }
   }

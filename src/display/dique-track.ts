@@ -50,22 +50,22 @@ export function diqueConcrete() {
       const drip = stain(u, v * 0.61) ** 2;
       const shade = 192 - 48 * drip - 17 * pocks(u, v) + 23 * (rng() - 0.5) - (seam < 3 ? 32 - seam * 7 : 0);
       const i = (y * 512 + x) * 4;
-      pixels.data[i] = shade + 3;
-      pixels.data[i + 1] = shade + 1;
-      pixels.data[i + 2] = shade - 5 - drip * 8;
+      pixels.data[i] = shade + 1;
+      pixels.data[i + 1] = shade + 2;
+      pixels.data[i + 2] = shade + 1 - drip * 6;
       pixels.data[i + 3] = 255;
     }
   }
   context.putImageData(pixels, 0, 0);
   const map = texture(canvas);
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  return new THREE.MeshStandardMaterial({ color: 0xb4ada1, map, bumpMap: map, bumpScale: 0.061, roughness: 0.85 });
+  return new THREE.MeshStandardMaterial({ color: 0xa1a2a0, map, bumpMap: map, bumpScale: 0.052, roughness: 0.82 });
 }
 
 function asphalt() {
   const map = mineralMap(929, [193, 196, 201], 1.25);
   return new THREE.MeshPhysicalMaterial({ color: TINT.asphalt, map, bumpMap: map, bumpScale: 0.035,
-    vertexColors: true, roughness: 0.83, clearcoat: 0.17, clearcoatRoughness: 0.57 });
+    vertexColors: true, roughness: 0.71, clearcoat: 0.33, clearcoatRoughness: 0.35 });
 }
 
 function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
@@ -346,12 +346,11 @@ function retainingWalls(parent: THREE.Group, course: Course, concrete: THREE.Mat
   }
 }
 
-function steelBridge(parent: THREE.Group, course: Course) {
+function fallbackTruss(parent: THREE.Group, course: Course) {
   const web = standard(0x516269, 0.48, 0.67);
   const channel = standard(0x3b484b, 0.43, 0.73);
   const plate = standard(0x818c88, 0.48, 0.56);
   const rust = standard(0x776348, 0.78, 0.43);
-  const seam = standard(0x34322e, 0.96);
   const stations = Array.from({ length: 13 }, (_, i) => course.sampleAt(351 + i * (39 / 12)));
   for (const side of [-1, 1]) {
     const edge = (p: TrackPoint, y: number) => diqueEdge(course, p, side * (course.wallHalfAt(p.s, side) + 0.46), y);
@@ -372,6 +371,13 @@ function steelBridge(parent: THREE.Group, course: Course) {
       diqueBeam(parent, plate, diagonal[0], diagonal[1], 0.15, 0.135);
     }
   }
+}
+
+function steelBridge(parent: THREE.Group, course: Course, bridgeModel?: readonly THREE.Object3D[]) {
+  if (bridgeModel) parent.add(...bridgeModel);
+  else fallbackTruss(parent, course);
+  const plate = standard(0x818c88, 0.48, 0.56);
+  const seam = standard(0x34322e, 0.96);
   for (const s of [361.01, 384.82]) {
     const p = course.sampleAt(s);
     const yaw = Math.atan2(p.dx, p.dz);
@@ -389,11 +395,11 @@ function steelBridge(parent: THREE.Group, course: Course) {
   }
 }
 
-export function buildDiqueTrack(parent: THREE.Group, course: Course, concrete: THREE.Material) {
+export function buildDiqueTrack(parent: THREE.Group, course: Course, concrete: THREE.Material, bridgeModel?: readonly THREE.Object3D[]) {
   surfaceRuns(parent, course, concrete);
   curbs(parent, course);
   rails(parent, course);
   trackPaint(parent, course);
   retainingWalls(parent, course, concrete);
-  steelBridge(parent, course);
+  steelBridge(parent, course, bridgeModel);
 }

@@ -70,9 +70,9 @@ function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
   const target = new THREE.Vector3(-1.1, 0.11, -0.6);
   if (dique) {
     new THREE.Box3().setFromPoints(deck).getCenter(target);
-    target.z += 5;
+    target.z += 11;
   }
-  const eyeDirection = (dique ? new THREE.Vector3(-0.12, 0.82, 0.61) : new THREE.Vector3(-0.338, 0.779, 0.625)).normalize();
+  const eyeDirection = (dique ? new THREE.Vector3(-0.065, 0.717, 0.73) : new THREE.Vector3(-0.338, 0.779, 0.625)).normalize();
   const point = new THREE.Vector3();
   return (width: number, height: number) => {
     const qr = placardLayout(width, height);
@@ -85,7 +85,7 @@ function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
       camera.position.copy(target).addScaledVector(eyeDirection, distance);
       camera.lookAt(target);
       // The oblique view exposes the flanks while keeping the finish straight level.
-      camera.rotateZ(dique ? 0.055 : 0.383);
+      camera.rotateZ(dique ? 0.011 : 0.383);
       camera.updateMatrixWorld();
     };
 
@@ -234,8 +234,7 @@ async function bootstrap() {
     const { buildDiqueScene } = await import('./dique-scene');
     await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
     const root = new THREE.Group();
-    const diorama = buildDiqueScene(root, DIQUE, wood, !pages);
-    await diorama.craneReady;
+    const diorama = await buildDiqueScene(root, DIQUE, wood, !pages);
     return {
       ...diorama, root, course: DIQUE,
       barriers: buildSafetyBarriers(root, DIQUE), tyreMarks: buildTyreMarks(root, DIQUE),
