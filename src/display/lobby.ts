@@ -1,16 +1,15 @@
-import { CAR_SPECS, type RaceConfig } from '../shared/protocol.ts';
+import { CAR_SPECS, COURSE_OPTIONS, isCourseId, type CourseId, type RaceConfig } from '../shared/protocol.ts';
 import { LIVERIES } from '../shared/liveries.ts';
 import type { DisplayLobbyPacket } from '../shared/lobby.ts';
 import { placardLayout } from './signs';
 import './lobby.css';
 
-export function buildMultiplayerLobby() {
+export function buildMultiplayerLobby(onCourseSelected?: (course: CourseId) => void) {
   const panel = document.createElement('section');
   panel.className = 'lan-lobby';
   panel.setAttribute('aria-labelledby', 'lan-lobby-title');
   panel.innerHTML = `
     <header class="lan-lobby-header">
-      <p class="lan-lobby-kicker">Micro GP <span>·</span> Taller 07</p>
       <h2 id="lan-lobby-title">Sala de carrera</h2>
     </header>
     <div class="lan-lobby-content">
@@ -21,6 +20,7 @@ export function buildMultiplayerLobby() {
       </div>
       <fieldset class="lan-lobby-config" disabled>
         <legend>Configuración de la pista</legend>
+        <label class="lan-lobby-course">Circuito<select name="course">${Object.entries(COURSE_OPTIONS).map(([id, option]) => `<option value="${id}">${option.label}</option>`).join('')}</select></label>
         <label>Modo<select name="mode"><option value="race">Carrera</option><option value="practice">Práctica</option></select></label>
         <label>Vueltas<select name="laps">${Array.from({ length: 12 }, (_, i) => `<option>${i + 1}</option>`).join('')}</select></label>
         <label>Bots<select name="bots">${Array.from({ length: 4 }, (_, i) => `<option>${i}</option>`).join('')}</select></label>
@@ -42,6 +42,7 @@ export function buildMultiplayerLobby() {
 
   const invite = panel.querySelector<HTMLAnchorElement>('a')!;
   const config = panel.querySelector<HTMLFieldSetElement>('fieldset')!;
+  const course = config.querySelector<HTMLSelectElement>('[name="course"]')!;
   const laps = config.querySelector<HTMLSelectElement>('[name="laps"]')!;
   const bots = config.querySelector<HTMLSelectElement>('[name="bots"]')!;
   const difficulty = config.querySelector<HTMLSelectElement>('[name="difficulty"]')!;
@@ -87,6 +88,7 @@ export function buildMultiplayerLobby() {
     leavePlacardClear();
 
     config.disabled = !host;
+    course.value = lobby.config.course ?? 'taller';
     laps.value = String(lobby.config.laps);
     laps.disabled = lobby.config.mode === 'practice';
     bots.value = String(lobby.config.bots);
@@ -112,7 +114,11 @@ export function buildMultiplayerLobby() {
     launch.disabled = !host || !lobby.canLaunch;
   }
 
-  config.addEventListener('change', () => {
+  config.addEventListener('change', event => {
+    if (event.target === course) {
+      if (isCourseId(course.value)) send({ type: 'select-course', course: course.value });
+      return;
+    }
     const settings: RaceConfig = {
       laps: Number(laps.value), bots: Number(bots.value), difficulty: difficulty.value as RaceConfig['difficulty'],
       mode: mode.value as RaceConfig['mode'], night: night.checked,
@@ -138,7 +144,10 @@ export function buildMultiplayerLobby() {
       }
       if (message.type === 'lobby' && 'lobby' in message && 'host' in message) {
         connection = socket;
+        const previous = latest && (latest.lobby.config.course ?? 'taller');
         latest = message as DisplayLobbyPacket;
+        const selected = latest.lobby.config.course ?? 'taller';
+        if (selected !== previous) onCourseSelected?.(selected);
         render(latest);
         return true;
       }

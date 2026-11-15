@@ -1,18 +1,20 @@
-# Micro GP · Taller 07
+# Micro GP
 
 Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la carrera. Cada celular maneja un autito desde su navegador.
 
 ## Jugar en GitHub Pages
 
-Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1 a 4 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
+Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el circuito, el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1 a 4 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
 
-El circuito forma un ocho con un cruce a dos alturas. El túnel del ramal inferior desemboca bajo el tablero del puente, y la grada queda frente a la línea de meta. En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas.
+**Taller 07** forma un ocho con un cruce a dos alturas y una grada frente a meta. **Gran Premio del Dique** mide 759,35 unidades, cuatro veces la longitud de Taller 07. La recta del muelle desemboca en la horquilla de la grúa. La chicana de contenedores precede al puente y el descenso del vertedero lleva al túnel de retorno bajo el mismo cruce. Las zonas mojadas tienen el 82 % del agarre seco. La partida propone una vuelta en el Dique y recuerda cuántas elegiste para cada circuito.
+
+En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas. Los parciales se guardan por circuito.
 
 ## Jugar en Windows
 
 1. Abrí **Jugar.cmd** o entrá en **http://127.0.0.1:4173/** si el servidor ya está activo.
 2. Conectá el celular a la misma red que la PC y escaneá la placa QR de abajo a la derecha. Elegí un auto libre y marcá **Listo** en el mando.
-3. En la pantalla anfitriona de la PC, configurá la partida y pulsá **Confirmar salida** cuando todos estén listos.
+3. En la pantalla anfitriona de la PC, elegí el circuito, configurá la partida y pulsá **Confirmar salida** cuando todos estén listos.
 4. Mové la palanca a los lados para girar y mantené **GAS** para acelerar. **FRENO** tiene prioridad. Una vez detenido, soltalo y presionalo de nuevo para dar marcha atrás.
 
 Hacé clic una vez en la maqueta para habilitar los sonidos de la carrera.
@@ -57,6 +59,6 @@ El puerto predeterminado es 4173. `PORT` y `HOST` permiten cambiarlo. Para un de
 - `npm run dev` sirve el código fuente con Vite y mantiene la misma ruta de conexión para el teléfono.
 - `npm test` ejecuta las pruebas del trazado, las reglas de carrera y el enlace de los mandos.
 - `npm run build` verifica tipos y genera las dos pantallas en `dist`.
-- El diseño está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. La escena jugable usa geometría y materiales procedurales. Las imágenes de `referencias/` documentan el diseño.
+- El diseño inicial está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. El trazado y el perfil del Dique se documentan en `referencias/gran-premio-del-dique/`. La grúa del puerto se modeló en Blender y se exportó a GLB.
 
 La verificación en Chrome cubre partida individual, cámaras, pantalla dividida, lectura del QR y mandos con emulación móvil. Las pruebas de red también comprueban las cuatro plazas, la reconexión del mando y el relevo del anfitrión tras un corte silencioso.

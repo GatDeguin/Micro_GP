@@ -3,12 +3,13 @@ import {
   type Driver, type Livery, type RaceConfig, type RaceImpact, type RaceSnapshot,
 } from '../shared/protocol.ts';
 import { CAR_DIMENSIONS, GRID_LANE_OFFSET, type CarDimensions } from '../shared/car-dimensions.ts';
-import { GRID_ROWS, PIT_LANE, TRACK, isPitLane, wallHalfAt, type TrackLocation } from '../shared/track.ts';
-import { safetyAt } from '../shared/safety.ts';
+import { getCourse, TALLER, type Course } from '../shared/courses.ts';
+import { safetyPanelSpacing } from '../shared/safety.ts';
+import type { TrackLocation } from '../shared/track.ts';
 import { angleDifference, botDrive, type BotPlan } from './bot.ts';
 import { capsule, contactBetween } from './contact.ts';
 import { BASE_TOP_SPEED, HANDLING, loadSuspension, settledSuspension, type Handling, type Suspension } from './handling.ts';
-import { LapProgress } from './progress.ts';
+import { arcDelta, LapProgress } from './progress.ts';
 import { barrierTangent, slopeFor, tireLoad } from './road-contact.ts';
 import { RaceTiming } from './timing.ts';
 import { AutomaticTransmission } from './transmission.ts';
@@ -23,7 +24,6 @@ const CONTACT_GAP_FRAMES = 4;
 const MIN_AUDIBLE_IMPULSE = 0.46;
 const FULL_STRENGTH_IMPULSE = 7.2;
 
-const demoDistances = [6, TRACK.anchors.hairpin, TRACK.anchors.crest, TRACK.anchors.sweep];
 const laneFor = (index: number) => index % 2 === 0 ? GRID_LANE_OFFSET : -GRID_LANE_OFFSET;
 const quietSurface = () => ({ curb: 0, runoff: 0, gravel: 0, grass: 0, scrape: 0 });
 const barrierResponse = {
@@ -76,22 +76,22 @@ function approach(value: number, target: number, amount: number) {
   return value + clamp(target - value, -amount, amount);
 }
 
-function place(car: Car, s: number, offset: number, speed: number) {
-  const point = TRACK.sampleAt(s);
+function place(car: Car, s: number, offset: number, speed: number, course: Course) {
+  const point = course.sampleAt(s);
   car.x = point.x - point.dz * offset;
   car.z = point.z + point.dx * offset;
   car.yaw = Math.atan2(point.dx, point.dz);
   car.motionYaw = car.yaw;
   car.speed = speed;
-  car.road = TRACK.locate(car.x, car.z, point);
+  car.road = course.locate(car.x, car.z, point);
 }
 
-function spawn(s: number, index: number, speed: number, offset = laneFor(index),
+function spawn(course: Course, s: number, index: number, speed: number, offset = laneFor(index),
   transmission = new AutomaticTransmission(speed)): Car {
   const car: Car = {
     x: 0, z: 0, yaw: 0, dimensions: CAR_DIMENSIONS[index], motionYaw: 0, speed: 0, steer: 0, throttle: 0, brakePressure: 0,
     handling: HANDLING[index], suspension: settledSuspension(), exitLoad: 0,
-    road: { ...TRACK.sampleAt(s), offset: 0 }, progress: new LapProgress(s > 0 ? s - TRACK.length : s),
+    road: { ...course.sampleAt(s), offset: 0 }, progress: new LapProgress(s > 0 ? s - course.length : s, course),
     timing: new RaceTiming(), bot: { lane: laneFor(index), time: 0, wrongWay: 0 },
     transmission,
     surfaceSound: quietSurface(),
@@ -99,36 +99,36 @@ function spawn(s: number, index: number, speed: number, offset = laneFor(index),
     human: false, braking: false, reverseReady: false, reversing: false,
     stalled: 0, protection: 0,
   };
-  place(car, s, offset, speed);
+  place(car, s, offset, speed, course);
   return car;
 }
 
-function inGarage(car: Car) {
+function inGarage(car: Car, course: Course) {
   const { s, offset } = car.road;
-  return Math.abs(car.speed) <= 0.15 && Math.abs(offset - PIT_LANE.offset) <= 0.60
-    && PIT_LANE.stalls.some(stall => Math.abs(stall - s) <= 1.15);
+  return Math.abs(car.speed) <= 0.15 && Math.abs(offset - course.pit.offset) <= 0.60
+    && course.pit.stalls.some(stall => Math.abs(stall - s) <= 1.15);
 }
 
-function modelAtPose(model: number, previous: Car, pose: Car) {
-  const car = spawn(pose.road.s, model, pose.speed, pose.road.offset, previous.transmission.relocate(pose.speed));
+function modelAtPose(model: number, previous: Car, pose: Car, course: Course) {
+  const car = spawn(course, pose.road.s, model, pose.speed, pose.road.offset, previous.transmission.relocate(pose.speed));
   Object.assign(car, { x: pose.x, z: pose.z, yaw: pose.yaw, motionYaw: pose.motionYaw, road: pose.road });
   return car;
 }
 
-function move(car: Car, input: DriveInput, human: boolean, dt: number) {
+function move(car: Car, input: DriveInput, human: boolean, dt: number, course: Course) {
   const forwardX = Math.sin(car.yaw);
   const forwardZ = Math.cos(car.yaw);
   const along = forwardX * car.road.dx + forwardZ * car.road.dz;
   const across = forwardZ * car.road.dx - forwardX * car.road.dz;
-  const inPit = isPitLane(car.road.s, car.road.offset);
-  const surface = tireLoad(car.road, car.dimensions, along, across);
+  const inPit = course.isPitLane(car.road.s, car.road.offset);
+  const surface = tireLoad(car.road, car.dimensions, along, across, course);
   car.surfaceSound.curb = surface.curb;
   car.surfaceSound.runoff = surface.gravel + surface.grass + surface.escape * 0.32;
   car.surfaceSound.gravel = surface.gravel;
   car.surfaceSound.grass = surface.grass;
   car.surfaceSound.scrape = Math.max(0, car.surfaceSound.scrape - dt * 4.8);
   const grip = surface.grip - 0.38 * Math.max(0, car.suspension.heave);
-  const { uphill, lateral } = slopeFor(car.road, along, across);
+  const { uphill, lateral } = slopeFor(car.road, along, across, course);
 
   if (car.human !== human) {
     car.human = human;
@@ -152,7 +152,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number) {
   const exitTraction = 1 + (car.exitLoad - steerLoad) * style.exitTraction;
   const top = BASE_TOP_SPEED + style.straightBonus * (1 - Math.min(1, steerLoad * 3.2));
   const limit = top - surface.speedLoss - 1.42 * style.cornerDrag * cornerLoad;
-  const speedLimit = inPit ? Math.min(PIT_LANE.speedLimit, limit) : limit;
+  const speedLimit = inPit ? Math.min(course.pit.speedLimit, limit) : limit;
 
   if (input.brake) {
     if (human && !car.braking && car.reverseReady && car.speed === 0) car.reversing = true;
@@ -208,19 +208,19 @@ function setVelocity(car: Car, x: number, z: number) {
   if (Math.abs(car.speed) > EPSILON) car.motionYaw = Math.atan2(x * direction, z * direction);
 }
 
-function groundHeight(road: TrackLocation) {
-  return TRACK.heightAt(road.s, road.offset);
+function groundHeight(road: TrackLocation, course: Course) {
+  return course.heightAt(road.s, road.offset);
 }
 
-function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
+function resolveContacts(cars: readonly Car[], observe: ContactObserver, course: Course) {
   for (let i = 0; i < cars.length; i++) {
     const a = cars[i];
     if (!a.active || a.protection > 0) continue;
     for (let j = i + 1; j < cars.length; j++) {
       const b = cars[j];
       if (!b.active || b.protection > 0) continue;
-      const aHeight = groundHeight(a.road);
-      const bHeight = groundHeight(b.road);
+      const aHeight = groundHeight(a.road, course);
+      const bHeight = groundHeight(b.road, course);
       const contact = contactBetween(capsule(a, aHeight), capsule(b, bHeight));
       if (!contact) continue;
       const { nx, nz, depth } = contact;
@@ -261,16 +261,16 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver) {
   }
 }
 
-function constrain(car: Car, index: number, observe: ContactObserver) {
+function constrain(car: Car, index: number, observe: ContactObserver, course: Course) {
   if (!Number.isFinite(car.x + car.z)) return false;
-  car.road = TRACK.locate(car.x, car.z, car.road);
-  const overflow = (point: TrackLocation) => Math.abs(point.offset) - wallHalfAt(point.s, Math.sign(point.offset));
+  car.road = course.locate(car.x, car.z, car.road);
+  const overflow = (point: TrackLocation) => Math.abs(point.offset) - course.wallHalfAt(point.s, Math.sign(point.offset));
   if (overflow(car.road) > 0.9) return false;
 
   for (let i = 0; i < 3; i++) {
     const { ax, az, bx, bz, radius } = capsule(car);
-    const rear = TRACK.locate(ax, az, car.road);
-    const nose = TRACK.locate(bx, bz, car.road);
+    const rear = course.locate(ax, az, car.road);
+    const nose = course.locate(bx, bz, car.road);
     let boundary = car.road;
     if (overflow(rear) > overflow(boundary)) boundary = rear;
     if (overflow(nose) > overflow(boundary)) boundary = nose;
@@ -279,10 +279,11 @@ function constrain(car: Car, index: number, observe: ContactObserver) {
     if (penetration <= EPSILON) break;
 
     const side = offset < 0 ? -1 : 1;
-    const wallOffset = side * wallHalfAt(s, side);
-    const safety = safetyAt(s, side);
+    const wallOffset = side * course.wallHalfAt(s, side);
+    const panel = course.safetyPanels.find(panel => panel.side === side && Math.abs(arcDelta(s, panel.s, course.length)) <= safetyPanelSpacing / 2);
+    const safety = panel ? panel.tyres ? 'tyres' : 'rail' : undefined;
     const response = barrierResponse[safety ?? 'fence'];
-    const { dx, dz } = barrierTangent(s, side);
+    const { dx, dz } = barrierTangent(s, side, course);
     const nx = -dz * side;
     const nz = dx * side;
     const projection = Math.max(0.65, dx * boundary.dx + dz * boundary.dz);
@@ -309,20 +310,20 @@ function constrain(car: Car, index: number, observe: ContactObserver) {
       car.yaw = angleDifference(car.yaw + clamp(angleDifference(exit - car.yaw), -turn, turn));
     }
     // The wooden kickboard in the display spans s = -14.19 through 0.19 on the inside.
-    const kickboard = side < 0 && (s >= TRACK.length - 14.19 || s <= 0.19);
+    const kickboard = course.id === 'taller' && side < 0 && (s >= course.length - 14.19 || s <= 0.19);
     observe({
       source: `barrier:${index}:${side}`, kind: kickboard || safety === 'tyres' ? 'wall' : 'fence', impulse,
-      x: boundary.x - boundary.dz * wallOffset, y: TRACK.heightAt(s, wallOffset) + 0.18,
+      x: boundary.x - boundary.dz * wallOffset, y: course.heightAt(s, wallOffset) + 0.18,
       z: boundary.z + boundary.dx * wallOffset, distance: s, side,
     });
-    car.road = TRACK.locate(car.x, car.z, car.road);
+    car.road = course.locate(car.x, car.z, car.road);
   }
   return true;
 }
 
-function recover(car: Car, index: number, previousS: number, racing: boolean) {
+function recover(car: Car, index: number, previousS: number, racing: boolean, course: Course) {
   const s = racing ? car.progress.rewind() : previousS - 0.75;
-  place(car, s, laneFor(index), 0);
+  place(car, s, laneFor(index), 0, course);
   car.steer = 0;
   car.throttle = 0;
   car.brakePressure = 0;
@@ -340,7 +341,8 @@ function recover(car: Car, index: number, previousS: number, racing: boolean) {
 }
 
 export class Race {
-  private cars = CAR_SPECS.map((_, index) => spawn(demoDistances[index], index, 5.3));
+  private course: Course = TALLER;
+  private cars = this.demoCars();
   private config = { ...defaultRaceConfig };
   private readonly manual: boolean;
   private startRequested = false;
@@ -362,7 +364,17 @@ export class Race {
   configure(config: RaceConfig) {
     if (this.phase !== 'demo' || this.startRequested) return false;
     this.config = normalizeRaceConfig(config);
+    const nextCourse = getCourse(this.config.course);
+    if (nextCourse !== this.course) {
+      this.course = nextCourse;
+      this.resetTiming();
+      this.cars = this.demoCars();
+    }
     return true;
+  }
+
+  private demoCars() {
+    return CAR_SPECS.map((_, i) => spawn(this.course, this.course.demoDistances[i], i, 5.3));
   }
 
   launch() {
@@ -375,19 +387,19 @@ export class Race {
     this.phase = 'demo';
     this.startRequested = false;
     this.resetTiming();
-    this.cars = CAR_SPECS.map((_, index) => spawn(demoDistances[index], index, 5.3));
+    this.cars = this.demoCars();
   }
 
   swapPracticeCar(fromSlot: number, toSlot: number) {
     if (this.phase !== 'practice' || fromSlot === toSlot) return false;
     const from = this.cars[fromSlot];
     const to = this.cars[toSlot];
-    if (!from?.active || !from.owned || !to || to.owned || !inGarage(from)) return false;
+    if (!from?.active || !from.owned || !to || to.owned || !inGarage(from, this.course)) return false;
 
-    const replacement = modelAtPose(toSlot, to, from);
+    const replacement = modelAtPose(toSlot, to, from, this.course);
     replacement.owned = true;
     replacement.registeredDriver = true;
-    const displaced = modelAtPose(fromSlot, from, to);
+    const displaced = modelAtPose(fromSlot, from, to, this.course);
     displaced.active = to.active;
     this.cars[toSlot] = replacement;
     this.cars[fromSlot] = displaced;
@@ -418,6 +430,7 @@ export class Race {
   }
 
   private startHeat(drivers: readonly (Driver | undefined)[]) {
+    const course = this.course;
     this.startRequested = false;
     const humans = CAR_SPECS.map((_, i) => drivers[i]?.owned === true);
     if (!humans.some(Boolean) && this.config.bots === 0) return;
@@ -430,12 +443,12 @@ export class Race {
       const owned = humans[index];
       const active = owned || freeBots > 0;
       if (active && !owned) freeBots--;
-      const row = GRID_ROWS[Math.floor(index / 2)];
-      let car = spawn(row, index, 0);
+      const row = course.gridRows[Math.floor(index / 2)];
+      let car = spawn(course, row, index, 0);
       if (this.phase === 'practice' && active) {
-        const stall = owned ? PIT_LANE.stalls[nextStall++] : undefined;
-        if (stall !== undefined) car = spawn(stall, index, 0, PIT_LANE.offset);
-        else if (!owned) car = spawn(demoDistances[index], index, 5.3);
+        const stall = owned ? course.pit.stalls[nextStall++] : undefined;
+        if (stall !== undefined) car = spawn(course, stall, index, 0, course.pit.offset);
+        else if (!owned) car = spawn(course, course.demoDistances[index], index, 5.3);
       }
       car.active = active;
       return car;
@@ -443,6 +456,7 @@ export class Race {
   }
 
   step(dt: number, drivers: readonly (Driver | undefined)[]) {
+    const course = this.course;
     this.frame++;
     while (this.impacts.length && this.frame - this.impacts[0].frame >= IMPACT_MEMORY_FRAMES) this.impacts.shift();
     const hasDrivers = drivers.some(driver => driver?.owned);
@@ -489,14 +503,14 @@ export class Race {
       if (!car.active) return null;
       const cooling = this.phase === 'results' || car.timing.finishTime !== null;
       const human = (racing || practice) && !cooling && car.owned ? drivers[i]?.input : null;
-      const input = human ?? (practice && car.owned && inGarage(car) ? NEUTRAL
-        : botDrive(this.cars, i, laneFor(i), this.config.difficulty, cooling, dt));
+      const input = human ?? (practice && car.owned && inGarage(car, course) ? NEUTRAL
+        : botDrive(this.cars, i, laneFor(i), this.config.difficulty, cooling, dt, course));
       return { input, human: Boolean(human) };
     });
     commands.forEach((command, i) => {
-      if (command) move(this.cars[i], command.input, command.human, dt);
+      if (command) move(this.cars[i], command.input, command.human, dt, course);
     });
-    resolveContacts(this.cars, this.observeContact);
+    resolveContacts(this.cars, this.observeContact, course);
 
     const finishedThisTick: { index: number; fraction: number }[] = [];
     for (let i = 0; i < this.cars.length; i++) {
@@ -505,8 +519,8 @@ export class Race {
       const car = this.cars[i];
       const timed = (racing || practice) && car.timing.finishTime === null;
       const from = previous[i];
-      if (!constrain(car, i, this.observeContact)) {
-        recover(car, i, from.s, timed);
+      if (!constrain(car, i, this.observeContact, course)) {
+        recover(car, i, from.s, timed, course);
         continue;
       }
 
@@ -515,16 +529,16 @@ export class Race {
       const wantsForward = gas && !brake;
       car.stalled = wantsForward && !moving ? car.stalled + dt : 0;
       if (car.stalled + EPSILON >= 2.5 || (!command.human && car.bot.wrongWay > 1.6)) {
-        recover(car, i, from.s, timed);
+        recover(car, i, from.s, timed, course);
         continue;
       }
 
       const road = car.road;
-      const curvature = (TRACK.heightAt(road.s - 0.95, road.offset) + TRACK.heightAt(road.s + 0.95, road.offset)
-        - 2 * groundHeight(road)) / 0.95 ** 2;
+      const curvature = (course.heightAt(road.s - 0.95, road.offset) + course.heightAt(road.s + 0.95, road.offset)
+        - 2 * groundHeight(road, course)) / 0.95 ** 2;
       const lateral = angleDifference(car.motionYaw - from.motionYaw) * car.speed / dt;
       const headingDelta = car.motionYaw - Math.atan2(road.dx, road.dz);
-      const gravity = slopeFor(road, Math.cos(headingDelta), -Math.sin(headingDelta));
+      const gravity = slopeFor(road, Math.cos(headingDelta), -Math.sin(headingDelta), course);
       const roughness = car.surfaceSound.curb + 0.45 * car.surfaceSound.gravel + 0.28 * car.surfaceSound.grass;
       loadSuspension(car.suspension, car.handling, (car.speed - from.speed) / dt, lateral - gravity.lateral,
         curvature * car.speed ** 2, roughness, dt);
@@ -593,13 +607,13 @@ export class Race {
       })) : undefined,
       impacts: this.impacts.length ? this.impacts.map(impact => ({ ...impact })) : undefined,
       cars: this.cars.map(car => ({
-        x: car.x, y: groundHeight(car.road), z: car.z, yaw: car.yaw, speed: car.speed, distance: car.road.s,
+        x: car.x, y: groundHeight(car.road, this.course), z: car.z, yaw: car.yaw, speed: car.speed, distance: car.road.s,
         lap: demo ? 0 : car.progress.lap, owned: car.owned, steer: car.steer, braking: car.braking,
         blink: car.protection > 0 && Math.floor(car.protection * 8) % 2 === 0,
         active: car.active,
         livery: car.livery,
         suspension: { ...car.suspension },
-        pitReady: this.phase === 'practice' && car.owned && inGarage(car),
+        pitReady: this.phase === 'practice' && car.owned && inGarage(car, this.course),
         bestLap: car.timing.bestLap,
         lastLap: car.timing.lastLap,
         cleanLap: car.timing.cleanLap,

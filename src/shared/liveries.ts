@@ -1,4 +1,4 @@
-import type { CarView, Livery } from './protocol.ts';
+import type { CarView, CourseId, Livery } from './protocol.ts';
 
 export const LIVERIES = [
   { id: 'original', label: 'Original' },
@@ -9,25 +9,46 @@ export const LIVERIES = [
 export interface LiveryProgress {
   clean: boolean;
   sector: boolean;
+  /** Taller 07 retains the field used by existing garage saves. */
   bestSectors: (number | null)[];
+  diqueBestSectors?: (number | null)[];
 }
+
+const emptySectors = [null, null, null, null] as const;
 
 export function createLiveryProgress(): LiveryProgress {
-  return { clean: false, sector: false, bestSectors: [null, null, null, null] };
+  return { clean: false, sector: false, bestSectors: [...emptySectors] };
 }
 
-export function advanceLiveryProgress(previous: LiveryProgress, car: CarView): LiveryProgress {
+export function normalizeLiveryProgress(value: unknown): LiveryProgress {
+  const saved = value && typeof value === 'object' ? value as Partial<LiveryProgress> : {};
+  const times = (entries: unknown) => emptySectors.map((_, index) => {
+    const time: unknown = Array.isArray(entries) ? entries[index] : null;
+    return typeof time === 'number' && Number.isFinite(time) && time > 0 ? time : null;
+  });
+  const record: LiveryProgress = { clean: saved.clean === true, sector: saved.sector === true, bestSectors: times(saved.bestSectors) };
+  if (Array.isArray(saved.diqueBestSectors)) record.diqueBestSectors = times(saved.diqueBestSectors);
+  return record;
+}
+
+export function bestSectorsFor(progress: LiveryProgress, course: CourseId): readonly (number | null)[] {
+  return course === 'dique' ? progress.diqueBestSectors ?? emptySectors : progress.bestSectors;
+}
+
+export function advanceLiveryProgress(previous: LiveryProgress, car: CarView, course: CourseId = 'taller'): LiveryProgress {
   const clean = previous.clean || car.cleanLap === true;
   let sector = previous.sector;
   let changed = clean !== previous.clean;
-  const bestSectors = previous.bestSectors.map((best, index) => {
+  const bestSectors = bestSectorsFor(previous, course).map((best, index) => {
     const time = car.sectorTimes?.[index];
     if (typeof time !== 'number' || time <= 0 || !Number.isFinite(time) || (best !== null && time >= best)) return best;
     changed = true;
     if (best !== null && best - time >= 0.05) sector = true;
     return time;
   });
-  return changed ? { clean, sector, bestSectors } : previous;
+  if (!changed) return previous;
+  return course === 'dique' ? { ...previous, clean, sector, diqueBestSectors: bestSectors }
+    : { ...previous, clean, sector, bestSectors };
 }
 
 export function unlockedLiveries(progress: LiveryProgress): Livery[] {

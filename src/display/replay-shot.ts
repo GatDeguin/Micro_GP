@@ -3,11 +3,11 @@ import type { ReplayKind } from './replay';
 import { approachingCover, coverClearance } from './track-cover';
 import { cinematicStation } from './cinematic-cameras';
 import type { CarView } from '../shared/protocol';
-import { TRACK, wallHalfAt } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
 import type { buildPlacard } from './signs';
 import { cameraLights } from './render-layers';
 
-export function buildReplayShot(renderer: THREE.WebGLRenderer) {
+export function buildReplayShot(renderer: THREE.WebGLRenderer, course: Course = TALLER) {
   const camera = new THREE.PerspectiveCamera(38.5, 1, 0.06, 130);
   cameraLights(camera, false);
   const plateCamera = new THREE.PerspectiveCamera();
@@ -89,22 +89,23 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
 
   return {
     stop() { active = false; lastStation = undefined; },
+    dispose() { target.dispose(); quad.geometry.dispose(); material.dispose(); },
     render(scene: THREE.Scene, car: CarView, rival: CarView | undefined, width: number, height: number, dt: number,
       placard: ReturnType<typeof buildPlacard>, kind: ReplayKind, lowQuality: boolean) {
-      const lane = TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
-      const cover = approachingCover(lane.s, 5);
-      const station = kind === 'recovery' ? undefined : cinematicStation(lane.s);
+      const lane = course.locate(car.x, car.z, { s: car.distance, y: car.y });
+      const cover = approachingCover(lane.s, 5, course);
+      const station = kind === 'recovery' ? undefined : cinematicStation(lane.s, course);
       if (station?.id !== lastStation) active = false;
       lastStation = station?.id;
       if (!active) side = lane.offset > 1.25 ? -1 : 1;
       // The low atlas view puts the lens on the shoulder with the curb crossing the foreground.
       const offset = kind === 'recovery' ? -5.1 : kind === 'overtake' ? 1.85 : 5.15;
-      const ahead = TRACK.sampleAt(lane.s + offset * (1 - 0.30 * cover));
+      const ahead = course.sampleAt(lane.s + offset * (1 - 0.30 * cover));
       const shoulder = kind === 'recovery' ? lane.offset * 0.46
         : THREE.MathUtils.clamp(lane.offset + 3.83 * side, -3.4 + 1.76 * cover, 3.4 - 1.76 * cover);
       const eyeHeight = kind === 'recovery' ? THREE.MathUtils.lerp(2.45, 1.18, cover) : kind === 'overtake' ? 1.15 : 0.75;
       if (station) position.set(station.x, station.y, station.z);
-      else position.set(ahead.x - ahead.dz * shoulder, TRACK.heightAt(ahead.s, shoulder) + eyeHeight, ahead.z + ahead.dx * shoulder);
+      else position.set(ahead.x - ahead.dz * shoulder, course.heightAt(ahead.s, shoulder) + eyeHeight, ahead.z + ahead.dx * shoulder);
       subject.set(car.x, car.y + 0.54, car.z);
       groupAim.set(car.x, car.y + 0.24, car.z);
       if (rival && Math.abs(rival.y - car.y) < 1.1 && Math.hypot(rival.x - car.x, rival.z - car.z) < 9) {
@@ -119,9 +120,9 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer) {
       }
       active = true;
       if (cover > 0) {
-        const ground = TRACK.locate(camera.position.x, camera.position.z, { s: ahead.s, y: ahead.y });
-        if (Math.abs(ground.offset) < wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25) {
-          camera.position.y = Math.min(camera.position.y, TRACK.heightAt(ground.s, ground.offset) + coverClearance(ground.s) - 0.23);
+        const ground = course.locate(camera.position.x, camera.position.z, { s: ahead.s, y: ahead.y });
+        if (Math.abs(ground.offset) < course.wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25) {
+          camera.position.y = Math.min(camera.position.y, course.heightAt(ground.s, ground.offset) + coverClearance(ground.s, course) - 0.23);
         }
       }
       camera.aspect = width / height;

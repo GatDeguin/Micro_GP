@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CAR_DIMENSIONS, WHEEL_RADIUS, WHEEL_SIDE, type CarDimensions } from '../shared/car-dimensions';
 import { CAR_SPECS, type CarView } from '../shared/protocol';
-import { TRACK, wallHalfAt } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
 import { mergeStatic } from './batches';
 import { ARCH_RADIUS, archFloor, crownHeight, sectionAt, shellGeometry, shellSections, sidePoint, type Section } from './car-shell';
 import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
@@ -682,7 +682,7 @@ export function buildCars(parent: THREE.Object3D) {
         detail.visible = close;
         glazing.material = close ? closeGlass : glass;
       },
-      update(view: CarView, delta: number, slope: number, now: number, covered = false, bankRoll = 0) {
+      update(view: CarView, delta: number, slope: number, now: number, covered = false, bankRoll = 0, course: Course = TALLER) {
         const active = view.active !== false;
         chassis.visible = axles.visible = shadow.visible = active;
         const lighting = active && (night || covered);
@@ -709,9 +709,9 @@ export function buildCars(parent: THREE.Object3D) {
         chassis.rotation.z = bankRoll + roll;
         chassis.position.y = heave;
         angle = (angle + view.speed * delta / (WHEEL_RADIUS * scaleY)) % (Math.PI * 2);
-        const road = detail.visible ? TRACK.locate(view.x, view.z, { s: view.distance, y: view.y }) : null;
-        const settle = road !== null && Math.abs(road.offset) < wallHalfAt(road.s, Math.sign(road.offset))
-          && Math.abs(TRACK.heightAt(road.s, road.offset) - view.y) < 0.10;
+        const road = detail.visible ? course.locate(view.x, view.z, { s: view.distance, y: view.y }) : null;
+        const settle = road !== null && Math.abs(road.offset) < course.wallHalfAt(road.s, Math.sign(road.offset))
+          && Math.abs(course.heightAt(road.s, road.offset) - view.y) < 0.10;
         const sinYaw = Math.sin(view.yaw);
         const cosYaw = Math.cos(view.yaw);
         const sinPitch = Math.sin(pitch);
@@ -724,10 +724,10 @@ export function buildCars(parent: THREE.Object3D) {
           if (settle || settled) {
             const x = pivot.position.x * scaleX;
             const z = pivot.position.z * scaleZ;
-            const tyreRoad = settle ? TRACK.locate(view.x + cosYaw * x + sinYaw * z * cosPitch,
+            const tyreRoad = settle ? course.locate(view.x + cosYaw * x + sinYaw * z * cosPitch,
               view.z - sinYaw * x + cosYaw * z * cosPitch, { s: road.s, y: view.y }) : null;
             const hubFloor = root.position.y - sinPitch * z + cosPitch * sinBank * x;
-            const ground = tyreRoad ? TRACK.heightAt(tyreRoad.s, tyreRoad.offset) : hubFloor;
+            const ground = tyreRoad ? course.heightAt(tyreRoad.s, tyreRoad.offset) : hubFloor;
             correction = THREE.MathUtils.clamp(ground - hubFloor, -0.044, 0.044) / cosPitch;
             for (let corner = 0; corner < 4; corner++) shadowVertices.setY(4 + index * 4 + corner, 0.002 + correction);
           }

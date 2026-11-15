@@ -5,7 +5,7 @@ import { compactScenery, originalScenery } from './render-layers';
 const groupSize = 14;
 
 // Solid-painted pieces can share a draw in split screen. Textured surfaces and luminous parts keep their materials.
-export function buildCompactScenery(scene: THREE.Scene, roots: readonly THREE.Group[], excluded: ReadonlySet<THREE.Object3D>) {
+export function buildCompactScenery(scene: THREE.Object3D, roots: readonly THREE.Group[], excluded: ReadonlySet<THREE.Object3D>) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.68, metalness: 0.10 });
   const groups = new Map<string, { pieces: THREE.BufferGeometry[]; cast: boolean; receive: boolean }>();
   const local = new THREE.Matrix4();

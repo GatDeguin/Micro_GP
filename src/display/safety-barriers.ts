@@ -1,20 +1,20 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { RaceSnapshot } from '../shared/protocol';
-import { safetyPanels, safetyPanelSpacing } from '../shared/safety';
-import { TRACK, wallHalfAt } from '../shared/track';
+import { safetyPanelSpacing } from '../shared/safety';
+import { TALLER, type Course } from '../shared/courses';
 
 const metal = new THREE.MeshStandardMaterial({ color: 0xd9dce0, metalness: 0.72, roughness: 0.42 });
 const rubber = new THREE.MeshStandardMaterial({ color: 0xb3ada4, roughness: 0.88 });
 
-export function buildSafetyBarriers(parent: THREE.Object3D) {
-  const panels = safetyPanels.map(({ s, side, tyres }) => {
-    const p = TRACK.sampleAt(s);
+export function buildSafetyBarriers(parent: THREE.Object3D, course: Course = TALLER) {
+  const panels = course.safetyPanels.map(({ s, side, tyres }) => {
+    const p = course.sampleAt(s);
     const nx = -p.dz * side, nz = p.dx * side;
-    const edge = wallHalfAt(s, side);
+    const edge = course.wallHalfAt(s, side);
     return {
       s, side, nx, nz, yaw: Math.atan2(p.dx, p.dz),
-      x: p.x + nx * edge, y: TRACK.heightAt(s, side * edge), z: p.z + nz * edge,
+      x: p.x + nx * edge, y: course.heightAt(s, side * edge), z: p.z + nz * edge,
       tyres, bend: 0, velocity: 0, scuff: 0, dirty: true,
     };
   });
@@ -94,7 +94,7 @@ export function buildSafetyBarriers(parent: THREE.Object3D) {
       if (hit.kind === 'car' || hit.distance === undefined || hit.side === undefined) continue;
       for (const panel of panels) {
         if (hit.side !== panel.side) continue;
-        const along = Math.abs(TRACK.wrap(panel.s - hit.distance + TRACK.length / 2) - TRACK.length / 2);
+        const along = Math.abs(course.wrap(panel.s - hit.distance + course.length / 2) - course.length / 2);
         const pressure = hit.strength * Math.max(0, 1 - along / 2.65);
         if (pressure === 0) continue;
         panel.velocity += pressure * 2.2;

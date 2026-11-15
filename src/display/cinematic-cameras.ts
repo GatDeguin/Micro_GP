@@ -1,30 +1,37 @@
-import { PIT_LANE, TRACK, wallHalfAt } from '../shared/track';
+import { PIT_LANE, TRACK } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
 import { approachingCover } from './track-cover';
 
-const stations = [
+const taller = [
   { id: 'hairpin', at: TRACK.anchors.sweepApex, lead: 2.5, side: -1, lift: 2.2, range: 11.5 },
   { id: 'bridge', at: TRACK.crossing.upper, lead: -1.6, side: 1, lift: 3.15, range: 11.5 },
   { id: 'pits', at: PIT_LANE.stalls[0], lead: 3.3, side: -1, lift: 2.1, range: 10.2 },
   { id: 'last-turn', at: TRACK.anchors.front - 0.5, lead: 2.9, side: 1, lift: 2.25, range: 7.8 },
-].map(({ id, at, lead, side, lift, range }) => {
-  const p = TRACK.sampleAt(at + lead);
-  const offset = side * (wallHalfAt(p.s, side) + 0.73);
-  return {
-    id, at, range, x: p.x - p.dz * offset, z: p.z + p.dx * offset,
-    y: TRACK.heightAt(p.s, offset) + lift,
-  };
-});
+];
+const dique = [
+  { id: 'crane', at: 179, lead: 4.8, side: 1, lift: 3.2, range: 18 },
+  { id: 'bridge', at: 369.45, lead: -2.5, side: 1, lift: 3.4, range: 18 },
+  { id: 'spillway', at: 506, lead: -3.7, side: 1, lift: 4.5, range: 17 },
+  { id: 'last-turn', at: 736, lead: 2.5, side: 1, lift: 2.8, range: 22 },
+];
 
-export function cinematicStation(s: number) {
-  if (approachingCover(s, 4) > 0.08) return undefined;
+export function cinematicStation(s: number, course: Course = TALLER) {
+  if (approachingCover(s, 4, course) > 0.08) return undefined;
+  const stations = course.id === 'dique' ? dique : taller;
   let best = 1;
   let selected: (typeof stations)[number] | undefined;
   for (const station of stations) {
-    const half = TRACK.length / 2;
-    const relative = Math.abs(TRACK.wrap(s - station.at + half) - half) / station.range;
+    const half = course.length / 2;
+    const relative = Math.abs(course.wrap(s - station.at + half) - half) / station.range;
     if (relative >= best) continue;
     best = relative;
     selected = station;
   }
-  return selected;
+  if (selected) {
+    const { id, at, lead, side, lift, range } = selected;
+    const point = course.sampleAt(at + lead);
+    const offset = side * (course.wallHalfAt(point.s, side) + 0.73);
+    return { id, at, range, x: point.x - point.dz * offset, z: point.z + point.dx * offset,
+      y: course.heightAt(point.s, offset) + lift };
+  }
 }

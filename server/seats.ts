@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { CAR_SPECS, NEUTRAL } from "../src/shared/protocol.ts";
-import type { CarView, DriveInput, Driver, Livery } from "../src/shared/protocol.ts";
+import type { CarView, CourseId, DriveInput, Driver, Livery } from "../src/shared/protocol.ts";
 import { advanceLiveryProgress, createLiveryProgress, unlockedLiveries, type LiveryProgress } from "../src/shared/liveries.ts";
 import type { LobbySlot } from "../src/shared/lobby.ts";
 
@@ -15,7 +15,7 @@ interface Seat<Peer> {
   livery: Livery;
   ready: boolean;
   progress: LiveryProgress;
-  observed?: { car: number; lastLap: CarView["lastLap"]; sectorTimes: CarView["sectorTimes"] };
+  observed?: { car: number; course: CourseId; lastLap: CarView["lastLap"]; sectorTimes: CarView["sectorTimes"] };
   lastContact: number;
   lastInput: number;
   detachedAt?: number;
@@ -127,16 +127,16 @@ export class Seats<Peer> {
     return seat ? { car: seat.car, unlocked: unlockedLiveries(seat.progress) } : null;
   }
 
-  recordLiveryProgress(cars: readonly CarView[], drivers: readonly (Driver | undefined)[]) {
+  recordLiveryProgress(cars: readonly CarView[], drivers: readonly (Driver | undefined)[], course: CourseId = "taller") {
     for (const seat of this.slots) {
       if (!seat) continue;
       const car = cars[seat.car];
       const before = seat.observed;
-      seat.observed = { car: seat.car, lastLap: car.lastLap, sectorTimes: car.sectorTimes };
-      if (seat.peer === undefined || drivers[seat.car]?.input == null || before?.car !== seat.car) continue;
+      seat.observed = { car: seat.car, course, lastLap: car.lastLap, sectorTimes: car.sectorTimes };
+      if (seat.peer === undefined || drivers[seat.car]?.input == null || before?.car !== seat.car || before.course !== course) continue;
       const sectorTimes = car.sectorTimes?.map((time, index) => time === before.sectorTimes?.[index] ? null : time);
       const cleanLap = car.cleanLap === true && car.lastLap !== before.lastLap;
-      seat.progress = advanceLiveryProgress(seat.progress, { ...car, sectorTimes, cleanLap });
+      seat.progress = advanceLiveryProgress(seat.progress, { ...car, sectorTimes, cleanLap }, course);
     }
   }
 

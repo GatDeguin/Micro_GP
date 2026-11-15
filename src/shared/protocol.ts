@@ -8,8 +8,19 @@ export const FORWARD_GEARS = 5;
 
 export type Difficulty = 'rookie' | 'club' | 'pro';
 export type Livery = 'original' | 'clean' | 'sector';
+export type CourseId = 'taller' | 'dique';
+
+export const COURSE_OPTIONS = {
+  taller: { label: 'Taller 07', laps: 3 },
+  dique: { label: 'Gran Premio del Dique', laps: 1 },
+} satisfies Record<CourseId, { label: string; laps: number }>;
+
+export function isCourseId(value: unknown): value is CourseId {
+  return value === 'taller' || value === 'dique';
+}
 
 export interface RaceConfig {
+  course?: CourseId;
   laps: number;
   bots: number;
   difficulty: Difficulty;
@@ -17,15 +28,19 @@ export interface RaceConfig {
   night: boolean;
 }
 
-export const defaultRaceConfig: RaceConfig = { laps: 3, bots: 3, difficulty: 'club', mode: 'race', night: false };
+export const defaultRaceConfig: RaceConfig = {
+  course: 'taller', laps: COURSE_OPTIONS.taller.laps, bots: 3, difficulty: 'club', mode: 'race', night: false,
+};
 
-export function normalizeRaceConfig(value: unknown): RaceConfig {
+export function normalizeRaceConfig(value: unknown): RaceConfig & { course: CourseId } {
   const config = value && typeof value === 'object' ? value as Partial<RaceConfig> : {};
+  const course = isCourseId(config.course) ? config.course : 'taller';
   const integer = (candidate: unknown, fallback: number, min: number, max: number) =>
     typeof candidate === 'number' && Number.isFinite(candidate)
       ? Math.min(max, Math.max(min, Math.round(candidate))) : fallback;
   return {
-    laps: integer(config.laps, defaultRaceConfig.laps, 1, 12),
+    course,
+    laps: integer(config.laps, COURSE_OPTIONS[course].laps, 1, 12),
     bots: integer(config.bots, defaultRaceConfig.bots, 0, 3),
     difficulty: config.difficulty === 'rookie' || config.difficulty === 'pro' ? config.difficulty : 'club',
     mode: config.mode === 'practice' ? 'practice' : 'race',

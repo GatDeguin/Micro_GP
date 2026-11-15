@@ -25,8 +25,7 @@
 
 .lan-lobby[hidden], .lan-lobby-return[hidden], .lan-lobby [hidden] { display: none; }
 .lan-lobby-header h2 { margin: .15rem 0 .75rem; font-size: clamp(1.35rem, 2.5vw, 1.85rem); line-height: 1.08; }
-.lan-lobby-kicker, .lan-lobby-config legend { margin: 0; color: var(--lobby-gold); font: 700 .72rem/1.2 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
-.lan-lobby-kicker span { color: #a49078; }
+.lan-lobby-config legend { margin: 0; color: var(--lobby-gold); font: 700 .72rem/1.2 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .lan-lobby-content { display: grid; grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr); gap: .8rem; align-items: start; }
 .lan-lobby-invite { padding: .45rem; border-left: 2px solid #a68a6d; background: #2e2520; }
 .lan-lobby-invite strong { color: var(--lobby-gold); font-size: .8rem; }
@@ -34,6 +33,7 @@
 .lan-lobby-invite p { margin: .22rem 0 0; color: #d4c4af; font-size: .75rem; }
 .lan-lobby-config { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem .55rem; min-width: 0; margin: 0; padding: .4rem 0 0; border: 0; }
 .lan-lobby-config label { display: grid; gap: .15rem; color: #e0d1bf; font-size: .75rem; }
+.lan-lobby-course { grid-column: 1 / -1; }
 .lan-lobby :is(button, select), .lan-lobby-return button { min-height: 40px; border: 1px solid var(--lobby-edge); border-radius: .28rem; padding: .25rem .45rem; background: #3a2c23; color: inherit; font: 650 .8rem/1.2 system-ui, sans-serif; }
 .lan-lobby :is(a, button, select, input):focus-visible, .lan-lobby-return button:focus-visible { outline: 2px solid var(--lobby-gold); outline-offset: 2px; }
 .lan-lobby-config select { width: 100%; }

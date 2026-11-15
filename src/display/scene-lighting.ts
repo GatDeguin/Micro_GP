@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TRACK, wallHalfAt } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
 import { BENCH_SURFACE } from './materials';
 import { sceneryLights } from './render-layers';
 
@@ -66,13 +66,14 @@ function prefilterWorkshop(renderer: THREE.WebGLRenderer) {
   }
 }
 
-function shadowPoints() {
-  const bounds = TRACK.samples.flatMap(p => [-1, 1].flatMap(side => {
-    const offset = side * (wallHalfAt(p.s, side) + 1.47);
+function shadowPoints(course: Course) {
+  const bounds = course.samples.flatMap(p => [-1, 1].flatMap(side => {
+    const offset = side * (course.wallHalfAt(p.s, side) + 1.47);
     const x = p.x - p.dz * offset;
     const z = p.z + p.dx * offset;
     return [new THREE.Vector3(x, BENCH_SURFACE, z), new THREE.Vector3(x, p.y + 1.3, z)];
   }));
+  if (course.id === 'dique') return bounds;
   // Include the parts of the bench and the taller tools that can cast back over the course.
   for (const x of [-31, 32]) {
     for (const z of [-19, 17.7]) bounds.push(new THREE.Vector3(x, BENCH_SURFACE, z));
@@ -128,8 +129,10 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   toolLight.layers.set(sceneryLights);
   toolLight.position.set(0.7, 12.2, -14.4);
   toolLight.target.position.set(-4.9, BENCH_SURFACE, -16.7);
-  scene.add(key, key.target, fill, bounce, benchLight, benchLight.target, toolLight, toolLight.target);
-  const points = shadowPoints();
+  scene.add(key, key.target, fill, fill.target, bounce, benchLight, benchLight.target, toolLight, toolLight.target);
+  let points = shadowPoints(TALLER);
+  const lightCenter = new THREE.Vector3();
+  let dique = false;
   const trackLamps: { light: THREE.SpotLight; day: number }[] = [];
   const diffusers = new Set<THREE.MeshStandardMaterial>();
   const halos = new Set<THREE.SpriteMaterial>();
@@ -156,9 +159,13 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     // A single shadow-casting key is shared by all views of a given frame.
     if (night) key.position.set(-12.0, 24.0, -17.0);
     else key.position.set(close ? -19.1 : -17.7, close ? 16.7 : 24.8, close ? 13.0 : -8.2);
+    if (dique) key.position.multiplyScalar(5.2);
+    key.position.add(lightCenter);
+    key.target.position.copy(lightCenter);
     key.color.setHex(night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9);
     key.intensity = night ? 0.78 : close ? 3.10 : 2.94;
-    fill.position.set(20.8, 11.5, close ? -7.2 : 13.7);
+    fill.position.set(20.8, 11.5, close ? -7.2 : 13.7).add(lightCenter);
+    fill.target.position.copy(lightCenter);
     fill.color.setHex(night ? 0x819ed4 : 0xe1eaff);
     fill.intensity = night ? 0.28 : close ? 0.49 : 0.66;
     bounce.color.setHex(night ? 0x94acd3 : 0xffe9d7);
@@ -180,6 +187,14 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   applyLighting();
   return {
     restoreReflections,
+    setCourse(course: Course) {
+      dique = course.id === 'dique';
+      points = shadowPoints(course);
+      lightCenter.set(0, 0, 0);
+      if (dique) new THREE.Box3().setFromPoints(points).getCenter(lightCenter);
+      benchLight.visible = toolLight.visible = !dique;
+      applyLighting();
+    },
     lightShot(next: boolean) {
       if (close === next) return;
       close = next;

@@ -1,5 +1,5 @@
-import { CAR_SPECS, defaultRaceConfig, normalizeRaceConfig, type DriveInput, type Driver, type Livery, type RaceConfig, type RaceSnapshot } from '../shared/protocol';
-import { advanceLiveryProgress, createLiveryProgress, LIVERIES, unlockedLiveries, type LiveryProgress } from '../shared/liveries';
+import { CAR_SPECS, COURSE_OPTIONS, isCourseId, normalizeRaceConfig, type CourseId, type DriveInput, type Driver, type Livery, type RaceSnapshot } from '../shared/protocol';
+import { advanceLiveryProgress, bestSectorsFor, LIVERIES, normalizeLiveryProgress, unlockedLiveries } from '../shared/liveries';
 import { Race } from '../sim/race';
 
 type Action = 'left' | 'right' | 'gas' | 'brake';
@@ -11,36 +11,37 @@ const step = 1 / 60;
 const soloSaveKey = 'micro-gp:solo';
 
 function loadGarage() {
-  let saved: { config?: unknown; slot?: number; progress?: Partial<LiveryProgress>[]; liveries?: Livery[] } | null = null;
+  let saved: { config?: unknown; slot?: number; progress?: unknown[]; liveries?: Livery[]; lapsByCourse?: Partial<Record<CourseId, number>> } | null = null;
   try { saved = JSON.parse(localStorage.getItem(soloSaveKey) ?? 'null'); } catch { /* Use defaults. */ }
   const slot = CAR_SPECS.findIndex((_, index) => index === saved?.slot);
-  const progress = CAR_SPECS.map((_, index) => {
-    const entry = saved?.progress?.[index];
-    const current = createLiveryProgress();
-    current.clean = entry?.clean === true;
-    current.sector = entry?.sector === true;
-    current.bestSectors = current.bestSectors.map((_, sector) => {
-      const time = entry?.bestSectors?.[sector];
-      return typeof time === 'number' && Number.isFinite(time) && time > 0 ? time : null;
-    });
-    return current;
-  });
+  const config = normalizeRaceConfig(saved?.config);
+  const lapsByCourse = {
+    taller: normalizeRaceConfig({ course: 'taller', laps: saved?.lapsByCourse?.taller }).laps,
+    dique: normalizeRaceConfig({ course: 'dique', laps: saved?.lapsByCourse?.dique }).laps,
+    [config.course]: config.laps,
+  };
+  const progress = CAR_SPECS.map((_, index) => normalizeLiveryProgress(saved?.progress?.[index]));
   const liveries = progress.map((record, index): Livery => {
     const savedLivery = saved?.liveries?.[index];
     return savedLivery && unlockedLiveries(record).includes(savedLivery) ? savedLivery : 'original';
   });
-  return { slot: Math.max(0, slot), config: normalizeRaceConfig(saved?.config ?? defaultRaceConfig), progress, liveries };
+  return { slot: Math.max(0, slot), config, lapsByCourse, progress, liveries };
 }
 
-export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => void) {
+export function startSolo(
+  onState: (snapshot: RaceSnapshot, now?: number) => void,
+  onCourseSelected?: (course: CourseId) => void,
+) {
   const panel = document.createElement('div');
   panel.className = 'solo';
   const garage = loadGarage();
   const carOptions = CAR_SPECS.map((car, index) => `<option value="${index}">${car.number} · ${car.name}</option>`).join('');
+  const courseOptions = Object.entries(COURSE_OPTIONS).map(([id, option]) => `<option value="${id}">${option.label}</option>`).join('');
   panel.innerHTML = `
     <div class="solo-menu">
       <form class="solo-setup" id="solo-setup" aria-label="Preparar partida" hidden>
         <h2>Preparar partida</h2>
+        <label>Circuito <select name="course">${courseOptions}</select></label>
         <label>Modo <select name="mode"><option value="race">Carrera</option><option value="practice">Práctica libre</option></select></label>
         <label>Vueltas <input name="laps" type="number" min="1" max="12" required></label>
         <label>Rivales <select name="bots">${[0, 1, 2, 3].map(value => `<option>${value}</option>`).join('')}</select></label>
@@ -83,6 +84,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
   const unlock = panel.querySelector<HTMLParagraphElement>('[data-unlock]')!;
   const carSelect = setup.querySelector<HTMLSelectElement>('[name=car]')!;
   const livery = setup.querySelector<HTMLSelectElement>('[name=livery]')!;
+  const course = setup.querySelector<HTMLSelectElement>('[name=course]')!;
   const mode = setup.querySelector<HTMLSelectElement>('[name=mode]')!;
   const laps = setup.querySelector<HTMLInputElement>('[name=laps]')!;
   const night = setup.querySelector<HTMLInputElement>('[name=night]')!;
@@ -117,7 +119,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
     livery.value = garage.liveries[slot];
     const clean = progress.clean ? 'Vuelta limpia desbloqueada.' : 'Completá una vuelta limpia.';
     const sector = progress.sector ? 'Récord de sector desbloqueado.'
-      : progress.bestSectors.some(time => time !== null) ? 'Mejorá un parcial propio por 0,05 s.'
+      : bestSectorsFor(progress, garage.config.course).some(time => time !== null) ? 'Mejorá un parcial propio por 0,05 s.'
       : 'Marcá un parcial y mejoralo para desbloquear Récord de sector.';
     challenges.textContent = `${clean} ${sector}`;
   }
@@ -130,6 +132,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
   function syncMode() { laps.disabled = mode.value === 'practice'; }
 
   carSelect.value = String(garage.slot);
+  course.value = garage.config.course;
   mode.value = garage.config.mode;
   bots.value = String(garage.config.bots);
   difficulty.value = garage.config.difficulty;
@@ -138,6 +141,22 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
   syncMode();
   showLiveries();
   carSelect.addEventListener('change', showLiveries);
+  course.addEventListener('change', () => {
+    if (driver.owned || !isCourseId(course.value)) return;
+    const selected = course.value;
+    const previous = garage.config.course;
+    if (previous === selected) return;
+    const config = { ...garage.config, course: selected, laps: garage.lapsByCourse[selected] };
+    if (!race.configure(config)) return;
+    const editedLaps = laps.valueAsNumber;
+    if (Number.isInteger(editedLaps) && editedLaps >= 1 && editedLaps <= 12) garage.lapsByCourse[previous] = editedLaps;
+    garage.config = config;
+    laps.value = String(config.laps);
+    saveGarage();
+    showLiveries();
+    onCourseSelected?.(selected);
+    update(race.snapshot());
+  });
   mode.addEventListener('change', syncMode);
   livery.addEventListener('change', () => { garage.liveries[Number(carSelect.value)] = livery.value as Livery; });
   prepare.addEventListener('click', () => showSetup(setup.hidden));
@@ -147,9 +166,10 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
     heldPointers.clear();
   }
 
-  function start(config: RaceConfig, slot: number) {
+  function start(config: ReturnType<typeof normalizeRaceConfig>, slot: number) {
     if (!race.configure(config) || !race.launch()) return;
     garage.config = config;
+    garage.lapsByCourse[config.course] = config.laps;
     garage.slot = slot;
     saveGarage();
     resetInput();
@@ -165,7 +185,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
   setup.addEventListener('submit', event => {
     event.preventDefault();
     start(normalizeRaceConfig({
-      mode: mode.value, laps: laps.valueAsNumber, bots: Number(bots.value), difficulty: difficulty.value, night: night.checked,
+      course: course.value, mode: mode.value, laps: laps.valueAsNumber, bots: Number(bots.value), difficulty: difficulty.value, night: night.checked,
     }), Number(carSelect.value));
   });
   toggle.addEventListener('click', () => {
@@ -254,7 +274,7 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
     pit.hidden = !parked;
     practiceNote.hidden = phase !== 'practice' || parked;
     const previous = garage.progress[garage.slot];
-    const record = advanceLiveryProgress(previous, car);
+    const record = advanceLiveryProgress(previous, car, snapshot.config?.course ?? garage.config.course);
     if (record !== previous) {
       garage.progress[garage.slot] = record;
       saveGarage();
@@ -269,6 +289,8 @@ export function startSolo(onState: (snapshot: RaceSnapshot, now?: number) => voi
     }
   }
 
+  race.configure(garage.config);
+  onCourseSelected?.(garage.config.course);
   update(race.snapshot());
   return {
     advance(dt: number, now?: number) {

@@ -1,4 +1,4 @@
-import { CAR_SPECS, type Livery } from "../shared/protocol.ts";
+import { CAR_SPECS, COURSE_OPTIONS, type Livery } from "../shared/protocol.ts";
 import { LIVERIES } from "../shared/liveries.ts";
 import type { ControllerLobbyPacket } from "../shared/lobby.ts";
 import { bindControls } from "./controls.ts";
@@ -75,6 +75,7 @@ function render() {
   const phase = lobby?.phase ?? "lobby";
   const car = latest?.car;
   const selection = car === undefined ? null : lobby?.slots[car];
+  const course = COURSE_OPTIONS[lobby?.config.course ?? "taller"].label;
   const connected = status === "connected" && !!selection;
   const inPit = connected && phase === "practice" && latest?.pitReady === true;
   if (!inPit) garageOpen = false;
@@ -104,7 +105,7 @@ function render() {
     detail.textContent = owned ? "Tu auto" : reserved ? reserved.connected ? "Ocupado" : "Reservado" : "Libre";
   }
   garageStatus.textContent = connected ? phase === "practice" ? "Elegí un auto libre para salir de boxes."
-    : selection?.ready ? "Listo. La pantalla anfitriona confirma la salida." : "Elegí tu auto y marcate como listo."
+    : selection?.ready ? `${course} · Listo para la salida.` : `${course} · Elegí tu auto y marcate como listo.`
     : status === "in-progress" ? "Podés unirte al volver a la sala." : labels[status];
   const wasDriving = driving;
   const canDrive = connected && !garageOpen && (phase === "race" || phase === "practice");

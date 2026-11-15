@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { CarView } from '../shared/protocol';
-import { TRACK, wallHalfAt, type TrackPoint } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
+import type { TrackPoint } from '../shared/track';
 import type { buildPlacard } from './signs';
 import { approachingCover, coverClearance } from './track-cover';
 import { cinematicStation } from './cinematic-cameras';
@@ -8,7 +9,7 @@ import { cameraLights } from './render-layers';
 
 export type ViewMode = 'general' | 'chase' | 'trackside' | 'broadcast';
 
-function followCamera(slot: number) {
+function followCamera(slot: number, course: Course) {
   const camera = new THREE.PerspectiveCamera(46, 1, 0.09, 160);
   const position = new THREE.Vector3();
   const target = new THREE.Vector3();
@@ -22,10 +23,10 @@ function followCamera(slot: number) {
   return (mode: ViewMode, car: CarView, width: number, height: number, dt: number, qrSize = 0, compact = false) => {
     cameraLights(camera, compact, slot);
     const aspect = width / height;
-    const road = TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
-    const cover = approachingCover(road.s, 6);
+    const road = course.locate(car.x, car.z, { s: car.distance, y: car.y });
+    const cover = approachingCover(road.s, 6, course);
     const heading = road.dx * Math.sin(car.yaw) + road.dz * Math.cos(car.yaw);
-    const station = mode === 'broadcast' ? cinematicStation(road.s) : undefined;
+    const station = mode === 'broadcast' ? cinematicStation(road.s, course) : undefined;
     const changed = previousMode !== mode || previousStation !== station?.id;
     if (changed || Math.abs(heading) > 0.72) direction = heading >= 0 ? 1 : -1;
     if (changed) side = road.offset > 0.3 ? -1 : 1;
@@ -38,10 +39,10 @@ function followCamera(slot: number) {
       position.set(car.x - 5, car.y + 14, car.z + 10);
       target.set(car.x, car.y, car.z);
     } else if (mode === 'chase' || mode === 'general') {
-      const behind = TRACK.sampleAt(road.s - direction * THREE.MathUtils.lerp(5.4, 3.4, cover));
-      const ahead = TRACK.sampleAt(road.s + direction * 4.4);
+      const behind = course.sampleAt(road.s - direction * THREE.MathUtils.lerp(5.4, 3.4, cover));
+      const ahead = course.sampleAt(road.s + direction * 4.4);
       cameraRoad = behind;
-      const height = TRACK.heightAt(behind.s, road.offset * 0.45);
+      const height = course.heightAt(behind.s, road.offset * 0.45);
       position.set(behind.x - behind.dz * road.offset * 0.45,
         THREE.MathUtils.lerp(Math.max(car.y + 1.75, height + 2.75), height + 1.18, cover),
         behind.z + behind.dx * road.offset * 0.45);
@@ -51,13 +52,13 @@ function followCamera(slot: number) {
           THREE.MathUtils.lerp(car.y + 14, position.y, cover), THREE.MathUtils.lerp(car.z + 10, position.z, cover));
       }
     } else {
-      const ahead = TRACK.sampleAt(road.s + direction * THREE.MathUtils.lerp(4.3, 3.1, cover));
+      const ahead = course.sampleAt(road.s + direction * THREE.MathUtils.lerp(4.3, 3.1, cover));
       cameraRoad = ahead;
-      const left = THREE.MathUtils.lerp(wallHalfAt(ahead.s, -1) - 0.35, 1.64, cover);
-      const right = THREE.MathUtils.lerp(wallHalfAt(ahead.s, 1) - 0.35, 1.64, cover);
+      const left = THREE.MathUtils.lerp(course.wallHalfAt(ahead.s, -1) - 0.35, 1.64, cover);
+      const right = THREE.MathUtils.lerp(course.wallHalfAt(ahead.s, 1) - 0.35, 1.64, cover);
       const shoulder = THREE.MathUtils.clamp(road.offset + side * 3.3,
         -left, right);
-      position.set(ahead.x - ahead.dz * shoulder, TRACK.heightAt(ahead.s, shoulder) + 0.75, ahead.z + ahead.dx * shoulder);
+      position.set(ahead.x - ahead.dz * shoulder, course.heightAt(ahead.s, shoulder) + 0.75, ahead.z + ahead.dx * shoulder);
       target.set(car.x, car.y + 0.36, car.z);
     }
 
@@ -65,10 +66,10 @@ function followCamera(slot: number) {
     camera.position.lerp(position, blend);
     aim.lerp(target, blend);
     if (!station && (mode === 'trackside' || mode === 'broadcast' || cover > 0)) {
-      const ground = TRACK.locate(camera.position.x, camera.position.z, { s: cameraRoad.s, y: cameraRoad.y });
-      const inside = Math.abs(ground.offset) < wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25;
-      const floor = TRACK.heightAt(ground.s, ground.offset);
-      const ceiling = inside ? floor + coverClearance(ground.s) - 0.23 : Infinity;
+      const ground = course.locate(camera.position.x, camera.position.z, { s: cameraRoad.s, y: cameraRoad.y });
+      const inside = Math.abs(ground.offset) < course.wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25;
+      const floor = course.heightAt(ground.s, ground.offset);
+      const ceiling = inside ? floor + coverClearance(ground.s, course) - 0.23 : Infinity;
       camera.position.y = THREE.MathUtils.clamp(camera.position.y, floor + 0.59, ceiling);
     }
     camera.lookAt(aim);
@@ -100,8 +101,9 @@ export function buildRaceViews(
   renderer: THREE.WebGLRenderer, overhead: THREE.PerspectiveCamera,
   placard: ReturnType<typeof buildPlacard>, cameraFit: (camera: THREE.PerspectiveCamera) => (width: number, height: number) => void,
   backdrop: { wall: THREE.Object3D; build(): THREE.Texture },
+  course: Course = TALLER,
 ) {
-  const followers = Array.from({ length: 4 }, (_, slot) => followCamera(slot));
+  const followers = Array.from({ length: 4 }, (_, slot) => followCamera(slot, course));
   const shared = new THREE.PerspectiveCamera(overhead.fov, 1, overhead.near, overhead.far);
   const fitShared = cameraFit(shared);
   const plateScene = new THREE.Scene();

@@ -38,6 +38,7 @@ export class SnapshotClock {
   add(state: RaceSnapshot, now: number): void {
     const newest = this.snapshots.at(-1);
     if (!newest || newest.frame < 0 || state.frame < newest.frame || state.heat !== newest.heat
+      || (state.config?.course ?? 'taller') !== (newest.config?.course ?? 'taller')
       || state.phase !== newest.phase || now - this.lastArrival > SUSPENSION_MS) {
       this.reset(state, now);
       this.lastArrival = now;

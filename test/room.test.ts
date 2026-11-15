@@ -70,7 +70,7 @@ test("only the local host can configure or launch a ready grid", () => {
   assert.ok(room.control("viewer", { type: "configure", config }, 0));
   assert.ok(room.control("host", { type: "configure", config: { ...config, laps: -1 } }, 0));
   assert.equal(room.control("host", { type: "configure", config }, 0), null);
-  assert.deepEqual(room.lobby().config, config);
+  assert.deepEqual(room.lobby().config, { ...config, course: 'taller' });
   const first = room.join("a", undefined, 1)!;
   assert.ok(room.control("host", { type: "launch" }, 2));
   assert.equal(room.snapshot().phase, "demo");
@@ -84,6 +84,39 @@ test("only the local host can configure or launch a ready grid", () => {
   assert.deepEqual(room.snapshot().order, [0]);
   assert.ok(room.control("backup", { type: "configure", config }, 6));
   assert.equal(room.join("new", undefined, 7), null);
+});
+
+test("the host previews a circuit and its remembered laps before launching", () => {
+  const room = new Room<string>();
+  room.addDisplay("host", true);
+  room.addDisplay("viewer", false);
+  const driver = room.join("phone", undefined, 0)!;
+  const config = { laps: 6, bots: 0, difficulty: "club", mode: "race", night: false };
+  room.control("host", { type: "configure", config }, 0);
+  room.ready(driver.slot, "phone", true, 1);
+  assert.ok(room.control("viewer", { type: "select-course", course: "dique" }, 1));
+  assert.ok(room.control("host", { type: "configure", config: { ...config, course: "other" } }, 1));
+  assert.equal(room.control("host", { type: "select-course", course: "dique" }, 2), null);
+  assert.equal(room.lobby().config.course, "dique");
+  assert.equal(room.lobby().config.laps, 1);
+  assert.equal(room.lobby().canLaunch, false);
+  assert.equal(room.snapshot().config?.course, "dique");
+  assert.equal(room.snapshot().phase, "demo");
+
+  assert.equal(room.control("host", { type: "configure", config: { ...config, course: "dique", laps: 4 } }, 3), null);
+  assert.equal(room.control("host", { type: "select-course", course: "taller" }, 3), null);
+  assert.equal(room.lobby().config.laps, 6);
+  assert.equal(room.control("host", { type: "select-course", course: "dique" }, 4), null);
+  assert.equal(room.lobby().config.laps, 4);
+
+  room.ready(driver.slot, "phone", true, 5);
+  assert.equal(room.control("host", { type: "launch" }, 5), null);
+  room.step(1 / 60, 6);
+  assert.equal(room.snapshot().phase, "grid");
+  assert.equal(room.snapshot().config?.course, "dique");
+  assert.ok(room.control("host", { type: "select-course", course: "taller" }, 7));
+  assert.equal(room.control("host", { type: "return" }, 8), null);
+  assert.equal(room.snapshot().config?.course, "dique");
 });
 
 test("car reservations survive reconnect and lock choices when the host launches", () => {

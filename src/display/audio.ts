@@ -1,6 +1,7 @@
 import { Vector3, type Camera } from 'three';
 import type { CarView, RaceSnapshot } from '../shared/protocol';
-import { sectorAt, TRACK, TRACK_SECTORS, type SectorId } from '../shared/track';
+import type { SectorId } from '../shared/track';
+import { DIQUE, TALLER, diquePlanPoint, getCourse } from '../shared/courses';
 import firstTrack from '../../Musica/01.mp3?url';
 import secondTrack from '../../Musica/02.mp3?url';
 import type { prepareAudioBank } from './audio-samples';
@@ -65,8 +66,20 @@ const roadTones: Record<SectorId, { frequency: number; gain: number }> = {
   pit: { frequency: 520, gain: 0.81 }, underpass: { frequency: 700, gain: 1.04 },
   tunnel: { frequency: 665, gain: 1.08 },
 };
-const pitSource = TRACK_SECTORS.find(sector => sector.id === 'pit')!.cue;
-const grandstand = { x: TRACK.sampleAt(0).x, y: 0.38, z: 2.3 };
+const ambience = {
+  taller: {
+    pit: TALLER.sectors.find(sector => sector.id === 'pit')!.cue,
+    crowd: { x: TALLER.sampleAt(0).x, y: 0.38, z: 2.3 },
+    river: { x: 3.65, y: -0.156, z: -6.35 },
+    pond: { x: 4.65, y: -0.156, z: -0.74 },
+  },
+  dique: {
+    pit: DIQUE.sectors.find(sector => sector.id === 'pit')!.cue,
+    crowd: { ...diquePlanPoint(132, 148), y: 0.4 },
+    river: { ...diquePlanPoint(90, 51), y: -1.15 },
+    pond: { ...diquePlanPoint(134, 102), y: -1.15 },
+  },
+};
 
 function emitter(context: AudioContext, destination: AudioNode) {
   const gain = context.createGain();
@@ -250,12 +263,15 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
 
   function update({ state, cars, camera, view, focus, tick, dt }: RaceMix) {
     if (context.state !== 'running' || muted) return;
+    const course = getCourse(state.config?.course);
+    const { pit: pitSource, crowd: grandstand, river: riverSource, pond: pondSource } = ambience[course.id];
     const now = context.currentTime;
     const wide = view === 'general';
     const replay = view === 'replay';
     const changedView = timeline !== view;
     const reset = timeline === undefined || (timeline === 'replay') !== replay
-      || tick < previousTick || state.heat !== previousState?.heat;
+      || tick < previousTick || state.heat !== previousState?.heat
+      || course.id !== (previousState?.config?.course ?? 'taller');
     timeline = view;
     previousTick = tick;
     cameraRight.setFromMatrixColumn(camera.matrixWorld, 0);
@@ -353,10 +369,10 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
       }
       voice.onCurb = onCurb;
       if (!setMix && !shifted) continue;
-      const location = TRACK.locate(car.x, car.z, { s: car.distance, y: car.y });
-      const section = sectorAt(location.s, location.offset).id;
+      const location = course.locate(car.x, car.z, { s: car.distance, y: car.y });
+      const section = course.sectorAt(location.s, location.offset).id;
       const tone = roadTones[section];
-      const covered = Number.isFinite(coverClearance(location.s));
+      const covered = Number.isFinite(coverClearance(location.s, course));
       const overDeck = section === 'bridge' && car.y > 0.85;
       const deckStep = Math.abs(voice.deckAt - location.s);
       voice.deckAt = overDeck ? location.s : NaN;
@@ -423,10 +439,10 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
 
     if (!setMix) return;
     const damp = 1 - pace * 0.42;
-    locate(camera, 3.65, -0.156, -6.35, wide);
+    locate(camera, riverSource.x, riverSource.y, riverSource.z, wide);
     river.gain.setTargetAtTime(damp * loudness * 0.070, now, 0.25);
     river.pan.setTargetAtTime(pan, now, 0.18);
-    locate(camera, 4.65, -0.156, -0.74, wide);
+    locate(camera, pondSource.x, pondSource.y, pondSource.z, wide);
     pond.gain.setTargetAtTime(damp * loudness * 0.031, now, 0.25);
     pond.pan.setTargetAtTime(pan, now, 0.18);
     locate(camera, grandstand.x, grandstand.y, grandstand.z, wide);

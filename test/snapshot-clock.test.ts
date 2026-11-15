@@ -86,6 +86,20 @@ test('a duplicate tick refreshes its snapshot without snapping to it early', () 
   assert.ok(sample.alpha > 0 && sample.alpha < 1);
 });
 
+test('changing circuits during an exhibition drops poses from the previous layout', () => {
+  const clock = new SnapshotClock(75);
+  clock.add(snapshot(100, 'demo', 0), 0);
+  clock.add(snapshot(103, 'demo', 0), 50);
+  const dique: RaceSnapshot = {
+    ...snapshot(103, 'demo', 0),
+    config: { course: 'dique', laps: 1, bots: 3, difficulty: 'club', mode: 'race', night: false },
+  };
+  clock.add(dique, 51);
+  const sample = clock.sample(51)!;
+  assert.equal(sample.from, dique);
+  assert.equal(sample.to, dique);
+});
+
 test('a gap longer than 420 ms in packets or rendering snaps to the latest snapshot', () => {
   const packetGap = new SnapshotClock(85);
   packetGap.add(snapshot(10), 0);

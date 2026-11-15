@@ -1,12 +1,15 @@
 import { Race } from "../src/sim/race.ts";
-import { CAR_SPECS, defaultRaceConfig, normalizeRaceConfig, type RaceConfig, type RaceSnapshot } from "../src/shared/protocol.ts";
+import { CAR_SPECS, COURSE_OPTIONS, defaultRaceConfig, isCourseId, normalizeRaceConfig, type RaceSnapshot } from "../src/shared/protocol.ts";
 import type { ControllerLobbyPacket, LobbyState } from "../src/shared/lobby.ts";
 import { Seats } from "./seats.ts";
 
-function validConfig(value: unknown): RaceConfig | null {
+type Config = ReturnType<typeof normalizeRaceConfig>;
+
+function validConfig(value: unknown, course: Config["course"]): Config | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const candidate = value as Partial<RaceConfig>;
-  const config = normalizeRaceConfig(candidate);
+  const candidate = value as Partial<Config>;
+  if ("course" in candidate && !isCourseId(candidate.course)) return null;
+  const config = normalizeRaceConfig({ ...candidate, course: candidate.course ?? course });
   return candidate.laps === config.laps && candidate.bots === config.bots &&
     candidate.difficulty === config.difficulty && candidate.mode === config.mode && candidate.night === config.night
     ? config : null;
@@ -16,7 +19,8 @@ export class Room<Peer> {
   private race = new Race({ manual: true });
   private seats = new Seats<Peer>();
   private eligibleHosts = new Set<Peer>();
-  private config = { ...defaultRaceConfig };
+  private config = normalizeRaceConfig(defaultRaceConfig);
+  private lapsByCourse = { taller: COURSE_OPTIONS.taller.laps, dique: COURSE_OPTIONS.dique.laps };
   private active = false;
   private phase: LobbyState["phase"] = "lobby";
   private drivers = this.seats.drivers(0);
@@ -47,10 +51,16 @@ export class Room<Peer> {
       return null;
     }
     if (this.active) return "La salida ya se confirmó.";
-    if (command.type === "configure") {
-      const config = validConfig(command.config);
+    if (command.type === "configure" || command.type === "select-course") {
+      const config = command.type === "configure" ? validConfig(command.config, this.config.course)
+        : isCourseId(command.course) ? { ...this.config, course: command.course, laps: this.lapsByCourse[command.course] } : null;
       if (!config) return "La configuración de carrera no es válida.";
+      if (config.course !== this.config.course) {
+        if (!this.race.configure(config)) return "No se pudo cambiar de circuito.";
+        this.seats.resetReady();
+      }
       this.config = config;
+      this.lapsByCourse[config.course] = config.laps;
       return null;
     }
     if (command.type !== "launch") return "Comando de sala desconocido.";
@@ -112,7 +122,7 @@ export class Room<Peer> {
 
   recordProgress(snapshot: RaceSnapshot) {
     if (this.phase === "race" || this.phase === "practice" || this.phase === "results") {
-      this.seats.recordLiveryProgress(snapshot.cars, this.drivers);
+      this.seats.recordLiveryProgress(snapshot.cars, this.drivers, snapshot.config?.course ?? this.config.course);
     }
   }
 

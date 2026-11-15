@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { raceTime } from './results';
 import qrcode from 'qrcode-generator';
 import { CAR_SPECS, FORWARD_GEARS, type RaceSnapshot } from '../shared/protocol';
-import { TRACK, WALL_HALF } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
+import { WALL_HALF } from '../shared/track';
 import { BENCH_SURFACE, box, canvas2d, flatSign, horizontalShadow, random, standard, texture } from './materials';
 
 const steel = standard(0x75736b, 0.44, 0.56);
@@ -60,9 +61,14 @@ function drawGear(context: CanvasRenderingContext2D, gear: string, spec: typeof 
   context.fillText(`#${spec.number}`, x + 106, y + 67);
 }
 
-function raceBoard(parent: THREE.Object3D) {
+function raceBoard(parent: THREE.Object3D, course: Course) {
   const base = new THREE.Group();
-  base.position.set(-10.55, -0.23, 4.45);
+  if (course.id === 'taller') base.position.set(-10.55, -0.23, 4.45);
+  else {
+    const finish = course.sampleAt(-9);
+    const shoulder = course.wallHalfAt(finish.s, -1) + 0.9;
+    base.position.set(finish.x + finish.dz * shoulder, -0.23, finish.z - finish.dx * shoulder);
+  }
   base.scale.setScalar(0.53);
   parent.add(base);
   const display = new THREE.Group();
@@ -115,7 +121,7 @@ function raceBoard(parent: THREE.Object3D) {
     context.strokeRect(8, 8, 1008, 349);
     context.fillStyle = '#d5b390';
     context.font = 'bold 31px ui-monospace, monospace';
-    context.fillText('TALLER 07   /   MESA DE CARRERA', 32, 57);
+    context.fillText(course.id === 'dique' ? 'GRAN PREMIO DEL DIQUE' : 'TALLER 07   /   MESA DE CARRERA', 32, 57);
     context.strokeStyle = '#6f5946';
     context.beginPath();
     context.moveTo(32, 78);
@@ -173,10 +179,11 @@ function raceBoard(parent: THREE.Object3D) {
   };
 }
 
-function startingLights(parent: THREE.Object3D) {
-  const start = TRACK.sampleAt(-1.75);
+function startingLights(parent: THREE.Object3D, course: Course) {
+  const start = course.sampleAt(-1.75);
+  const shoulder = (course.id === 'taller' ? WALL_HALF : course.wallHalfAt(start.s, -1)) + 0.44;
   const base = new THREE.Group();
-  base.position.set(start.x + start.dz * (WALL_HALF + 0.44), -0.23, start.z - start.dx * (WALL_HALF + 0.44));
+  base.position.set(start.x + start.dz * shoulder, -0.23, start.z - start.dx * shoulder);
   base.scale.setScalar(0.85);
   parent.add(base);
   box(base, foot, 0, 0.09, 0, 1.24, 0.18, 0.67);
@@ -205,10 +212,11 @@ function startingLights(parent: THREE.Object3D) {
   };
 }
 
-function flagStand(parent: THREE.Object3D) {
-  const start = TRACK.sampleAt(0.66);
+function flagStand(parent: THREE.Object3D, course: Course) {
+  const start = course.sampleAt(0.66);
+  const shoulder = (course.id === 'taller' ? WALL_HALF : course.wallHalfAt(start.s, -1)) + 0.62;
   const post = new THREE.Group();
-  post.position.set(start.x + start.dz * (WALL_HALF + 0.62), -0.23, start.z - start.dx * (WALL_HALF + 0.62));
+  post.position.set(start.x + start.dz * shoulder, -0.23, start.z - start.dx * shoulder);
   post.scale.setScalar(0.88);
   parent.add(post);
   box(post, foot, 0, 0.09, 0, 0.53, 0.18, 0.49);
@@ -249,10 +257,10 @@ function flagStand(parent: THREE.Object3D) {
   };
 }
 
-export function buildRaceSigns(parent: THREE.Object3D) {
-  const board = raceBoard(parent);
-  const lights = startingLights(parent);
-  const flag = flagStand(parent);
+export function buildRaceSigns(parent: THREE.Object3D, course: Course = TALLER) {
+  const board = raceBoard(parent, course);
+  const lights = startingLights(parent, course);
+  const flag = flagStand(parent, course);
   return { board, lights, flag };
 }
 

@@ -72,14 +72,15 @@ export class ReplayHistory {
   add(state: RaceSnapshot, now: number) {
     const previous = this.previous;
     this.previous = state;
-    if (!previous || previous.heat !== state.heat || state.frame < previous.frame ||
+    const changedCourse = (state.config?.course ?? 'taller') !== (previous?.config?.course ?? 'taller');
+    if (!previous || changedCourse || previous.heat !== state.heat || state.frame < previous.frame ||
         state.phase === 'demo' || state.phase === 'grid') {
       this.history = [];
       this.moments = [];
       this.outside.clear();
       this.stop();
     }
-    if (!previous || previous.heat !== state.heat || state.frame <= previous.frame) return;
+    if (!previous || changedCourse || previous.heat !== state.heat || state.frame <= previous.frame) return;
     const enteringResults = state.phase === 'results' && previous.phase === 'race';
     if (state.phase !== 'race' && !enteringResults) return;
     for (const moment of this.moments) if (state.frame <= moment.tick + TAIL_TICKS) moment.frames.push(state);

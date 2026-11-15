@@ -160,7 +160,7 @@ function display(peer: WebSocket, local: boolean) {
   peer.on("message", (buffer, binary) => {
     if (binary || peer.readyState !== WebSocket.OPEN) return;
     const command = readCommand(buffer.toString());
-    if (command?.type !== "configure" && command?.type !== "launch" && command?.type !== "return") return;
+    if (command?.type !== "configure" && command?.type !== "select-course" && command?.type !== "launch" && command?.type !== "return") return;
     const error = room.control(peer, command, performance.now());
     if (error) return send(peer, { type: "error", message: error });
     publishLobby();

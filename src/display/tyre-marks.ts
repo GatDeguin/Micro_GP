@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import type { CarView } from '../shared/protocol';
 import { CAR_DIMENSIONS } from '../shared/car-dimensions';
-import { TRACK } from '../shared/track';
+import { TALLER, type Course } from '../shared/courses';
 
 const capacity = 2304;
 
-export function buildTyreMarks(parent: THREE.Object3D) {
+export function buildTyreMarks(parent: THREE.Object3D, course: Course = TALLER) {
   const geometry = new THREE.BufferGeometry();
   const positions = new THREE.BufferAttribute(new Float32Array(capacity * 18), 3).setUsage(THREE.DynamicDrawUsage);
   const density = new THREE.BufferAttribute(new Float32Array(capacity * 6), 1).setUsage(THREE.DynamicDrawUsage);
@@ -49,10 +49,10 @@ export function buildTyreMarks(parent: THREE.Object3D) {
       const offset = side * tyre.tireOffset + (edge - 0.5) * width;
       const x = car.x - sin * tyre.axle + cos * offset;
       const z = car.z - cos * tyre.axle - sin * offset;
-      const road = TRACK.locate(x, z, { s: car.distance, y: car.y });
-      const surface = TRACK.surfaceAt(road.s, road.offset);
+      const road = course.locate(x, z, { s: car.distance, y: car.y });
+      const surface = course.surfaceAt(road.s, road.offset);
       if (surface === 'gravel' || surface === 'grass') return false;
-      corners[first + edge].set(x, TRACK.heightAt(road.s, road.offset) + 0.013, z);
+      corners[first + edge].set(x, course.heightAt(road.s, road.offset) + 0.013, z);
     }
     return true;
   }
