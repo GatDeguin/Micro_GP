@@ -14,7 +14,7 @@ import { buildInfield } from './infield';
 import { buildMultiplayerLobby } from './lobby';
 import { BENCH_SURFACE, plankMap } from './materials';
 import { buildRaceViews } from './race-views';
-import { cameraLights } from './render-layers';
+import { cameraLights, sceneryLights } from './render-layers';
 import { ReplayHistory, replayCompanion } from './replay';
 import { buildReplayShot } from './replay-shot';
 import { buildRaceResults } from './results';
@@ -247,6 +247,9 @@ async function bootstrap() {
     scene.remove(stage.root);
     stage = next;
     scene.add(stage.root);
+    // The Dique floodlights have baked pools for the overview and direct beams for closer views.
+    if (stage.course.id === 'dique') camera.layers.disable(sceneryLights);
+    else camera.layers.enable(sceneryLights);
     canvas.setAttribute('aria-label', `Micro GP · ${COURSE_OPTIONS[stage.course.id].label}`);
     preview = exhibition(stage.course);
     if (replaying) lightShot(false);
