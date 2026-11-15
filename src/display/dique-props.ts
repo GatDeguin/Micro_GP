@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { diquePlanPoint, type Course } from '../shared/courses';
+import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses';
 import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
 import { instanceStatic } from './batches';
 import { sceneryLights } from './render-layers';
@@ -275,29 +275,38 @@ function containers(parent: THREE.Group, course: Course) {
   const stacks = [[173, 88, -0.19, blue], [155, 133, -0.04, oxide], [194, 123, 0.11, blue],
     [201.5, 132.6, -0.06, oxide], [125.2, 130.0, -0.19, blue], [52.6, 68.7, 0, blue],
     [169.1, 67, -0.12, oxide], [166, 74, -0.07, blue], [184.1, 65.8, -0.11, amber],
-    [212, 71, 0.03, blue], [221.6, 76, 0.14, oxide], [138, 127, -0.08, blue],
-    [197.5, 62.5, -0.12, oxide], [233.8, 75.6, 0.03, blue], [197, 79, 0.12, blue],
-    [104, 132.7, -0.12, oxide], [121, 119.6, 0.16, blue], [151.5, 30.8, -0.07, blue]] as const;
+    [221, 62.9, 0.03, blue], [221.6, 76, 0.14, oxide], [138, 127, -0.08, blue],
+    [210.9, 50.8, -0.12, oxide], [233.8, 75.6, 0.03, blue], [194.5, 84.8, 1.56, blue],
+    [104, 132.7, -0.12, oxide], [121, 119.6, 0.16, blue], [151.5, 30.8, -0.07, blue],
+    [194.4, 96.5, 1.58, oxide], [173.9, 75.6, 1.53, amber], [198.0, 71.5, 1.48, amber]] as const;
   for (const [i, [x, z, yaw, color]] of stacks.entries()) {
     const anchor = diquePlanPoint(x, z);
-    if (!diqueRoadClear(course, anchor.x, anchor.z, 4.35)) continue;
+    const point = (x: number, z: number) => ({
+      x: anchor.x + Math.cos(yaw) * x + Math.sin(yaw) * z,
+      z: anchor.z - Math.sin(yaw) * x + Math.cos(yaw) * z,
+    });
+    const fits = [-4.15, -2.07, 0, 2.07, 4.15].every(x => [-1.73, 0, 1.73].every(z => {
+      const corner = point(x, z);
+      return diqueRoadClear(course, corner.x, corner.z, 0.42);
+    }));
+    if (!fits) continue;
     shippingContainer(parent, anchor.x, anchor.z, yaw, color);
-    if ([4, 7, 12, 13].includes(i)) {
+    if ([4, 7, 12, 13, 14].includes(i)) {
       shippingContainer(parent, anchor.x + 0.15, anchor.z + 0.038, yaw + 0.018, i % 3 === 0 ? amber : blue, true);
     }
     for (let j = 0; j < 4; j++) {
-      const x = anchor.x + (j - 2) * 0.67 + (i % 2 ? 5.21 : -4.31);
-      const z = anchor.z + 1.91 + rng() * 0.54;
+      const { x, z } = point((j - 2) * 0.67 + (i % 2 ? 5.21 : -4.31), 1.91 + rng() * 0.54);
       if (diqueRoadClear(course, x, z, 0.45)) barrel(parent, [blue, amber, oxide][(i + j) % 3], x, DIQUE_GROUND, z);
     }
-    pallet(parent, anchor.x - 4.97, DIQUE_GROUND, anchor.z - 1.51);
+    const load = point(-4.97, -1.51);
+    if (diqueRoadClear(course, load.x, load.z, 0.88)) pallet(parent, load.x, DIQUE_GROUND, load.z);
   }
 }
 
 function serviceYards(parent: THREE.Group, course: Course, concrete: THREE.Material) {
   const rng = random(44611);
   const stations = [[45, 83], [58, 109], [102, 33], [154, 41], [130, 81],
-    [158, 78], [207, 74], [226.5, 96.5], [174, 133], [219, 129]] as const;
+    [158, 78], [221.0, 69.6], [226.5, 96.5], [174, 133], [219, 129]] as const;
   for (const [i, [x, z]] of stations.entries()) {
     const at = diquePlanPoint(x, z);
     if (!diqueRoadClear(course, at.x, at.z, 3.75)) continue;
@@ -516,7 +525,8 @@ function lights(parent: THREE.Group, course: Course) {
   const poles: THREE.SpotLight[] = [];
   const stations = [[4, 1], [44, 1], [92, 1], [136, -1], [171, 1], [238, 1], [279, -1],
     [325, -1], [395, 1], [445, 1], [494, -1], [555, -1], [644, -1], [692, 1], [735, -1]] as const;
-  for (const [i, [s, side]] of stations.entries()) {
+  for (const [i, [at, side]] of stations.entries()) {
+    const s = diqueRoadDistance(at);
     const p = course.sampleAt(s);
     const margin = side * (course.wallHalfAt(s, side) + 1.25);
     const q = diqueEdge(course, p, margin);
@@ -597,9 +607,9 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   serviceYards(parent, course, concrete);
   pumpingStation(parent, concrete, lamp, garageGlow);
   for (const [s, side, text, note] of [[125, 1, '100', 'GRÚA'], [141, 1, '50', 'GRÚA'],
-    [222, 1, 'CHICANA', 'CONTENEDORES'], [335, -1, 'PUENTE', 'NIVEL ALTO'], [476, 1, 'FRENÁ', 'VERTEDERO'],
+    [279, 1, 'CHICANA', 'REGRESO A PISTA'], [335, -1, 'PUENTE', 'NIVEL ALTO'], [476, 1, 'FRENÁ', 'VERTEDERO'],
     [574, -1, 'TÚNEL', 'CARRIL BAJO'], [640, 1, 'MALECÓN', 'DOS CURVAS'], [20, -1, 'BOXES', 'DESPACIO']] as const) {
-    brakingBoard(parent, course, s, side, text, note);
+    brakingBoard(parent, course, diqueRoadDistance(s), side, text, note);
   }
   return {
     ...crane,

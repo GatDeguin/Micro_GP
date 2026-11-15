@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DIQUE, getCourse } from '../src/shared/courses.ts';
+import { DIQUE, diquePlanPoint, diqueRoadDistance, getCourse } from '../src/shared/courses.ts';
 import { GRID_LANE_OFFSET } from '../src/shared/car-dimensions.ts';
-import { NEUTRAL, defaultRaceConfig, type Driver, type RaceSnapshot } from '../src/shared/protocol.ts';
-import { TRACK } from '../src/shared/track.ts';
+import { NEUTRAL, defaultRaceConfig, type CarView, type Driver, type RaceImpact, type RaceSnapshot } from '../src/shared/protocol.ts';
+import { TRACK, type TrackPoint } from '../src/shared/track.ts';
+import { angleDifference } from '../src/sim/bot.ts';
+import { LapProgress } from '../src/sim/progress.ts';
 import { Race } from '../src/sim/race.ts';
 
 const TICK = 1 / 60;
@@ -19,16 +21,22 @@ function stepUntilResults(race: Race, drivers: readonly Driver[], maxSeconds: nu
   assert.fail('the Dique race did not finish');
 }
 
-test('Dique follows the approved scale, two decks, tunnel and passing zones', () => {
+test('the detour extends the Dique at the original scale and preserves both decks, tunnel and passing zones', () => {
   assert.equal(getCourse(), getCourse('taller'));
   assert.equal(getCourse('taller').sampleAt, TRACK.sampleAt);
   assert.equal(getCourse('dique'), DIQUE);
-  assert.ok(Math.abs(DIQUE.length - TRACK.length * 4) < 1e-6);
+  const originalLength = TRACK.length * 4;
+  assert.equal(diqueRoadDistance(143.43), 143.43);
+  assert.equal(diqueRoadDistance(originalLength), DIQUE.length);
+  const bypassLength = DIQUE.detour.to - DIQUE.detour.from;
+  assert.ok(bypassLength > 112 && bypassLength < 125);
   assert.deepEqual(DIQUE.sampleAt(DIQUE.length), DIQUE.sampleAt(0));
   const high = DIQUE.sampleAt(DIQUE.crossing.upper);
   const low = DIQUE.sampleAt(DIQUE.crossing.lower);
   assert.ok(Math.hypot(high.x - low.x, high.z - low.z) < 0.04);
-  assert.ok(Math.abs(high.s - 369.45) < 0.02 && Math.abs(low.s - 606.46) < 0.02);
+  assert.ok(Math.abs(high.s - diqueRoadDistance(369.45)) < 0.02);
+  assert.ok(Math.abs(low.s - diqueRoadDistance(606.46)) < 0.02);
+  assert.ok(Math.hypot(high.x - 17.2988, high.z + 80.63285) < 0.005);
   assert.equal(high.y, 4.8);
   assert.equal(low.y, -0.7);
   assert.ok(Math.abs(DIQUE.crossing.clearance - 4.9) < 1e-8);
@@ -52,6 +60,119 @@ test('Dique follows the approved scale, two decks, tunnel and passing zones', ()
   const grades = DIQUE.samples.slice(1).map((point, i) => (point.y - DIQUE.samples[i].y) / (point.s - DIQUE.samples[i].s));
   assert.ok(Math.max(...grades) >= 0.112 && Math.max(...grades) <= 0.113);
   assert.ok(Math.min(...grades) >= -0.140 && Math.min(...grades) <= -0.138);
+});
+
+test('the longer bypass changes direction before and after the northern turn without folding its lanes', () => {
+  const { from, to, apex } = DIQUE.detour;
+  const approach = DIQUE.samples.filter(point => point.s > from && point.s < apex);
+  const returnLane = DIQUE.samples.filter(point => point.s > apex && point.s < to);
+  for (const lane of [approach, returnLane]) {
+    const eastward = lane.findIndex(point => point.dx > 0.23);
+    assert.ok(eastward > 0);
+    assert.ok(lane.slice(0, eastward).some(point => point.dx < -0.23));
+    assert.ok(lane.slice(eastward).some(point => point.dx < -0.23));
+  }
+  const north = diquePlanPoint(198.65, 56.35);
+  const tip = DIQUE.sampleAt(apex);
+  assert.ok(Math.hypot(tip.x - north.x, tip.z - north.z) < 0.20 && tip.y === 0);
+
+  const path = DIQUE.samples.filter(point => point.s >= from && point.s <= to);
+  for (let index = 1; index < path.length - 1; index++) {
+    const point = path[index];
+    const before = path[index - 1];
+    const after = path[index + 1];
+    const angle = Math.abs(Math.atan2(before.dx * after.dz - before.dz * after.dx, before.dx * after.dx + before.dz * after.dz));
+    const wall = Math.max(DIQUE.wallHalfAt(point.s, -1), DIQUE.wallHalfAt(point.s, 1));
+    assert.ok(angle * (wall + 0.54) < after.s - before.s, `inside barrier folds at ${point.s.toFixed(2)}`);
+  }
+});
+
+test('the replacement joins the original plan and keeps the abandoned connector outside both drivable lanes', () => {
+  const { from, to, apex, closedSamples } = DIQUE.detour;
+  for (const [distance, rawX, rawZ] of [[from, 224, 112], [to, 180, 101]]) {
+    const actual = DIQUE.sampleAt(distance);
+    const expected = diquePlanPoint(rawX, rawZ);
+    assert.ok(Math.hypot(actual.x - expected.x, actual.z - expected.z) < 0.004);
+    assert.ok(actual.dx < -0.999 && Math.abs(actual.dz) < 0.035);
+  }
+  assert.equal(diqueRoadDistance(closedSamples[0].s), from);
+  assert.ok(Math.abs(diqueRoadDistance(closedSamples[closedSamples.length - 1].s) - to) < 1e-9);
+  assert.ok(apex > from && apex < to && DIQUE.checkpoints[1] === apex);
+  for (const old of closedSamples.filter(point => point.s >= from + 22 && point.s <= from + 28)) {
+    for (const hint of [undefined, { s: from, y: 0 }, { s: to, y: 0 }]) {
+      const active = DIQUE.locate(old.x, old.z, hint);
+      assert.ok(Math.abs(active.offset) > DIQUE.wallHalfAt(active.s, Math.sign(active.offset)) + 3);
+    }
+  }
+});
+
+test('driving the closed connector instead of reaching the bypass apex cannot score a lap', () => {
+  const { from, to, closedSamples } = DIQUE.detour;
+  const progress = new LapProgress(-0.8, DIQUE);
+  let previous = DIQUE.sampleAt(-0.8);
+  function advance(point: TrackPoint) {
+    progress.advance(previous, point, true);
+    previous = point;
+  }
+  function follow(from: number, to: number) {
+    const steps = Math.ceil((to - from) / 0.21);
+    for (let index = 1; index <= steps; index++) advance(DIQUE.sampleAt(from + (to - from) * index / steps));
+  }
+  follow(-0.8, from);
+  assert.equal(progress.checkpoint, 0);
+  for (const old of closedSamples.slice(1)) {
+    const active = DIQUE.locate(old.x, old.z, { s: previous.s, y: previous.y });
+    advance({ ...old, s: active.s });
+  }
+  follow(to, DIQUE.length + 0.35);
+  assert.equal(progress.checkpoint, 0);
+  assert.equal(progress.lap, 0);
+});
+
+test('full throttle into the closed connector meets the live barrier and the driver can regain speed', () => {
+  const race = new Race({ manual: true });
+  race.configure({ ...defaultRaceConfig, course: 'dique', laps: 1, bots: 0 });
+  race.launch();
+  const { from, apex, closedSamples } = DIQUE.detour;
+  const oldAim = closedSamples[Math.floor(closedSamples.length / 2)];
+  let entry: CarView | undefined;
+  for (let frame = 0; frame < 60 * 55; frame++) {
+    race.step(TICK, [{ owned: true, input: null }]);
+    const state = race.snapshot();
+    const car = state.cars[0];
+    if (state.phase === 'race' && Math.abs(car.distance! - from) < 1) {
+      entry = car;
+      break;
+    }
+  }
+  assert.ok(entry && entry.speed > 7);
+  assert.ok(Math.abs(angleDifference(entry.yaw - Math.atan2(oldAim.x - entry.x, oldAim.z - entry.z))) < 0.14);
+
+  let barrier: RaceImpact | undefined;
+  for (let frame = 0; frame < 60 * 4 && !barrier; frame++) {
+    race.step(TICK, [{ owned: true, input: { x: 0, gas: true, brake: false } }]);
+    barrier = race.snapshot().impacts?.find(hit => (hit.kind === 'wall' || hit.kind === 'fence') && hit.side === -1 &&
+      hit.distance !== undefined && hit.distance >= from && hit.distance < apex);
+  }
+  assert.ok(barrier && barrier.strength > 0.3);
+  const touched = race.snapshot().cars[0];
+  assert.ok(touched.distance! < apex && touched.lap === 0 && touched.sectorTimes?.[0] === null);
+
+  for (let frame = 0; frame < 12; frame++) race.step(TICK, [parked]);
+  const released = race.snapshot().cars[0];
+  for (let frame = 0; frame < 150; frame++) {
+    const car = race.snapshot().cars[0];
+    const road = DIQUE.locate(car.x, car.z, { s: car.distance, y: car.y });
+    assert.ok(Math.abs(road.offset) < DIQUE.wallHalfAt(road.s, Math.sign(road.offset)));
+    const aim = DIQUE.sampleAt(road.s + 1.95 + Math.max(0, car.speed) * 0.213);
+    const heading = Math.atan2(aim.x - car.x, aim.z - car.z);
+    const steer = Math.max(-1, Math.min(1, angleDifference(car.yaw - heading) * 2.2));
+    race.step(TICK, [{ owned: true, input: { x: steer, gas: true, brake: false } }]);
+  }
+  const recovered = race.snapshot().cars[0];
+  assert.ok(recovered.speed > released.speed + 2);
+  assert.ok(recovered.distance! > touched.distance! + 15 && recovered.distance! < apex);
+  assert.equal(recovered.sectorTimes?.[0], null);
 });
 
 test('a Dique practice session parks four drivers and can switch back to Taller cleanly', () => {
@@ -119,38 +240,32 @@ test('the fourth pit stall connects to the dock straight without losing pit spee
   assert.ok(enteredTrack);
 });
 
-test('a four-car Dique race completes both levels and records the approved lap rhythm', () => {
-  const race = new Race({ manual: true });
-  const drivers: Driver[] = [{ owned: true, input: null }];
-  assert.equal(race.configure({ ...defaultRaceConfig, course: 'dique', laps: 1 }), true);
-  assert.equal(race.launch(), true);
-  const passages = Array.from({ length: 4 }, () => new Set<string>());
-  const finish = stepUntilResults(race, drivers, 128, state => {
-    if (state.phase !== 'race') return;
-    for (const [slot, car] of state.cars.entries()) {
-      if (Math.abs(car.distance! - DIQUE.crossing.upper) < 1) {
-        assert.ok(Math.abs(car.y - 4.8) < 0.02);
-        passages[slot].add('upper');
+const racePaces = [['rookie', 95, 116], ['club', 87, 103], ['pro', 82, 100]] as const;
+for (const [difficulty, fastest, slowest] of racePaces) {
+  test(`four ${difficulty} Dique drivers finish through the mandatory bypass and both decks`, () => {
+    const race = new Race({ manual: true });
+    const drivers: Driver[] = [{ owned: true, input: null }];
+    assert.equal(race.configure({ ...defaultRaceConfig, course: 'dique', laps: 1, difficulty }), true);
+    assert.equal(race.launch(), true);
+    const passages = Array.from({ length: 4 }, () => new Set<number>());
+    const markers = [[DIQUE.detour.from, 0], [DIQUE.detour.apex, 0], [DIQUE.detour.to, 0],
+      [DIQUE.crossing.upper, 4.8], [DIQUE.crossing.lower, -0.7]];
+    const finish = stepUntilResults(race, drivers, 131, state => {
+      if (state.phase !== 'race') return;
+      for (const [slot, car] of state.cars.entries()) {
+        for (const [distance, height] of markers) {
+          if (Math.abs(car.distance! - distance) >= 1) continue;
+          assert.ok(Math.abs(car.y - height) < 0.02);
+          passages[slot].add(distance);
+        }
       }
-      if (Math.abs(car.distance! - DIQUE.crossing.lower) < 1) {
-        assert.ok(Math.abs(car.y + 0.7) < 0.02);
-        passages[slot].add('lower');
-      }
-    }
+    });
+    assert.deepEqual(finish.cars.map(car => car.lap), [1, 1, 1, 1]);
+    assert.deepEqual(passages.map(markers => markers.size), [5, 5, 5, 5]);
+    assert.ok(finish.results?.every(entry => entry.time !== null && entry.bestLap! >= fastest && entry.bestLap! <= slowest));
+    assert.ok(finish.cars.every(car => car.sectorTimes?.length === 4));
   });
-  assert.deepEqual(finish.cars.map(car => car.lap), [1, 1, 1, 1]);
-  assert.deepEqual(passages.map(levels => levels.size), [2, 2, 2, 2]);
-  const best = Math.min(...finish.cars.map(car => car.bestLap ?? Infinity));
-  assert.ok(best >= 80 && best <= 105, `best lap was ${best} seconds`);
-});
-
-test('the Pro bots retain the approved lap rhythm on the Dique', () => {
-  const race = new Race({ manual: true });
-  race.configure({ ...defaultRaceConfig, course: 'dique', laps: 1, difficulty: 'pro' });
-  race.launch();
-  const result = stepUntilResults(race, [{ owned: true, input: null }], 110);
-  assert.ok(result.results?.every(entry => entry.time !== null && entry.bestLap! >= 80 && entry.bestLap! <= 105));
-});
+}
 
 test('the wet inside line uses about 82 percent of the dry line’s tire grip', async () => {
   const { CAR_DIMENSIONS } = await import('../src/shared/car-dimensions.ts');

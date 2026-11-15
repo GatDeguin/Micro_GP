@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { diquePlanPoint, type Course } from '../shared/courses.ts';
+import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses.ts';
 import type { RaceSnapshot } from '../shared/protocol.ts';
 import { DIQUE_BUILDING_PAD, diqueBuildingPoint, diqueBuildings, type DiqueBuilding } from './dique-architecture-layout';
 import { DIQUE_GROUND, diqueEdge, diqueRoadClear } from './dique-geometry';
@@ -140,7 +140,8 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   const dispatch = atGround(freightLane.gate.x - 4.10, freightLane.gate.z);
   add('dispatcher', dispatch, dispatch, Math.PI - 0.45, inspector);
   add('mechanic', plan(56.55, 124.4), plan(56.55, 124.4), Math.PI - 0.25, mechanic);
-  add('dock', plan(199.6, 71.8), plan(203.1, 71.82), 1.55, workwear);
+  add('dock', plan(216.9, 79.8), plan(220.3, 79.9), 1.55, workwear);
+  add('clerk', plan(222.3, 73.4), plan(225.2, 73.2), 1.78, inspector);
   function spillwayWalk(px: number, pz: number, yaw: number, from: number, to: number, look: number) {
     const center = plan(px, pz, -0.744);
     const along = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
@@ -149,7 +150,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   spillwayWalk(73.1, 81.4, 0.39, -1.72, 0.69, Math.PI / 2);
   spillwayWalk(92.45, 103, -0.29, -0.96, 0.91, -Math.PI / 2);
 
-  const marshalPosts = [6.1, 460.0].map((s, i) => {
+  const marshalPosts = [6.1, diqueRoadDistance(460)].map((s, i) => {
     const lane = course.sampleAt(s);
     const side = 1;
     const edge = diqueEdge(course, lane, course.wallHalfAt(s, side) + (i ? 0.69 : 0.82));
@@ -159,6 +160,13 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
     add('marshal', edge, edge, yaw, marshal, new THREE.Vector3(lane.x, lane.y, lane.z));
     return { edge, yaw };
   });
+  if (course.detour) {
+    const lane = course.sampleAt(course.detour.from + 25);
+    const post = diqueEdge(course, lane, course.wallHalfAt(lane.s, 1) + 1.23);
+    post.y = DIQUE_GROUND;
+    const yaw = Math.atan2(lane.x - post.x, lane.z - post.z);
+    add('marshal', post, post, yaw, marshal, new THREE.Vector3(lane.x, lane.y, lane.z));
+  }
 
   const coated = standard(0xffffff, 0.76);
   const accents = standard(0xffffff, 0.56, 0.12);

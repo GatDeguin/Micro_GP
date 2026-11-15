@@ -1,5 +1,5 @@
 import { PIT_LANE, TRACK } from '../shared/track';
-import { TALLER, type Course } from '../shared/courses';
+import { DIQUE, TALLER, diqueRoadDistance, type Course } from '../shared/courses';
 import { approachingCover } from './track-cover';
 
 const taller = [
@@ -13,12 +13,17 @@ const dique = [
   { id: 'bridge', at: 369.45, lead: -2.5, side: 1, lift: 3.4, range: 18 },
   { id: 'spillway', at: 506, lead: -3.7, side: 1, lift: 4.5, range: 17 },
   { id: 'last-turn', at: 736, lead: 2.5, side: 1, lift: 2.8, range: 22 },
-];
+].map(station => ({ ...station, at: diqueRoadDistance(station.at) }));
+dique.push(
+  { id: 'port-entry', at: DIQUE.detour.from + 18, lead: -2.2, side: 1, lift: 4.8, range: 19 },
+  { id: 'port-crates', at: DIQUE.detour.apex, lead: 1.5, side: 1, lift: 4.65, range: 20 },
+  { id: 'port-return', at: DIQUE.detour.to - 17, lead: 2.4, side: -1, lift: 4.3, range: 20 },
+);
 
 export function cinematicStation(s: number, course: Course = TALLER) {
   if (approachingCover(s, 4, course) > 0.08) return undefined;
-  if (course.id === 'dique' && s >= 636 && s <= 646) {
-    return { id: 'tunnel-outfall', at: 640, range: 6, x: -22.5, y: 3.3, z: -70.9 };
+  if (course.id === 'dique' && s >= diqueRoadDistance(636) && s <= diqueRoadDistance(646)) {
+    return { id: 'tunnel-outfall', at: diqueRoadDistance(640), range: 6, x: -22.5, y: 3.3, z: -70.9 };
   }
   const stations = course.id === 'dique' ? dique : taller;
   let best = 1;

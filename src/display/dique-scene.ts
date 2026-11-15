@@ -7,9 +7,11 @@ import { buildCompactScenery } from './compact-scenery';
 import { buildDiqueArchitecture } from './dique-architecture';
 import { buildDiqueCargoShip } from './dique-cargo-ship';
 import { buildDiqueCraneActivity } from './dique-crane-activity';
+import { buildDiqueDetourLook } from './dique-detour-look';
 import { buildDiqueHarbor, buildDiqueTunnel } from './dique-harbor';
 import { buildDiqueLandscape } from './dique-landscape';
 import { buildDiqueProps } from './dique-props';
+import { buildDiqueRoadworks } from './dique-roadworks';
 import { buildDiqueTerminal } from './dique-terminal';
 import { buildDiqueTrack, diqueConcrete } from './dique-track';
 import { buildDiqueWorkers } from './dique-workers';
@@ -48,6 +50,8 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   const equipment = buildDiqueProps(props, course, concrete, garage);
   const terminal = buildDiqueTerminal(props, freight, course, concrete);
   const architecture = buildDiqueArchitecture(props, course, concrete, buildings);
+  const detour = buildDiqueDetourLook(infrastructure, course);
+  const roadworks = buildDiqueRoadworks(infrastructure, course);
 
   if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, equipment.crane]));
   mergeStatic(dock, new Set([harbor.backWall]), 45);
@@ -68,6 +72,8 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       equipment.setNight(night);
       terminal.setNight(night);
       architecture.setNight(night);
+      detour?.setNight(night);
+      roadworks.setNight(night);
       ship.setNight(night);
       yard.setNight(night);
       craneActivity?.setNight?.(night);
@@ -84,6 +90,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
     },
     update(now: number) {
       harbor.update(now);
+      roadworks.update(now);
       yard.update(now);
       craneActivity?.update(now);
       terminal.update(now);

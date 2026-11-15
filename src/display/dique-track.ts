@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import type { Course } from '../shared/courses';
+import { diqueRoadDistance, type Course } from '../shared/courses';
 import { GRID_LANE_OFFSET } from '../shared/car-dimensions';
 import type { TrackPoint } from '../shared/track';
 import { box, canvas2d, noiseField, random, standard, texture } from './materials';
@@ -129,9 +129,12 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
       const wheelLine = 1 - Math.min(1, Math.abs(Math.abs(fraction) - 0.46) * 7);
       const wear = streak * (1 - 0.12 * wheelLine);
       const wet = course.wetAt(p.s, offset);
+      const workLane = course.detour
+        ? THREE.MathUtils.smoothstep(Math.min(p.s - course.detour.from, course.detour.to - p.s), 0, 6) : 0;
       positions.push(q.x, q.y, q.z);
       uv.push(p.s / course.length * 96, offset * 0.30);
-      colors.push(wear * (1 - 0.44 * wet), wear * (1 - 0.37 * wet), wear * (1 - 0.30 * wet));
+      colors.push(wear * (1 - 0.44 * wet + 0.27 * workLane), wear * (1 - 0.37 * wet + 0.32 * workLane),
+        wear * (1 - 0.30 * wet + 0.31 * workLane));
       if (line === bands.length - 1 || i === samples.length - 1) continue;
       const k = i * bands.length + line;
       indices.push(k, k + 1, k + bands.length, k + bands.length, k + 1, k + bands.length + 1);
@@ -147,7 +150,7 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
 }
 
 function wetShoulder(parent: THREE.Group, course: Course) {
-  const samples = diqueSpan(course, 145, 219);
+  const samples = diqueSpan(course, 145, diqueRoadDistance(219));
   const inner = [-1, -0.81, -0.61, -0.42, -0.19, 0.04];
   const positions = [];
   const colors = [];
@@ -227,6 +230,7 @@ function surfaceRuns(parent: THREE.Group, course: Course, concrete: THREE.Materi
 
 function curbs(parent: THREE.Group, course: Course) {
   const colors = [new THREE.Color(0xb43d32), new THREE.Color(0xeee2c2)];
+  const hazard = [new THREE.Color(0x726b54), new THREE.Color(0xd7a551)];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.74, map: mineralMap(645, [212, 212, 209], 2.5) });
   const rng = random(5532);
   const count = Math.round(course.length / 1.4);
@@ -240,7 +244,9 @@ function curbs(parent: THREE.Group, course: Course) {
       const from = i * step;
       const to = from + step;
       if (side < 0 && to > course.pit.entry && from < course.pit.exit) continue;
-      const color = colors[i % 2].clone().multiplyScalar(0.72 + rng() * 0.33);
+      const midpoint = (from + to) / 2;
+      const paint = course.detour && midpoint > course.detour.from + 3 && midpoint < course.detour.to - 3 ? hazard : colors;
+      const color = paint[i % 2].clone().multiplyScalar(0.72 + rng() * 0.33);
       const start = vertices.length / 3;
       for (const [row, along] of [0.035, 0.19, 0.81, 0.965].entries()) {
         const p = course.sampleAt(from + along * step);
@@ -327,6 +333,7 @@ function rails(parent: THREE.Group, course: Course) {
   const post = standard(0x818b8e, 0.46, 0.58);
   const rail = standard(0xa8b3b0, 0.39, 0.59);
   const base = standard(0x66615a, 0.72, 0.30);
+  const repairRail = [standard(0xc77b38, 0.75, 0.17), standard(0xe0cba0, 0.83)];
   const count = Math.round(course.length / 2.30);
   const spacing = course.length / count;
   const skip = (s: number, side: number) => (s > course.tunnel.from + 0.03 && s < course.tunnel.to - 0.03)
@@ -348,6 +355,16 @@ function rails(parent: THREE.Group, course: Course) {
         box(parent, post, foot.x, foot.y + 0.391, foot.z, 0.077, 0.795, 0.091, false).rotation.y = yaw;
       }
       if (skip((s + next) / 2, side)) continue;
+      // The inside guardrail crosses the former road and is also the first work-zone barrier.
+      const from = course.detour?.from;
+      const along = from === undefined ? -1 : (s + next) / 2 - from;
+      if (side === -1 && along >= 5.4 && along <= 17.7) {
+        for (const [level, height] of [0.24, 0.69].entries()) {
+          diqueBeam(parent, repairRail[(i + level) % repairRail.length],
+            diqueEdge(course, p, lateral, height), diqueEdge(course, q, nextLateral, height), 0.132, 0.19, false);
+        }
+        continue;
+      }
       for (const [height, gauge] of [[0.18, 0.056], [0.43, 0.063], [0.76, 0.068]]) {
         diqueBeam(parent, rail, diqueEdge(course, p, lateral, height), diqueEdge(course, q, nextLateral, height), gauge, gauge * 0.72, false);
       }
@@ -383,8 +400,9 @@ function wallLamps(parent: THREE.Group, course: Course, glow: THREE.Material) {
     color: 0xffd889, emissive: 0xffa350, emissiveIntensity: 3.35, roughness: 0.44,
   });
   const projections: THREE.BufferGeometry[] = [];
-  for (const s of [321, 340, 410, 427, 442, 457, 472, 491, 509, 534]) {
-    const side = s < 350 ? -1 : 1;
+  for (const at of [321, 340, 410, 427, 442, 457, 472, 491, 509, 534]) {
+    const s = diqueRoadDistance(at);
+    const side = at < 350 ? -1 : 1;
     const p = course.sampleAt(s);
     const height = p.y + course.bankAt(s) * side * (course.wallHalfAt(s, side) + 0.22) - DIQUE_GROUND;
     if (height < 1.3) continue;
@@ -417,7 +435,9 @@ function wallLamps(parent: THREE.Group, course: Course, glow: THREE.Material) {
 }
 
 function wallFootings(parent: THREE.Group, course: Course, material: THREE.Material) {
-  for (const [from, to, outer, height] of [[413, 488, 1.08, 0.88], [410, 492, 1.83, 0.34]]) {
+  for (const [start, end, outer, height] of [[413, 488, 1.08, 0.88], [410, 492, 1.83, 0.34]]) {
+    const from = diqueRoadDistance(start);
+    const to = diqueRoadDistance(end);
     const samples = diqueSpan(course, from, to);
     const footing = (p: TrackPoint, distance: number, y: number) => {
       const point = diqueEdge(course, p, course.wallHalfAt(p.s, 1) + distance);
@@ -444,7 +464,8 @@ function bridgePiers(parent: THREE.Group, course: Course, stone: THREE.Material,
     color: 0xffcf8d, emissive: 0xff9a36, emissiveIntensity: 2.8, roughness: 0.4,
   });
   const pools: THREE.BufferGeometry[] = [];
-  for (const [s, offset] of [[355.75, -1.25], [382.25, -1.3]]) {
+  for (const [at, offset] of [[355.75, -1.25], [382.25, -1.3]]) {
+    const s = diqueRoadDistance(at);
     const p = course.sampleAt(s);
     const q = diqueEdge(course, p, offset);
     const pier = new THREE.Group();
@@ -483,8 +504,8 @@ function retainingWalls(parent: THREE.Group, course: Course, concrete: THREE.Mat
   const beams = standard(0x8e8778, 0.79, 0.12);
   const topFace = standard(0x686e70, 0.81, 0.20);
   const weathered = castConcrete(true);
-  const bridgeFrom = 349.5;
-  const bridgeTo = 391.5;
+  const bridgeFrom = diqueRoadDistance(349.5);
+  const bridgeTo = diqueRoadDistance(391.5);
   const makeRetaining = (from: number, to: number) => {
     const samples = diqueSpan(course, from, to);
     for (const side of [-1, 1]) {
@@ -515,8 +536,8 @@ function retainingWalls(parent: THREE.Group, course: Course, concrete: THREE.Mat
     }
   };
   // At the crossing the track is an open girder and its support is set outside the lower deck.
-  makeRetaining(292, bridgeFrom);
-  makeRetaining(bridgeTo, 566);
+  makeRetaining(diqueRoadDistance(292), bridgeFrom);
+  makeRetaining(bridgeTo, diqueRoadDistance(566));
   wallFootings(parent, course, concrete);
   const glow = retainingGlow();
   wallLamps(parent, course, glow);
@@ -543,7 +564,7 @@ function fallbackTruss(parent: THREE.Group, course: Course) {
   const channel = standard(0x3b484b, 0.43, 0.73);
   const plate = standard(0x818c88, 0.48, 0.56);
   const rust = standard(0x776348, 0.78, 0.43);
-  const stations = Array.from({ length: 13 }, (_, i) => course.sampleAt(351 + i * (39 / 12)));
+  const stations = Array.from({ length: 13 }, (_, i) => course.sampleAt(diqueRoadDistance(351) + i * (39 / 12)));
   for (const side of [-1, 1]) {
     const edge = (p: TrackPoint, y: number) => diqueEdge(course, p, side * (course.wallHalfAt(p.s, side) + 0.46), y);
     for (const [i, p] of stations.entries()) {
@@ -570,7 +591,8 @@ function steelBridge(parent: THREE.Group, course: Course, bridgeModel?: readonly
   else fallbackTruss(parent, course);
   const plate = standard(0x818c88, 0.48, 0.56);
   const seam = standard(0x34322e, 0.96);
-  for (const s of [361.01, 384.82]) {
+  for (const at of [361.01, 384.82]) {
+    const s = diqueRoadDistance(at);
     const p = course.sampleAt(s);
     const yaw = Math.atan2(p.dx, p.dz);
     const half = course.roadHalfAt(s) - 0.085;

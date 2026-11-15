@@ -1,14 +1,15 @@
 import type { CourseId } from './protocol.ts';
 import { safetyPanels } from './safety.ts';
-import { GRID_ROWS, PIT_LANE, TRACK, TRACK_SECTORS, sectorAt } from './track.ts';
+import { GRID_ROWS, PIT_LANE, TRACK, TRACK_SECTORS, sectorAt, type TrackPoint } from './track.ts';
 import { DIQUE } from './dique-track.ts';
 
-export { DIQUE, diquePlanPoint } from './dique-track.ts';
+export { DIQUE, diquePlanPoint, diqueRoadDistance } from './dique-track.ts';
 export type CourseSector = (typeof TRACK_SECTORS)[number];
 
 export interface Course extends Omit<typeof TRACK, 'anchors' | 'crossing'> {
   id: CourseId;
   crossing: Omit<typeof TRACK.crossing, 'x' | 'z'> & { x: number; z: number };
+  detour?: { from: number; to: number; apex: number; closedSamples: readonly TrackPoint[] };
   pit: {
     entry: number;
     full: number;

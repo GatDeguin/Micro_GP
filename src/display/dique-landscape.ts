@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { diquePlanPoint, type Course } from '../shared/courses';
+import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses';
 import { box, random, standard } from './materials';
 import { DIQUE_GROUND, diqueBeam, diqueEdge, diquePart, diquePlane, diqueRoadClear } from './dique-geometry';
 
@@ -262,7 +262,8 @@ function plants(parent: THREE.Group, course: Course) {
       target.push({ x: dx, z: dz, size, tint: palette[Math.floor(rng() * palette.length)] });
     }
   }
-  for (const s of [414, 422, 435, 442, 455, 463, 475, 482, 490]) {
+  for (const at of [414, 422, 435, 442, 455, 463, 475, 482, 490]) {
+    const s = diqueRoadDistance(at);
     const p = course.sampleAt(s);
     const offset = course.wallHalfAt(s, 1) + 1.73;
     for (let i = 0; i < 6; i++) {

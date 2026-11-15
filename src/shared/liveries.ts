@@ -11,7 +11,9 @@ export interface LiveryProgress {
   sector: boolean;
   /** Taller 07 retains the field used by existing garage saves. */
   bestSectors: (number | null)[];
+  /** Archived timings for the Dique layout before the port detour. */
   diqueBestSectors?: (number | null)[];
+  diqueDetourBestSectors?: (number | null)[];
 }
 
 const emptySectors = [null, null, null, null] as const;
@@ -28,11 +30,12 @@ export function normalizeLiveryProgress(value: unknown): LiveryProgress {
   });
   const record: LiveryProgress = { clean: saved.clean === true, sector: saved.sector === true, bestSectors: times(saved.bestSectors) };
   if (Array.isArray(saved.diqueBestSectors)) record.diqueBestSectors = times(saved.diqueBestSectors);
+  if (Array.isArray(saved.diqueDetourBestSectors)) record.diqueDetourBestSectors = times(saved.diqueDetourBestSectors);
   return record;
 }
 
 export function bestSectorsFor(progress: LiveryProgress, course: CourseId): readonly (number | null)[] {
-  return course === 'dique' ? progress.diqueBestSectors ?? emptySectors : progress.bestSectors;
+  return course === 'dique' ? progress.diqueDetourBestSectors ?? emptySectors : progress.bestSectors;
 }
 
 export function advanceLiveryProgress(previous: LiveryProgress, car: CarView, course: CourseId = 'taller'): LiveryProgress {
@@ -47,7 +50,7 @@ export function advanceLiveryProgress(previous: LiveryProgress, car: CarView, co
     return time;
   });
   if (!changed) return previous;
-  return course === 'dique' ? { ...previous, clean, sector, diqueBestSectors: bestSectors }
+  return course === 'dique' ? { ...previous, clean, sector, diqueDetourBestSectors: bestSectors }
     : { ...previous, clean, sector, bestSectors };
 }
 

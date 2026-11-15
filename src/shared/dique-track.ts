@@ -7,11 +7,27 @@ type PlanSection = readonly [PlanPoint] | readonly [PlanPoint, PlanPoint, PlanPo
 
 const start = [55, 157] as const;
 // End point first, followed by the cubic Bézier handles where the plan uses a bend.
-const plan: readonly PlanSection[] = [
+const dockPlan: readonly PlanSection[] = [
   [[222, 157]],
   [[224, 112], [262, 157], [270, 112]],
+];
+const closedRoad: readonly PlanSection[] = [
   [[207, 112]],
   [[180, 101], [194, 112], [192, 101]],
+];
+const bypassApproach: readonly PlanSection[] = [
+  [[203.42, 94], [211, 112], [203.42, 107]],
+  [[203.42, 83]],
+  [[210.8, 70], [203.42, 77], [210.8, 76]],
+];
+const bypassTurn: PlanSection = [[186.5, 70], [210.8, 51.8], [186.5, 51.8]];
+const bypass: readonly PlanSection[] = [
+  ...bypassApproach, bypassTurn,
+  [[182.6, 86.5], [186.5, 77.5], [182.6, 81]],
+  [[185.5, 95.5], [182.6, 89.8], [185.5, 92.1]],
+  [[180, 101], [185.5, 98.54], [183.04, 101]],
+];
+const returnPlan: readonly PlanSection[] = [
   [[151, 114], [168, 101], [165, 114]],
   [[112, 88], [134, 114], [125, 102]],
   [[83, 57]],
@@ -26,11 +42,9 @@ const plan: readonly PlanSection[] = [
   [start, [18, 146], [30, 157]],
 ];
 
-const length = TRACK.length * 4;
+const originalLength = TRACK.length * 4;
 const startX = -3.75;
 const startZ = 8.6875;
-const count = Math.ceil(length / 0.39);
-const spacing = length / count;
 const pit = {
   entry: 12, full: 33, leave: 99, exit: 118, side: -1, offset: -5.15, halfWidth: 1.6,
   stalls: [36, 49, 62, 75], stationOffset: -8.2, speedLimit: 5.1,
@@ -53,27 +67,51 @@ function wrap(distance: number) {
   return remainder < 0 ? remainder + length : remainder;
 }
 
-const raw = [{ x: start[0] as number, z: start[1] as number, s: 0 }];
-function append(x: number, z: number) {
-  const previous = raw[raw.length - 1];
-  raw.push({ x, z, s: previous.s + Math.hypot(x - previous.x, z - previous.z) });
+function tracePlan(plan: readonly PlanSection[]) {
+  const points = [{ x: start[0] as number, z: start[1] as number, s: 0 }];
+  const ends: number[] = [];
+  function append(x: number, z: number) {
+    const previous = points[points.length - 1];
+    points.push({ x, z, s: previous.s + Math.hypot(x - previous.x, z - previous.z) });
+  }
+  for (const [[x, z], first, second] of plan) {
+    const from = points[points.length - 1];
+    if (first && second) {
+      for (let i = 1; i <= 384; i++) {
+        const t = i / 384;
+        const u = 1 - t;
+        append(u ** 3 * from.x + 3 * u * u * t * first[0] + 3 * u * t * t * second[0] + t ** 3 * x,
+          u ** 3 * from.z + 3 * u * u * t * first[1] + 3 * u * t * t * second[1] + t ** 3 * z);
+      }
+    } else append(x, z);
+    ends.push(points[points.length - 1].s);
+  }
+  return { points, ends };
 }
 
-for (const [[x, z], first, second] of plan) {
-  const from = raw[raw.length - 1];
-  if (!first || !second) {
-    append(x, z);
-    continue;
-  }
-  for (let i = 1; i <= 384; i++) {
-    const t = i / 384;
-    const u = 1 - t;
-    append(u ** 3 * from.x + 3 * u * u * t * first[0] + 3 * u * t * t * second[0] + t ** 3 * x,
-      u ** 3 * from.z + 3 * u * u * t * first[1] + 3 * u * t * t * second[1] + t ** 3 * z);
-  }
+const original = tracePlan([...dockPlan, ...closedRoad, ...returnPlan]);
+const route = tracePlan([...dockPlan, ...bypass, ...returnPlan]);
+const scale = originalLength / original.ends[original.ends.length - 1];
+const detourFrom = route.ends[dockPlan.length - 1] * scale;
+const detourTo = route.ends[dockPlan.length + bypass.length - 1] * scale;
+const originalDetourTo = original.ends[dockPlan.length + closedRoad.length - 1] * scale;
+const extraLength = detourTo - originalDetourTo;
+const length = originalLength + extraLength;
+const count = Math.ceil(length / 0.39);
+const spacing = length / count;
+
+/** Maps a station on the original plan to the current race arc. Replaced stations map by fraction of the bypass. */
+export function diqueRoadDistance(originalDistance: number) {
+  if (originalDistance <= detourFrom) return originalDistance;
+  if (originalDistance >= originalDetourTo) return originalDistance + extraLength;
+  return mix(detourFrom, detourTo, (originalDistance - detourFrom) / (originalDetourTo - detourFrom));
 }
 
-const scale = length / raw[raw.length - 1].s;
+function originalRoadDistance(distance: number) {
+  if (distance <= detourFrom) return distance;
+  if (distance >= detourTo) return distance - extraLength;
+  return mix(detourFrom, originalDetourTo, (distance - detourFrom) / (detourTo - detourFrom));
+}
 
 export function diquePlanPoint(x: number, z: number) {
   return { x: (x - start[0]) * scale + startX, z: (z - start[1]) * scale + startZ };
@@ -81,10 +119,11 @@ export function diquePlanPoint(x: number, z: number) {
 
 const elevations = [
   [0, 0], [297, 0], [361, 4.8], [385, 4.8], [422, 6.1], [465, 6.1],
-  [522, 0.8], [580, -0.7], [632, -0.7], [667, 0], [length, 0],
+  [522, 0.8], [580, -0.7], [632, -0.7], [667, 0], [originalLength, 0],
 ] as const;
 
-function nominalHeight(s: number) {
+function nominalHeight(distance: number) {
+  const s = originalRoadDistance(distance);
   for (let i = 1; i < elevations.length; i++) {
     const [to, high] = elevations[i];
     if (s > to) continue;
@@ -94,17 +133,25 @@ function nominalHeight(s: number) {
   return 0;
 }
 
+function pointOnTrace(trace: typeof original.points, s: number) {
+  const distance = s / scale;
+  let low = 0;
+  let high = trace.length - 1;
+  while (low + 1 < high) {
+    const middle = (low + high) >> 1;
+    if (trace[middle].s < distance) low = middle;
+    else high = middle;
+  }
+  const from = trace[low];
+  const to = trace[high];
+  const fraction = clamp01((distance - from.s) / (to.s - from.s));
+  return diquePlanPoint(mix(from.x, to.x, fraction), mix(from.z, to.z, fraction));
+}
+
 const samples: TrackPoint[] = [];
-let cursor = 1;
 for (let i = 0; i < count; i++) {
   const s = i * spacing;
-  const distance = s / scale;
-  while (raw[cursor].s < distance) cursor++;
-  const from = raw[cursor - 1];
-  const to = raw[cursor];
-  const fraction = (distance - from.s) / (to.s - from.s);
-  const point = diquePlanPoint(mix(from.x, to.x, fraction), mix(from.z, to.z, fraction));
-  samples.push({ ...point, y: nominalHeight(s), s, dx: 0, dz: 0 });
+  samples.push({ ...pointOnTrace(route.points, s), y: nominalHeight(s), s, dx: 0, dz: 0 });
 }
 
 for (let i = 0; i < count; i++) {
@@ -115,6 +162,20 @@ for (let i = 0; i < count; i++) {
   const magnitude = Math.hypot(dx, dz);
   Object.assign(samples[i], { dx: dx / magnitude, dz: dz / magnitude });
 }
+
+const closedCount = Math.ceil((originalDetourTo - detourFrom) / 0.39);
+const closedSamples: readonly TrackPoint[] = Array.from({ length: closedCount + 1 }, (_, index) => {
+  const s = mix(detourFrom, originalDetourTo, index / closedCount);
+  const before = pointOnTrace(original.points, s - .18);
+  const after = pointOnTrace(original.points, s + .18);
+  const dx = after.x - before.x;
+  const dz = after.z - before.z;
+  const magnitude = Math.hypot(dx, dz);
+  return { ...pointOnTrace(original.points, s), y: 0, s, dx: dx / magnitude, dz: dz / magnitude };
+});
+const turnStart = route.ends[dockPlan.length + bypassApproach.length - 1] * scale;
+const turnEnd = route.ends[dockPlan.length + bypassApproach.length] * scale;
+const detour = { from: detourFrom, to: detourTo, apex: (turnStart + turnEnd) * .5, closedSamples };
 
 function interpolate(index: number, t: number, s: number): TrackPoint {
   const from = samples[index];
@@ -176,10 +237,13 @@ function locate(x: number, z: number, hint?: TrackHint): TrackLocation {
 
 function findCrossing() {
   // The plan places the crossover on the western return and the diagonal deck.
-  for (let i = Math.floor(361 / spacing); samples[i].s < 385; i++) {
+  const upperEnd = diqueRoadDistance(385);
+  const lowerBegin = Math.floor(diqueRoadDistance(580) / spacing);
+  const lowerEnd = diqueRoadDistance(632);
+  for (let i = Math.floor(diqueRoadDistance(361) / spacing); samples[i].s < upperEnd; i++) {
     const upper = samples[i];
     const u = segments[i];
-    for (let j = Math.floor(580 / spacing); samples[j].s < 632; j++) {
+    for (let j = lowerBegin; samples[j].s < lowerEnd; j++) {
       const lower = samples[j];
       const v = segments[j];
       const determinant = u.dx * v.dz - u.dz * v.dx;
@@ -200,19 +264,22 @@ const intersection = findCrossing();
 const { upper, lower } = intersection;
 
 const anchors = {
-  crane: 178, chicaneIn: 239, chicaneOut: 262, crest: 443.5, spillway: 507,
-  upperCross: upper, lowerCross: lower, maleconFirst: 662, maleconLast: 739,
+  crane: 178, chicaneIn: diqueRoadDistance(239), chicaneOut: diqueRoadDistance(262),
+  crest: diqueRoadDistance(443.5), spillway: diqueRoadDistance(507),
+  upperCross: upper, lowerCross: lower, maleconFirst: diqueRoadDistance(662), maleconLast: diqueRoadDistance(739),
 };
 const crossing = {
-  ...intersection, upperFrom: 361, upperTo: 385,
+  ...intersection, upperFrom: diqueRoadDistance(361), upperTo: diqueRoadDistance(385),
   lowerFrom: lower - 6, lowerTo: lower + 6, clearance: 4.9,
 };
-const tunnel = { from: 580, to: 632, archTo: 584, taperTo: 587, clearance: 2.75, archClearance: 2.93 };
-const bridge = { from: 297, crest: anchors.crest, to: 580, height: 6.1 };
-const chicane = { from: 220, apexIn: anchors.chicaneIn, apexOut: anchors.chicaneOut, to: 320 };
+const tunnel = { from: diqueRoadDistance(580), to: diqueRoadDistance(632), archTo: diqueRoadDistance(584),
+  taperTo: diqueRoadDistance(587), clearance: 2.75, archClearance: 2.93 };
+const bridge = { from: diqueRoadDistance(297), crest: anchors.crest, to: diqueRoadDistance(580), height: 6.1 };
+const chicane = { from: detour.from, apexIn: anchors.chicaneIn, apexOut: anchors.chicaneOut, to: diqueRoadDistance(320) };
 
 function roadHalfAt(distance: number) {
-  const s = wrap(distance);
+  const road = wrap(distance);
+  const s = originalRoadDistance(road);
   const craneWidth = 1.4 * band(s, 146, 163, 198, 217);
   const chicaneWidth = 0.55 * band(s, 220, 231, 236, 252) - 0.60 * band(s, 247, 259, 265, 276)
     + 0.75 * band(s, 272, 288, 292, 317);
@@ -220,7 +287,10 @@ function roadHalfAt(distance: number) {
   const descentWidth = 1.30 * band(s, 482, 495, 513, 533);
   const tunnelWidth = 0.10 * band(s, 568, 580, 632, 642);
   const maleconWidth = 0.90 * band(s, 647, 660, 708, 725);
-  return 3.10 + craneWidth + chicaneWidth + elevatedWidth + descentWidth + tunnelWidth + maleconWidth;
+  const approved = 3.10 + craneWidth + chicaneWidth + elevatedWidth + descentWidth + tunnelWidth + maleconWidth;
+  const extent = band(road, detour.from, detour.from + 5, detour.to - 3, detour.to);
+  const bypassWidth = mix(3, 2.72, smooth(road, detour.to - 14, detour.to - 7));
+  return mix(approved, bypassWidth, extent);
 }
 
 function pitRoadHalfAt(distance: number) {
@@ -232,17 +302,20 @@ function isPitLane(distance: number, offset: number) {
 }
 
 function wallHalfAt(distance: number, side: number) {
-  const s = wrap(distance);
-  const asphalt = side === pit.side ? pitRoadHalfAt(s) : roadHalfAt(s);
-  const narrow = Math.max(band(s, 351, 361, 385, 394), band(s, 570, 580, 632, 642));
+  const road = wrap(distance);
+  const s = originalRoadDistance(road);
+  const asphalt = side === pit.side ? pitRoadHalfAt(road) : roadHalfAt(road);
+  const works = band(road, detour.from, detour.from + 9, detour.to - 3, detour.to);
+  const narrow = Math.max(works * .86, band(s, 351, 361, 385, 394), band(s, 570, 580, 632, 642));
   return asphalt + mix(1.12, 0.42, narrow);
 }
 
 function surfaceBandsAt(distance: number, side: number) {
-  const s = wrap(distance);
+  const road = wrap(distance);
+  const s = originalRoadDistance(road);
   const isPitchedPit = side === pit.side && s >= pit.entry && s <= pit.exit;
-  const asphalt = isPitchedPit ? pitRoadHalfAt(s) : roadHalfAt(s);
-  const wall = wallHalfAt(s, side);
+  const asphalt = isPitchedPit ? pitRoadHalfAt(road) : roadHalfAt(road);
+  const wall = wallHalfAt(road, side);
   const curb = isPitchedPit ? asphalt : Math.min(wall, asphalt + CURB_WIDTH);
   const escape = curb + (wall - curb) * 0.84 * Math.max(band(s, 220, 233, 289, 311), band(s, 474, 494, 526, 540));
   const gravel = escape + (wall - escape) * 0.86 * Math.max(band(s, 140, 159, 208, 229), band(s, 644, 664, 719, 751));
@@ -260,10 +333,10 @@ function surfaceAt(s: number, offset: number): TrackSurface {
 }
 
 function bankAt(distance: number) {
-  const s = wrap(distance);
+  const s = originalRoadDistance(wrap(distance));
   const crane = band(s, 146, 171, 189, 217) * Math.tan(8 * Math.PI / 180);
   const spillway = band(s, 474, 498, 514, 539) * Math.tan(5 * Math.PI / 180);
-  const malecon = band(s, 713, 732, 742, length) * Math.tan(4 * Math.PI / 180);
+  const malecon = band(s, 713, 732, 742, originalLength) * Math.tan(4 * Math.PI / 180);
   return crane - spillway + malecon;
 }
 
@@ -272,8 +345,9 @@ function heightAt(s: number, offset: number) {
 }
 
 function wetAt(distance: number, offset: number) {
-  const s = wrap(distance);
-  const margins = band(offset, -roadHalfAt(s) - 0.12, -roadHalfAt(s) + 0.18, -1.02, -0.20);
+  const road = wrap(distance);
+  const s = originalRoadDistance(road);
+  const margins = band(offset, -roadHalfAt(road) - 0.12, -roadHalfAt(road) + 0.18, -1.02, -0.20);
   return band(s, 146, 163, 204, 217) * margins;
 }
 
@@ -283,13 +357,13 @@ function sector(id: SectorId, name: string, from: number, to: number, at = (from
 }
 
 const dock = sector('straight', 'Recta del muelle', 0, 146, 75);
-const crane = sector('hairpin', 'Horquilla de la grúa', 146, 220, anchors.crane);
-const containers = sector('chicane', 'Chicana de contenedores', 220, 320, anchors.chicaneOut);
-const deck = sector('bridge', 'Puente diagonal', 320, 388, upper);
-const crest = sector('back-straight', 'Coronación del dique', 388, 465, anchors.crest);
-const spillway = sector('esses', 'Curva del vertedero', 465, 511, anchors.spillway);
-const returnRoad = sector('underpass', 'Descenso al túnel', 511, 642, lower);
-const malecon = sector('sweep', 'Doble curva del malecón', 642, length, anchors.maleconLast);
+const crane = sector('hairpin', 'Horquilla de la grúa', 146, detour.from, anchors.crane);
+const containers = sector('chicane', 'Desvío de contenedores', detour.from, diqueRoadDistance(320), detour.apex);
+const deck = sector('bridge', 'Puente diagonal', diqueRoadDistance(320), diqueRoadDistance(388), upper);
+const crest = sector('back-straight', 'Coronación del dique', diqueRoadDistance(388), diqueRoadDistance(465), anchors.crest);
+const spillway = sector('esses', 'Curva del vertedero', diqueRoadDistance(465), diqueRoadDistance(511), anchors.spillway);
+const returnRoad = sector('underpass', 'Descenso al túnel', diqueRoadDistance(511), diqueRoadDistance(642), lower);
+const malecon = sector('sweep', 'Doble curva del malecón', diqueRoadDistance(642), length, anchors.maleconLast);
 const garage = sector('pit', 'Boxes del muelle', pit.entry, pit.exit, pit.stalls[1], pit.offset);
 const covered = sector('tunnel', 'Túnel del dique', tunnel.from, tunnel.to, lower);
 const circuitSectors = [dock, crane, containers, deck, crest, spillway, returnRoad, malecon];
@@ -312,7 +386,8 @@ const safetyPanels: Course['safetyPanels'] = [
 
 export const DIQUE = {
   id: 'dique', length, samples: samples as readonly TrackPoint[], sampleAt, locate, wrap, anchors, crossing, tunnel, bridge, chicane,
-  pit, gridRows: [-2.18, -5.98], roadHalfAt, wallHalfAt, pitRoadHalfAt, isPitLane, bankAt, heightAt, surfaceAt, surfaceBandsAt,
+  pit, detour, gridRows: [-2.18, -5.98], roadHalfAt, wallHalfAt, pitRoadHalfAt, isPitLane, bankAt, heightAt, surfaceAt, surfaceBandsAt,
   sectors: [...circuitSectors, garage, covered], sectorAt, safetyPanels, wetAt,
-  checkpoints: [0, 220, 388, 642], demoDistances: [10, anchors.crane, upper, anchors.maleconFirst],
+  checkpoints: [0, detour.apex, diqueRoadDistance(388), diqueRoadDistance(642)],
+  demoDistances: [10, anchors.crane, upper, anchors.maleconFirst],
 } satisfies Course & { anchors: typeof anchors };
