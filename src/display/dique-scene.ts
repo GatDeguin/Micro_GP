@@ -7,6 +7,7 @@ import { buildCompactScenery } from './compact-scenery';
 import { buildDiqueArchitecture } from './dique-architecture';
 import { buildDiqueCargoShip } from './dique-cargo-ship';
 import { buildDiqueCraneActivity } from './dique-crane-activity';
+import { buildDiqueDetails, detailDiqueModels } from './dique-details';
 import { buildDiqueDetourLook } from './dique-detour-look';
 import { buildDiqueHarbor, buildDiqueTunnel } from './dique-harbor';
 import { buildDiqueLandscape } from './dique-landscape';
@@ -36,6 +37,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   const garage = kit?.getObjectByName('Box');
   const quay = kit?.getObjectByName('Muro');
   const pier = kit?.getObjectByName('Embarcadero');
+  detailDiqueModels(garage, quay, pier, buildings);
   const infrastructure = new THREE.Group();
   const dock = new THREE.Group();
   const props = new THREE.Group();
@@ -54,6 +56,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   const detour = buildDiqueDetourLook(infrastructure, course);
   const roadworks = buildDiqueRoadworks(infrastructure, course);
   const treatment = buildDiqueTreatment(props, course, concrete);
+  buildDiqueDetails(dock, props, course, !!garage);
 
   const movingProps = new Set<THREE.Object3D>([equipment.crane]);
   if (treatment) movingProps.add(treatment.animated);

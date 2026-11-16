@@ -79,10 +79,12 @@ export function plankMap() {
     const v = y / canvas.height;
     for (let x = 0; x < canvas.width; x++) {
       const u = x / canvas.width;
-      const swirl = figure(u + 0.08 * crown(u, v), v);
-      const warped = v + 0.128 * crown(u, v) + 0.070 * curl(u, v) + 0.025 * swirl;
+      const crownSample = crown(u, v);
+      const curlSample = curl(u, v);
+      const swirl = figure(u + 0.08 * crownSample, v);
+      const warped = v + 0.128 * crownSample + 0.070 * curlSample + 0.025 * swirl;
       const cathedrals = Math.sin(2 * Math.PI * (warped * 31 + 0.58 * swirl));
-      const grain = Math.max(0, cathedrals) ** 8 * (0.36 + 0.64 * curl(u, v));
+      const grain = Math.max(0, cathedrals) ** 8 * (0.36 + 0.64 * curlSample);
       const fineGrain = pores(u, warped);
       const streak = Math.sin(2 * Math.PI * (warped * 104 + 0.58 * fineGrain));
       const pinhole = Math.max(0, poresAlong(u, warped) - 0.74);

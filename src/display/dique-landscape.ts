@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { foliageCluster } from './infield-plants';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses';
 import { box, random, standard } from './materials';
@@ -278,8 +279,9 @@ function plants(parent: THREE.Group, course: Course) {
     }
   }
   const make = (entries: readonly { x: number; y?: number; z: number; size: number; tint: number }[], stones: boolean) => {
-    const geometry = new THREE.DodecahedronGeometry(1, 0);
+    const geometry = stones ? new THREE.DodecahedronGeometry(1, 0) : foliageCluster();
     const material = standard(0xffffff, stones ? 0.91 : 0.96);
+    material.vertexColors = !stones;
     const batch = new THREE.InstancedMesh(geometry, material, entries.length);
     const point = new THREE.Object3D();
     const color = new THREE.Color();

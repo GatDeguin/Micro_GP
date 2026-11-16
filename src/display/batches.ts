@@ -43,6 +43,8 @@ function replace(root: THREE.Group, sources: OpaqueMesh[], batch: OpaqueMesh) {
   batch.renderOrder = original.renderOrder;
   batch.layers.mask = original.layers.mask;
   batch.frustumCulled = original.frustumCulled;
+  // Batch vertices are already in root space. Only the parent's world transform moves.
+  batch.matrixAutoUpdate = false;
   for (const source of sources) source.removeFromParent();
   root.add(batch);
 }
@@ -75,7 +77,7 @@ export function mergeStatic(root: THREE.Group, animated?: ReadonlySet<THREE.Obje
       geometry.boundingBox!.getCenter(center).applyMatrix4(mesh.matrixWorld);
       attributes.push(String(Math.floor(center.x / cell)), String(Math.floor(center.z / cell)));
     }
-    return [Boolean(geometry.index), ...attributes].join(',');
+    return attributes.join(',');
   }, animated);
   const worldToRoot = root.matrixWorld.clone().invert();
   const local = new THREE.Matrix4();
@@ -83,6 +85,17 @@ export function mergeStatic(root: THREE.Group, animated?: ReadonlySet<THREE.Obje
     const pieces = sources.map(source =>
       source.geometry.clone().applyMatrix4(local.multiplyMatrices(worldToRoot, source.matrixWorld)),
     );
+    // Index only the unindexed pieces of a mixed batch. This retains every vertex,
+    // seam and normal while letting both representations share the same draw.
+    if (pieces.some(piece => piece.index !== null)) {
+      for (const piece of pieces) {
+        if (piece.index) continue;
+        const count = piece.getAttribute('position').count;
+        const indices = count > 65535 ? new Uint32Array(count) : new Uint16Array(count);
+        for (let i = 0; i < count; i++) indices[i] = i;
+        piece.setIndex(new THREE.BufferAttribute(indices, 1));
+      }
+    }
     const geometry = mergeGeometries(pieces);
     for (const piece of pieces) piece.dispose();
     if (geometry) replace(root, sources, new THREE.Mesh(geometry, sources[0].material));

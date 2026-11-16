@@ -34,10 +34,16 @@ function batch(parent: THREE.Group, name: string, geometry: THREE.BufferGeometry
   mesh.frustumCulled = false;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   parent.add(mesh);
-  return { mesh, used: 0 };
+  return { mesh, used: 0, colors: new Int32Array(capacity).fill(-1), colorsChanged: false };
 }
 
 type Batch = ReturnType<typeof batch>;
+
+function uploadPrefix(attribute: THREE.InstancedBufferAttribute, components: number) {
+  attribute.clearUpdateRanges();
+  attribute.addUpdateRange(0, components);
+  attribute.needsUpdate = true;
+}
 
 function checkerMap() {
   const pixels = new Uint8Array(8 * 6 * 4);
@@ -211,14 +217,18 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   let truckInspection = false;
 
   function write(target: Batch, hex: number) {
+    const slot = target.used++;
     part.updateMatrix();
-    target.mesh.setMatrixAt(target.used, matrix.multiplyMatrices(root.matrix, part.matrix));
+    target.mesh.setMatrixAt(slot, matrix.multiplyMatrices(root.matrix, part.matrix));
+    if (target.colors[slot] === hex) return;
     let shade = palette.get(hex);
     if (!shade) {
       shade = color.setHex(hex).clone();
       palette.set(hex, shade);
     }
-    target.mesh.setColorAt(target.used++, shade);
+    target.mesh.setColorAt(slot, shade);
+    target.colors[slot] = hex;
+    target.colorsChanged = true;
   }
 
   function shape(target: Batch, at: Point, size: Point, hex: number, rx = 0, ry = 0, rz = 0) {
@@ -411,14 +421,23 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   }
 
   function render(now: number, dt: number) {
-    for (const partBatch of batches) partBatch.used = 0;
+    for (const partBatch of batches) {
+      partBatch.used = 0;
+      partBatch.colorsChanged = false;
+    }
     catwalk();
     for (const worker of workers) pose(worker, now, dt);
     for (const partBatch of batches) {
-      partBatch.mesh.count = partBatch.used;
-      if (partBatch.used === 0) continue;
-      partBatch.mesh.instanceMatrix.needsUpdate = true;
-      if (partBatch.mesh.instanceColor) partBatch.mesh.instanceColor.needsUpdate = true;
+      const { mesh, used, colorsChanged } = partBatch;
+      mesh.count = used;
+      if (used === 0) continue;
+      uploadPrefix(mesh.instanceMatrix, used * mesh.instanceMatrix.itemSize);
+      const colors = mesh.instanceColor;
+      if (colorsChanged && colors) {
+        // Retain pending colors for slots that may return before this batch is drawn.
+        const pending = colors.updateRanges[0]?.count ?? 0;
+        uploadPrefix(colors, Math.max(pending, used * colors.itemSize));
+      }
     }
   }
 

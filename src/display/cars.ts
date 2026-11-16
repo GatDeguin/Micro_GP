@@ -50,11 +50,13 @@ const hub = standard(0x292c2d, 0.49, 0.42);
 const splitter = standard(0x292729, 0.72, 0.18);
 const rubberSeal = standard(0x14181a, 0.78);
 const upholstery = standard(0x46382e, 0.87);
+const defrostWire = standard(0x675140, 0.81, 0.18);
+const reverseLens = standard(0xaba99b, 0.30, 0.28);
 const stripePaint = new THREE.MeshStandardMaterial({ color: 0xf0e2c7, roughness: 0.43, polygonOffset: true, polygonOffsetFactor: -2 });
 const glass = new THREE.MeshPhysicalMaterial({ color: 0x192b32, metalness: 0.17, roughness: 0.22, clearcoat: 0.72, clearcoatRoughness: 0.22 });
 const closeGlass = new THREE.MeshPhysicalMaterial({
-  color: 0x273437, metalness: 0.045, roughness: 0.15, clearcoat: 0.94, clearcoatRoughness: 0.14,
-  envMapIntensity: 1.12, opacity: 0.53, transparent: true, depthWrite: false,
+  color: 0x23292d, metalness: 0.025, roughness: 0.13, clearcoat: 0.89, clearcoatRoughness: 0.13,
+  envMapIntensity: 1.15, opacity: 0.45, transparent: true, depthWrite: false,
 });
 const frontMarker = new THREE.MeshPhysicalMaterial({ color: 0xad5317, roughness: 0.27,
   emissive: 0x984c16, emissiveIntensity: 0.1, clearcoat: 0.65 });
@@ -65,25 +67,54 @@ const tyreGeometry = new THREE.LatheGeometry([
   [0.192, 0.076], [0.172, 0.084], [0.122, 0.084],
 ].map(([x, y]) => new THREE.Vector2(x, y)), 48);
 tyreGeometry.rotateZ(Math.PI / 2);
-const rimGeometry = new THREE.CylinderGeometry(0.134, 0.134, 0.034, 24);
-rimGeometry.rotateZ(Math.PI / 2);
-const turnedRim = new THREE.LatheGeometry([
-  [0.084, -0.033], [0.094, -0.031], [0.103, -0.028], [0.112, -0.018], [0.118, -0.006],
-  [0.124, 0.001], [0.131, 0.005], [0.136, 0.002], [0.138, -0.003], [0.136, -0.014],
-].reverse().map(([radius, depth]) => new THREE.Vector2(radius, depth)), 36).rotateX(Math.PI / 2);
-const wheelFace = mergeGeometries([
-  turnedRim,
-  new THREE.CylinderGeometry(0.033, 0.039, 0.020, 18).rotateX(Math.PI / 2).translate(0, 0, -0.020),
-  ...Array.from({ length: 5 }, (_, i) => new THREE.BoxGeometry(0.025, 0.092, 0.014)
-    .rotateX(0.24).translate(0, 0.069, -0.017).rotateZ(i * Math.PI * 2 / 5)),
-  ...Array.from({ length: 5 }, (_, i) => new THREE.CylinderGeometry(0.0054, 0.007, 0.006, 6)
-    .rotateX(Math.PI / 2).translate(0, 0.031, -0.007).rotateZ(i * Math.PI * 2 / 5)),
-].map((geometry, i) => {
-  const tint = i === 0 ? 1 : i >= 7 ? 0.81 : i === 1 ? 0.50 : 0.43;
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(
-    new Float32Array(geometry.getAttribute('position').count * 3).fill(tint), 3));
-  return geometry;
-})).rotateY(Math.PI / 2);
+
+function wheelFaces() {
+  const profile = [
+    [0.109, -0.035], [0.117, -0.028], [0.123, -0.012], [0.128, -0.003],
+    [0.132, 0.004], [0.135, 0.005], [0.138, -0.001], [0.136, -0.014],
+  ];
+  const turnedRim = new THREE.LatheGeometry(profile.reverse().map(([radius, depth]) =>
+    new THREE.Vector2(radius, depth)), 36).rotateX(Math.PI / 2);
+  const brakeDrum = new THREE.CircleGeometry(0.124, 28).translate(0, 0, -0.042);
+  const hubCap = new THREE.CylinderGeometry(0.030, 0.036, 0.023, 16).rotateX(Math.PI / 2).translate(0, 0, -0.018);
+  const lug = new THREE.CylinderGeometry(0.0046, 0.006, 0.007, 5).rotateX(Math.PI / 2).translate(0, 0.0245, -0.003);
+  const valve = new THREE.CylinderGeometry(0.0040, 0.0034, 0.017, 5).rotateX(Math.PI / 2)
+    .translate(0.036, -0.118, -0.012);
+  const createFace = (spokeCount: number, tint: number, spokeWidth: number, direction: number) => {
+    const pieces: THREE.BufferGeometry[] = [];
+    const finish = (source: THREE.BufferGeometry, color: number) => {
+      const g = source.clone();
+      const c = new THREE.Color(color);
+      const rgb = new Float32Array(g.getAttribute('position').count * 3);
+      for (let i = 0; i < rgb.length; i += 3) c.toArray(rgb, i);
+      g.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
+      pieces.push(g);
+      return g;
+    };
+    finish(turnedRim, 0xffffff);
+    finish(brakeDrum, 0x313033);
+    finish(hubCap, tint);
+    finish(valve, 0x5a5850);
+    const arm = new THREE.BoxGeometry(spokeWidth, 0.087, 0.016).rotateX(-0.19).rotateZ(direction)
+      .translate(0.006 * direction, 0.071, -0.020);
+    for (let i = 0; i < spokeCount; i++) {
+      const angle = i * Math.PI * 2 / spokeCount;
+      finish(arm, tint).rotateZ(angle);
+      finish(lug, 0xc3b6a1).rotateZ(angle);
+    }
+    const merged = mergeGeometries(pieces).rotateY(Math.PI / 2);
+    for (const piece of pieces) piece.dispose();
+    arm.dispose();
+    return merged;
+  };
+  const faces = [[5, 0xa29173, 0.026, 0.04], [4, 0x989694, 0.032, 0.07],
+    [5, 0xb7b3a8, 0.025, -0.09], [6, 0x8b8894, 0.022, 0.14]]
+    .map(([count, color, width, angle]) => createFace(count, color, width, angle));
+  for (const geometry of [turnedRim, brakeDrum, hubCap, lug, valve]) geometry.dispose();
+  return faces;
+}
+
+const wheelFace = wheelFaces();
 const lampCup = new THREE.CylinderGeometry(1, 1, 1, 28).rotateX(Math.PI / 2);
 const lampRing = new THREE.TorusGeometry(0.942, 0.058, 8, 30);
 const lampLens = new THREE.SphereGeometry(1, 28, 16);
@@ -129,31 +160,49 @@ function metalFinish(polished: boolean) {
 }
 
 function tyreMaterial() {
-  const { canvas, context } = canvas2d(512, 128);
+  const { canvas, context } = canvas2d(512, 160);
   const shoulder = context.createLinearGradient(0, 0, 0, canvas.height);
-  for (const [v, shade] of [[0, '#bababa'], [0.18, '#d9d9d9'], [0.34, '#adadad'], [0.5, '#d1d1d1'], [0.66, '#adadad'], [0.82, '#d9d9d9'], [1, '#bababa']] as const) {
+  for (const [v, shade] of [[0, '#8c8c8c'], [0.16, '#c2c2c2'], [0.32, '#aaaaaa'], [0.5, '#c5c5c5'],
+    [0.68, '#aaaaaa'], [0.84, '#c2c2c2'], [1, '#8c8c8c']] as const) {
     shoulder.addColorStop(v, shade);
   }
   context.fillStyle = shoulder;
   context.fillRect(0, 0, canvas.width, canvas.height);
-  for (let x = -16; x < canvas.width + 16; x += 16) {
-    for (const [offset, color, width] of [[0, '#797979', 1.7], [1.5, '#ebebeb', 0.8]] as const) {
+  const tread = [[-13, 45], [-4, 54], [1, 67], [8, 74], [-1, 86], [3, 99], [14, 116]] as const;
+  for (let x = -16; x <= canvas.width + 16; x += 16) {
+    for (const [offset, color, width] of [[0, '#626262', 2.7], [1.9, '#dadada', 0.75]] as const) {
       context.beginPath();
       context.strokeStyle = color;
       context.lineWidth = width;
-      context.moveTo(x + offset, 39);
-      context.lineTo(x + 5 + offset, 54);
-      context.lineTo(x + 1 + offset, 68);
-      context.lineTo(x + 6 + offset, 89);
+      tread.forEach(([dx, y], i) => {
+        if (i === 0) context.moveTo(x + dx + offset, y);
+        else context.lineTo(x + dx + offset, y);
+      });
       context.stroke();
     }
   }
-  context.fillStyle = '#8f8f8f';
-  for (const y of [13, 22, 103, 113]) context.fillRect(0, y, canvas.width, 1);
+  for (const [y, color, width] of [[9, '#adadad', 1], [28, '#cdcdcd', 0.9], [38, '#8a8a8a', 1], [69, '#939393', 1.25],
+    [91, '#939393', 1.25], [122, '#8a8a8a', 1], [132, '#cdcdcd', 0.9], [151, '#adadad', 1]] as const) {
+    context.fillStyle = color;
+    context.fillRect(0, y, canvas.width, width);
+  }
+  const rng = random(313);
+  for (let i = 0; i < 745; i++) {
+    context.fillStyle = i % 6 === 0 ? 'rgba(220,216,210,.18)' : 'rgba(102,97,90,.16)';
+    context.fillRect(rng() * canvas.width, rng() * canvas.height, 0.5 + rng(), 0.4 + rng() * 0.75);
+  }
+  context.font = '700 8px Arial, sans-serif';
+  for (const y of [20, 144]) for (const x of [19, 141, 262, 384]) {
+    context.fillStyle = '#8c8c8c';
+    context.fillText('RADIAL · 55 R13', x + 1, y + 1);
+    context.fillStyle = '#cfcfcf';
+    context.fillText('RADIAL · 55 R13', x, y);
+  }
   const map = texture(canvas);
-  const bumps = map.clone();
-  bumps.colorSpace = THREE.NoColorSpace;
-  return new THREE.MeshStandardMaterial({ color: 0x2e2b28, roughness: 0.82, map, bumpMap: bumps, bumpScale: 0.0022 });
+  map.colorSpace = THREE.NoColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  return new THREE.MeshStandardMaterial({ color: 0x252323, roughness: 0.98, map,
+    bumpMap: map, bumpScale: 0.0039, roughnessMap: map });
 }
 
 function flutedLens() {
@@ -180,6 +229,31 @@ function flutedLens() {
     color: 0xd3d4c7, map, metalness: 0.29, roughness: 0.21,
     emissive: 0x8c602b, emissiveIntensity: 0.12, clearcoat: 0.95, clearcoatRoughness: 0.15,
   });
+}
+
+function tailLightMap() {
+  const { canvas, context } = canvas2d(128, 64);
+  const gradient = context.createLinearGradient(0, 0, 0, 64);
+  gradient.addColorStop(0, '#505050');
+  gradient.addColorStop(0.19, '#d6d6d6');
+  gradient.addColorStop(0.50, '#b9b9b9');
+  gradient.addColorStop(0.80, '#d0d0d0');
+  gradient.addColorStop(1, '#575757');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 128, 64);
+  for (let x = 2; x < 128; x += 5) {
+    context.fillStyle = 'rgba(55,55,55,.48)';
+    context.fillRect(x, 5, 1.55, 54);
+    context.fillStyle = 'rgba(240,240,240,.32)';
+    context.fillRect(x + 1.55, 7, 1, 50);
+  }
+  for (const y of [13, 31, 49]) {
+    context.fillStyle = '#5d5d5d';
+    context.fillRect(2, y, 124, 1.3);
+    context.fillStyle = 'rgba(226,226,226,.45)';
+    context.fillRect(2, y + 1.5, 124, 0.9);
+  }
+  return texture(canvas);
 }
 
 function enamelRelief() {
@@ -302,6 +376,9 @@ function windowBorders(parent: THREE.Object3D, model: Model, trim: THREE.Materia
 function cockpit(parent: THREE.Object3D, model: Model) {
   const [rear, front, top, width] = model.roof;
   const seatZ = THREE.MathUtils.lerp(rear, front, 0.40);
+  const parcelZ = THREE.MathUtils.lerp(model.glass[0][0], rear, 0.71);
+  const parcel = sectionAt(model.glass, parcelZ);
+  box(parent, splitter, 0, parcel[2] + 0.057, parcelZ, parcel[1] * 1.35, 0.027, 0.105, false);
   for (const side of [-1, 1]) {
     const x = side * width * 0.48;
     box(parent, rubberSeal, x, 0.472, seatZ + 0.04, 0.181, 0.043, 0.217, false);
@@ -329,6 +406,32 @@ function cockpit(parent: THREE.Object3D, model: Model) {
     seam(parent, [at(side * 0.157, rest), at(side * 0.075, rest - 0.018)], rubberSeal, 0.0038);
     seam(parent, [at(side * 0.050, rest - 0.020), at(side * 0.212, rest - 0.037)], rubberSeal, 0.0048);
   }
+}
+
+function rearDefroster(parent: THREE.Object3D, model: Model) {
+  const first = model.glass[0][0] + 0.026;
+  const last = model.roof[0] - 0.013;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const ratio of [0.21, 0.38, 0.55, 0.72, 0.88]) {
+    const center = THREE.MathUtils.lerp(first, last, ratio);
+    const half = sectionAt(model.glass, center)[1] * 0.64;
+    const zFrom = center - 0.00055;
+    const zTo = center + 0.00055;
+    for (let i = 0; i <= 10; i++) {
+      const x = THREE.MathUtils.lerp(-half, half, i / 10);
+      const start = positions.length / 3;
+      for (const z of [zFrom, zTo]) positions.push(x, crownHeight(sectionAt(model.glass, z), x, false) - 0.0026, z);
+      if (i < 10) indices.push(start, start + 1, start + 2, start + 2, start + 1, start + 3);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const wire = new THREE.Mesh(geometry, defrostWire);
+  wire.name = 'Hilos térmicos en la luneta';
+  parent.add(wire);
 }
 
 function paintWear(parent: THREE.Object3D, model: Model, seed: number) {
@@ -449,9 +552,11 @@ function numberOnRoof(parent: THREE.Object3D, number: string, roof: readonly Sec
   const panel = new THREE.Mesh(geometry,
     new THREE.MeshStandardMaterial({ map: texture(canvas), roughness: 0.60, polygonOffset: true, polygonOffsetFactor: -2 }));
   parent.add(panel);
+  return panel.material;
 }
 
-function wheel(parent: THREE.Object3D, side: number, z: number, tyre: THREE.Material, rim: THREE.Material, rollScale: number) {
+function wheel(parent: THREE.Object3D, side: number, z: number, tyre: THREE.Material, rim: THREE.Material,
+  face: THREE.BufferGeometry, rollScale: number) {
   const pivot = new THREE.Group();
   const spin = new THREE.Group();
   pivot.position.set(side * WHEEL_SIDE, WHEEL_Y, z);
@@ -460,12 +565,10 @@ function wheel(parent: THREE.Object3D, side: number, z: number, tyre: THREE.Mate
   parent.add(pivot);
   const rubber = new THREE.Mesh(tyreGeometry, tyre);
   rubber.castShadow = rubber.receiveShadow = true;
-  const wheelRim = new THREE.Mesh(rimGeometry, hub);
-  const spokes = new THREE.Mesh(wheelFace, rim);
-  wheelRim.position.x = 0.043 * side;
+  const spokes = new THREE.Mesh(face, rim);
   spokes.position.x = 0.092 * side;
   if (side < 0) spokes.rotation.y = Math.PI;
-  spin.add(rubber, wheelRim, spokes);
+  spin.add(rubber, spokes);
   return { pivot, spin };
 }
 
@@ -527,6 +630,48 @@ function frontFascia(parent: THREE.Object3D, detail: THREE.Object3D, model: Mode
   }
 }
 
+function rearFascia(parent: THREE.Object3D, detail: THREE.Object3D, model: Model, index: number, tail: number,
+  trim: THREE.Material, lens: THREE.Material, number: THREE.Material) {
+  const x = [0.282, 0.275, 0.250, 0.346][index];
+  const y = [0.327, 0.321, 0.281, 0.340][index];
+  const width = [0.144, 0.154, 0.119, 0.158][index];
+  const height = [0.060, 0.052, 0.042, 0.048][index];
+  if (index > 0) {
+    box(parent, rubberSeal, 0, y, tail - 0.007, x * 2 + width + 0.033, height + 0.017, 0.023, false);
+  }
+  for (const side of [-1, 1]) {
+    if (index === 0) box(parent, rubberSeal, side * x, y, tail - 0.011, width + 0.021, height + 0.018, 0.026, false);
+    const brake = roundedPart(parent, lens, side * (x - 0.012), y, tail - 0.025, width - 0.023, height, 0.022);
+    brake.name = 'Piloto trasero estriado';
+    brake.castShadow = false;
+    box(detail, index < 2 ? frontMarker : reverseLens, side * (x + width * 0.392), y + (index === 0 ? 0.008 : 0),
+      tail - 0.029, 0.024, index === 0 ? 0.033 : height * 0.76, 0.012, false);
+    if (index === 0) box(detail, reverseLens, side * (x + 0.057), y - 0.017, tail - 0.030, 0.026, 0.012, 0.014, false);
+  }
+
+  const inset = index === 2 ? 0.220 : 0.262;
+  box(parent, rubberSeal, 0, inset + (index === 2 ? 0.008 : 0), tail - 0.020,
+    index === 3 ? 0.216 : 0.204, index === 2 ? 0.040 : 0.052, 0.031, false);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.128, 0.041), number);
+  plate.name = 'Chapa trasera numerada';
+  plate.position.set(0, inset + (index === 2 ? 0.012 : 0), tail - 0.037);
+  plate.rotation.y = Math.PI;
+  detail.add(plate);
+  if (model.body === compact) box(detail, trim, 0, 0.342, tail - 0.009, 0.077, 0.017, 0.022, false);
+
+  for (const tip of index < 2 ? [-0.257] : [-0.263, 0.263]) {
+    const socket = new THREE.Mesh(lampCup, trim);
+    socket.position.set(tip, 0.161, tail - 0.027);
+    socket.scale.set(0.025, 0.021, 0.035);
+    socket.receiveShadow = true;
+    const bore = new THREE.Mesh(lampCup, rubberSeal);
+    bore.position.set(tip, 0.161, tail - 0.044);
+    bore.scale.set(0.0145, 0.012, 0.004);
+    bore.receiveShadow = true;
+    detail.add(socket, bore);
+  }
+}
+
 function headlightPattern() {
   const { canvas, context } = canvas2d(128, 128);
   context.fillStyle = '#000';
@@ -556,6 +701,7 @@ export function buildCars(parent: THREE.Object3D) {
   wheelChrome.vertexColors = wheelSatin.vertexColors = true;
   const tyre = tyreMaterial();
   const lens = flutedLens();
+  const tailGlow = tailLightMap();
   const enamel = enamelRelief();
   const beamMask = headlightPattern();
   return CAR_SPECS.map((car, i) => {
@@ -578,8 +724,8 @@ export function buildCars(parent: THREE.Object3D) {
     parent.add(root);
 
     const paint = new THREE.MeshPhysicalMaterial({
-      color: enamelColors[i], roughness: i === 0 ? 0.28 : 0.31, metalness: 0.22,
-      clearcoat: 0.94, clearcoatRoughness: i === 3 ? 0.23 : 0.19,
+      color: enamelColors[i], roughness: i === 0 ? 0.255 : 0.285, metalness: 0.22,
+      clearcoat: 0.96, clearcoatRoughness: i === 3 ? 0.191 : 0.161, envMapIntensity: 1.13,
       clearcoatRoughnessMap: enamel, bumpMap: enamel, bumpScale: 0.00075,
     });
     loft(chassis, model.body, paint, model.wheelbase);
@@ -594,7 +740,8 @@ export function buildCars(parent: THREE.Object3D) {
     loft(chassis, roof, paint);
     windowBorders(chassis, model, trim);
     cockpit(detail, model);
-    numberOnRoof(chassis, car.number, roof, (rear + front) / 2, i === 3 ? 0.19 : 0.23);
+    rearDefroster(detail, model);
+    const number = numberOnRoof(chassis, car.number, roof, (rear + front) / 2, i === 3 ? 0.19 : 0.23);
     const stripes = stripePaint.clone();
     model.stripe.forEach(offset => {
       const width = i === 0 ? 0.072 : 0.062;
@@ -610,7 +757,9 @@ export function buildCars(parent: THREE.Object3D) {
     roundedPart(chassis, bumper, 0, 0.218, tail - 0.016, i === 3 ? 0.85 : 0.69, 0.066, 0.067);
     frontFascia(chassis, detail, model, i, nose, trim, paint);
     paintWear(detail, model, 114 + i * 317);
-    const rearLamps = new THREE.MeshStandardMaterial({ color: 0x962522, emissive: 0xf82013, emissiveIntensity: 0.28, roughness: 0.43 });
+    const rearLamps = new THREE.MeshStandardMaterial({ color: 0xaf3022, map: tailGlow, emissive: 0xff281a, emissiveMap: tailGlow,
+      emissiveIntensity: 0.24, roughness: 0.31 });
+    rearFascia(chassis, detail, model, i, tail, trim, rearLamps, number);
     const headlamp = lens.clone();
     headlamp.emissive.setHex(0xffebc7);
     headlamp.emissiveIntensity = 0;
@@ -627,8 +776,8 @@ export function buildCars(parent: THREE.Object3D) {
     const wheels: ReturnType<typeof wheel>[] = [];
     for (const side of [-1, 1]) {
       const wheelTrim = i === 0 || i === 2 ? wheelChrome : wheelSatin;
-      wheels.push(wheel(axles, side, -model.wheelbase, tyre, wheelTrim, scaleY / scaleZ),
-        wheel(axles, side, model.wheelbase, tyre, wheelTrim, scaleY / scaleZ));
+      wheels.push(wheel(axles, side, -model.wheelbase, tyre, wheelTrim, wheelFace[i], scaleY / scaleZ),
+        wheel(axles, side, model.wheelbase, tyre, wheelTrim, wheelFace[i], scaleY / scaleZ));
       sideDetails(chassis, detail, model, paint, trim, side);
       const headX = side * [0.285, 0.269, 0.312, 0.271][i];
       const headZ = i < 2 ? nose + 0.010 : i === 2 ? 0.816 : 0.887;
@@ -648,7 +797,6 @@ export function buildCars(parent: THREE.Object3D) {
         box(chassis, rubberSeal, intake.x, intake.y, intake.z, 0.019, 0.086, 0.185, false).rotation.y = side * 0.19;
       }
       const tailX = i === 3 ? 0.342 : 0.281;
-      box(chassis, rearLamps, side * tailX, i === 2 ? 0.28 : 0.327, tail - 0.014, 0.136, 0.06, 0.049, false);
       hazards.push(box(chassis, blink, side * (tailX + 0.064), i === 2 ? 0.303 : 0.346, tail + 0.009, 0.072, 0.047, 0.068, false));
       if (model.wing) {
         const stanchion = box(chassis, splitter, side * (i === 3 ? 0.34 : 0.30), i === 3 ? 0.509 : 0.506,
@@ -703,7 +851,7 @@ export function buildCars(parent: THREE.Object3D) {
         const pitch = -Math.atan(slope);
         const roll = view.suspension?.roll ?? 0;
         const heave = view.suspension?.heave ?? 0;
-        shadow.position.y = -(view.arcade?.jump ?? 0);
+        shadow.position.y = 0.009 - (view.arcade?.jump ?? 0);
         shadow.rotation.x = axles.rotation.x = headlights.rotation.x = pitch;
         shadow.rotation.z = axles.rotation.z = headlights.rotation.z = bankRoll;
         chassis.rotation.x = pitch + (view.suspension?.pitch ?? 0);
@@ -738,7 +886,7 @@ export function buildCars(parent: THREE.Object3D) {
         });
         if (settle || settled) shadowVertices.needsUpdate = true;
         settled = settle;
-        rearLamps.emissiveIntensity = view.braking ? 3.4 : lit ? 0.95 : 0.24;
+        rearLamps.emissiveIntensity = view.braking ? 3.25 : lit ? 0.78 : 0.14;
         for (const hazard of hazards) hazard.visible = view.blink && Math.floor(now / 170) % 2 === 0;
       },
     };

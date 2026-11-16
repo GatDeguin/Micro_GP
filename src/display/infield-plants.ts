@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PIT_LANE, TRACK, wallHalfAt } from '../shared/track';
 import { grandstandSections } from './grandstands';
 import { random, standard } from './materials';
@@ -83,6 +83,29 @@ function flowerGeometry(petals: number) {
   return flower;
 }
 
+export function foliageCluster() {
+  const seed = new THREE.IcosahedronGeometry(1, 2);
+  // Weld the UV seam too so the small lobes have continuous lighting.
+  seed.deleteAttribute('uv');
+  seed.deleteAttribute('normal');
+  const crown = mergeVertices(seed);
+  seed.dispose();
+  const positions = crown.getAttribute('position');
+  const colors = new Float32Array(positions.count * 3);
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
+    const lobes = Math.sin(x * 6.7 + y * 2.3) * Math.cos(z * 7.3 - y * 2.1);
+    const tips = Math.sin(x * 17.2 + z * 8.9) * Math.cos(y * 13.4 - z * 11.7);
+    const radius = 1 + 0.13 * lobes + 0.047 * tips;
+    positions.setXYZ(i, x * radius, y * radius, z * radius);
+    const shade = 0.68 + 0.25 * (y * 0.5 + 0.5) + 0.055 * lobes;
+    colors.set([shade * 0.96, shade, shade * 0.91], i * 3);
+  }
+  crown.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  crown.computeVertexNormals();
+  return crown;
+}
+
 function trees(parent: THREE.Object3D, available: (x: number, z: number) => boolean, height: number,
   time: { value: number }, rng: () => number) {
   const sites = [[-30.6, -4.4, 1.30], [-28.7, -3.6, 1.04], [-27.1, 2.95, 1.03], [-26.3, -5.7, 1.31],
@@ -91,15 +114,9 @@ function trees(parent: THREE.Object3D, available: (x: number, z: number) => bool
   ].filter(([x, z]) => available(x, z));
   const bark = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.71, 1, 1, 7), standard(0xffffff, 0.91), sites.length * 4);
   const foliage = standard(0xffffff, 0.91);
+  foliage.vertexColors = true;
   plantWind(foliage, time, 0.21, true);
-  const crown = new THREE.IcosahedronGeometry(1, 1);
-  const points = crown.getAttribute('position');
-  for (let i = 0; i < points.count; i++) {
-    const x = points.getX(i), y = points.getY(i), z = points.getZ(i);
-    const relief = 1 + 0.12 * Math.sin(7.5 * x + 3.6 * y) * Math.cos(5.9 * z - 4.8 * y);
-    points.setXYZ(i, x * relief, y * relief, z * relief);
-  }
-  crown.computeVertexNormals();
+  const crown = foliageCluster();
   const leaves = new THREE.InstancedMesh(crown, foliage, sites.length * 12);
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   plantWind(depth, time, 0.21, true);
@@ -198,7 +215,9 @@ export function buildGroundcover(parent: THREE.Object3D, islands: readonly (read
   blades.vertexColors = true;
   plantWind(blades, time, 0.48);
   const grass = new THREE.InstancedMesh(tuftGeometry(), blades, tufts.length);
-  const leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), standard(0xffffff, 0.89), shrubs.length * 3);
+  const shrubMaterial = standard(0xffffff, 0.89);
+  shrubMaterial.vertexColors = true;
+  const leaves = new THREE.InstancedMesh(foliageCluster(), shrubMaterial, shrubs.length * 3);
   const transform = new THREE.Object3D();
   const tint = new THREE.Color();
   tufts.forEach(([x, z, size], i) => {
