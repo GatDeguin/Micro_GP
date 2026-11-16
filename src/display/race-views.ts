@@ -41,11 +41,11 @@ function followCamera(slot: number, course: Course) {
     if (frame && loop && !station) {
       // Ride the complete 3D road frame through a loop, including its inverted apex.
       const chase = mode === 'chase' || mode === 'general';
-      const eye = course.frameAt!(road.s + direction * (chase ? -4.2 : 3.2),
+      const eye = course.frameAt!(road.s + direction * (chase ? -5.2 : 3.2),
         chase ? road.offset * .55 : THREE.MathUtils.clamp(road.offset + side * 2.6, -2.8, 2.8));
-      const lift = chase ? 2.6 : 1.75;
+      const lift = chase ? 3.4 : 1.75;
       position.set(eye.x + eye.nx * lift, eye.y + eye.ny * lift, eye.z + eye.nz * lift);
-      const aim = course.frameAt!(road.s + direction * (chase ? .7 : 0), road.offset);
+      const aim = course.frameAt!(road.s, road.offset);
       target.set(aim.x + aim.nx * .55, aim.y + aim.ny * .55, aim.z + aim.nz * .55);
       normal.set(frame.nx, frame.ny, frame.nz);
     } else if (station) {
@@ -95,7 +95,7 @@ function followCamera(slot: number, course: Course) {
     }
     camera.lookAt(aim);
     const lens = station ? THREE.MathUtils.clamp(42 - (position.distanceTo(target) - 6) * 0.72, 31, 42)
-      : mode === 'general' ? 44 : mode === 'chase' ? 48 : 42;
+      : mode === 'general' ? 44 : mode === 'chase' ? (loop ? 60 : 48) : 42;
     const fov = lens
       + THREE.MathUtils.clamp((1.25 - aspect) * 22, 0, 22) + (qrSize ? 4 : 0);
     const far = compact ? (mode === 'general' ? 46 : 34) : course.id === 'spaceport' ? 430 : 160;
