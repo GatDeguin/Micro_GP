@@ -6,6 +6,7 @@ import { box, canvas2d, noiseField, random, texture } from './materials';
 import { buildSpaceportCampus } from './spaceport-campus';
 import { buildSpaceportPeople } from './spaceport-people';
 import { buildSpaceportVehicles } from './spaceport-vehicles';
+import { buildSpaceportActivity } from './spaceport-activity';
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
@@ -425,6 +426,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   const vehicles = await buildSpaceportVehicles(animated, {
     ...campus.fleet, routes: campus.fleet.routes.map(route => ({ ...route, cornerRadius: 0 })),
   });
+  const activity = buildSpaceportActivity(animated, { material: metal });
   const signFrames = parts(fixed, metal, 'Soportes de señalización');
   for (const x of [36, 72]) signFrames.box(x, 4.82, -8.40, .15, 1.65, .15, tone.steel);
   for (const [x, y, z] of [[186, 2.8, -78], [-157, 5.6, -264]] as const) {
@@ -465,11 +467,13 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       night = value; lampMaterial.emissiveIntensity = value ? 3.1 : 1.2;
       groundMaterial.color.setHex(value ? 0x727c7d : tone.sand);
       campus.setNight(value); people.setNight(value); vehicles.setNight(value);
+      activity.setNight(value);
     },
     setDetail(value: boolean) {
       detail = value; campus.setDetail(value); people.setDetail(value); vehicles.setDetail(value);
+      activity.setDetail(value);
     },
-    observe(snapshot: RaceSnapshot) { people.observe(snapshot); },
+    observe(snapshot: RaceSnapshot) { people.observe(snapshot); activity.observe(snapshot); },
     update(now: number) {
       const time = now * .001;
       radar.rotation.y = time * .23;
@@ -477,6 +481,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       warningMaterial.emissiveIntensity = (night ? 2.3 : 1.3) * (.65 + .35 * Math.sin(time * 4.5) ** 8);
       radar.visible = manipulator.visible = detail;
       campus.update(now); people.update(now); vehicles.update(now);
+      activity.update(now);
     },
   };
 }

@@ -62,3 +62,19 @@ test('eight and spiral crossings retain physical clearance and ordinary grades r
     }
   }
 });
+
+test('campus racing passes the courtyard and laboratories with usable inside bend radii', () => {
+  let courtyard = false, laboratoryStreet = false;
+  for (let s = SPACEPORT.chicane.from; s < SPACEPORT.length - 1; s += .15) {
+    const point = SPACEPORT.sampleAt(s), before = SPACEPORT.sampleAt(s - .15), after = SPACEPORT.sampleAt(s + .15);
+    courtyard ||= point.x > -116 && point.x < -98 && point.z > -145 && point.z < -112;
+    laboratoryStreet ||= point.x > -136 && point.x < -124 && point.z > -97 && point.z < -71;
+    const angle = Math.acos(Math.max(-1, Math.min(1, before.dx * after.dx + before.dz * after.dz)));
+    const curvature = angle / .3;
+    // A centreline that reverses too sharply folds the inner ribbon over itself
+    // and makes nearest-road progress jump even when the bot drives normally.
+    assert.ok(curvature * SPACEPORT.wallHalfAt(s, 1) < .52, `folded inner barrier at ${s}`);
+    assert.ok(Math.abs(point.y) < .01, 'street circuit stays on its ground deck');
+  }
+  assert.ok(courtyard && laboratoryStreet, 'the race must visit both inhabited campus spaces');
+});

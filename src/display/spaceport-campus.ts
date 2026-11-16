@@ -82,7 +82,7 @@ function roadRibbon(parent: THREE.Group, source: THREE.MeshStandardMaterial) {
   mesh.name = 'Red conectada de caminos de servicio'; parent.add(mesh);
 }
 
-function siteLabels(parent: THREE.Group, labels: { text: string; x: number; y: number; z: number; width: number }[]) {
+function siteLabels(parent: THREE.Group, labels: { text: string; x: number; y: number; z: number; width: number; yaw?: number }[]) {
   if (typeof document === 'undefined') return;
   const { canvas, context } = canvas2d(1024, 1024);
   context.fillStyle = '#203747'; context.fillRect(0, 0, 1024, 1024);
@@ -95,10 +95,11 @@ function siteLabels(parent: THREE.Group, labels: { text: string; x: number; y: n
   const material = new THREE.MeshStandardMaterial({ map: texture(canvas), roughness: .7,
     emissive: 0x536572, emissiveIntensity: .14 });
   const positions: number[] = [], uv: number[] = [], indices: number[] = [];
-  labels.forEach(({ x, y, z, width }, i) => {
+  labels.forEach(({ x, y, z, width, yaw = 0 }, i) => {
     const height = Math.max(.65, width / 16), at = positions.length / 3;
-    positions.push(x - width / 2, y - height / 2, z, x + width / 2, y - height / 2, z,
-      x - width / 2, y + height / 2, z, x + width / 2, y + height / 2, z);
+    const dx = Math.cos(yaw) * width / 2, dz = -Math.sin(yaw) * width / 2;
+    positions.push(x - dx, y - height / 2, z - dz, x + dx, y - height / 2, z + dz,
+      x - dx, y + height / 2, z - dz, x + dx, y + height / 2, z + dz);
     uv.push(0, 1 - (i + 1) / 16, 1, 1 - (i + 1) / 16, 0, 1 - i / 16, 1, 1 - i / 16);
     indices.push(at, at + 1, at + 2, at + 2, at + 1, at + 3);
   });
@@ -115,9 +116,19 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   const d = batch(group, materials.metal, 'Arquitectura y equipamiento del campus', 52, materials.concrete);
   const landscapeMaterial = materials.concrete.clone(); landscapeMaterial.roughness = .96;
   const vegetation = batch(group, landscapeMaterial, 'Dunas, arbustos y vegetación costera', 65);
+  const plantMaterial = landscapeMaterial.clone();
+  const wind = { value: 0 };
+  plantMaterial.onBeforeCompile = shader => {
+    shader.uniforms.campusWind = wind;
+    shader.vertexShader = 'uniform float campusWind;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\nfloat sway = smoothstep(.08, 1.5, position.y); transformed.x += sin(campusWind * 1.7 + position.z * .43 + position.x * .19) * .095 * sway; transformed.z += cos(campusWind * 1.3 + position.x * .31) * .055 * sway;');
+  };
+  plantMaterial.customProgramCacheKey = () => 'campus-plants-wind-v1';
+  const plants = batch(group, plantMaterial, 'Plantas y arbustos al viento', 65);
   const people: SpaceportPerson[] = [];
   const labels: Parameters<typeof siteLabels>[1] = [];
-  const windows: { x: number; y: number; z: number; w: number; h: number }[] = [];
+  const windows: { x: number; y: number; z: number; w: number; h: number; yaw?: number }[] = [];
   const bulbs: THREE.Vector3[] = [];
   const sky = campusSky(group);
   roadRibbon(group, materials.roadway);
@@ -177,7 +188,7 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
         d.box(x + dx, .30, front + 2.9, 6.8, .60, .15, palette.black);
         for (const side of [-1, 1]) bollard(x + dx + side * 4.1, front + 3.3);
         d.box(x + dx, 6.15, front + .52, 8.6, .18, 1.5, palette.white);
-        d.box(x + dx - 1.8, .9, front + .4, 1.2, 1.0, 1.1, palette.warm);
+        d.box(x + dx - 1.8, 1.3, front + .65, 1.2, 1.0, 1.1, palette.warm);
       }
       for (let dx = -w / 2 + 2; dx < w / 2; dx += 2.8) d.box(x + dx, h * .57, z - depth / 2 - .03, .065, h * .86, .07, palette.trim);
       d.box(x - 14, 1.05, front + .14, 1.7, 2.1, .12, palette.white);
@@ -198,20 +209,46 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
       }
       d.box(x, 1.65, front + .11, 3.2, 3.3, .17, palette.navy);
       for (const side of [-1, 1]) {
-        d.box(x + side * .72, 1.65, front + .23, 1.35, 3.0, .04, palette.glass);
-        d.box(x + side * .13, 1.32, front + .29, .04, .55, .04, palette.white);
+        if (site.id !== 'reception' && site.id !== 'laboratory') {
+          d.box(x + side * .72, 1.65, front + .23, 1.35, 3.0, .04, palette.glass);
+          d.box(x + side * .13, 1.32, front + .29, .04, .55, .04, palette.white);
+        }
         d.box(x + side * 3.9, 1.73, front + 2.3, .13, 3.46, .13, palette.trim);
       }
       d.box(x, 3.58, front + 1.2, 8.4, .20, 3.3, palette.navy);
       d.box(x, .015, front + 2.4, 8.8, .16, 5.1, palette.paving);
       for (const side of [-1, 1]) bollard(x + side * 3.3, front + 4.7);
-      walkway(x, front + 5.0, -75.8, front + 5.0);
+      walkway(x, front + 5.0, x < -140 ? -174 : -75.8, front + 5.0);
+    }
+    if (x < -140) {
+      // The street-facing east elevation stays legible from the race camera;
+      // entrances use the protected west promenade, away from the racing lane.
+      const q = new THREE.Quaternion().setFromAxisAngle(up, Math.PI / 2);
+      for (let zz = z - depth / 2 + 3.2; zz < front - 1.5; zz += 4.1) {
+        d.box(x + w / 2 + .12, 2.7, zz, 3.4, 2.1, .20, palette.trim, q);
+        d.box(x + w / 2 + .24, 2.7, zz, 3.05, 1.77, .045, palette.glass, q);
+        d.box(x + w / 2 + .29, 2.7, zz, .07, 1.8, .04, palette.white, q);
+        windows.push({ x: x + w / 2 + .28, y: 3.2, z: zz, w: 2.8, h: .045, yaw: Math.PI / 2 });
+      }
+      labels.push({ text: site.label, x: x + w / 2 + .30, y: h - .85, z, width: depth - 2.5, yaw: Math.PI / 2 });
+    }
+    if (site.id === 'laboratory' || site.id === 'mission' || site.id === 'reception') {
+      const q = new THREE.Quaternion().setFromAxisAngle(up, -Math.PI / 2);
+      for (let zz = z - depth / 2 + 3; zz < front - 1; zz += 4.3) {
+        for (let yy = 2.7; yy < h - 1.4; yy += 3.4) {
+          d.box(x - w / 2 - .10, yy, zz, 3.2, 2.05, .20, palette.trim, q);
+          d.box(x - w / 2 - .23, yy, zz, 2.9, 1.74, .04, palette.glass, q);
+          d.box(x - w / 2 - .28, yy, zz, .07, 1.78, .04, palette.white, q);
+          windows.push({ x: x - w / 2 - .27, y: yy + .48, z: zz, w: 2.65, h: .045, yaw: -Math.PI / 2 });
+        }
+      }
+      d.pipe(p(x - w / 2 - .20, .2, z - depth / 2 + .35),
+        p(x - w / 2 - .20, h - .3, z - depth / 2 + .35), .065, palette.trim);
     }
     for (let i = 0; i < (w > 25 ? 3 : 2); i++) {
       const xx = x - w * .28 + i * w * .24;
       d.box(xx, h + .75, z - depth * .18, 3.0, 1.1, 3.8, palette.trim);
       d.cylinder(xx, h + 1.36, z - depth * .18, 1.05, .15, palette.black);
-      for (let j = -2; j <= 2; j++) d.box(xx + j * .35, h + 1.45, z - depth * .18, .055, .035, 1.8, palette.white);
       d.pipe(p(xx, h + .2, z), p(xx, h + .2, front - 2), .13, palette.trim);
     }
     labels.push({ text: site.label, x, y: h - .65, z: front + .28, width: w * .84 });
@@ -225,6 +262,25 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   // Kerbs, pedestrian paths and lane paint give every arrival a destination.
   walkway(-76, -305, -76, -18, 2.5);
   walkway(-76, -18, 100, -18, 2.4);
+  walkway(-174, -153, -174, 22, 2.6);
+  walkway(-174, 22, -84, 22, 2.6);
+  for (let i = 0; i < 4; i++) d.box(-84 + i * .5, .06 + i * .12, 22, .55, .12, 2.6, palette.concrete);
+  for (const z of [-140, -112, -82, -54, -22]) { pole(-177, z); bench(-177, z + 4); }
+  // Protected observation terrace faces the new courtyard bend.
+  d.box(-138.1, .04, -132.5, 3.2, .20, 19, palette.paving);
+  railing(-136.65, -142, -136.65, -123, .14, 1.2);
+  walkway(-138.1, -123, -138.1, -116.5, 2.3);
+  walkway(-138.1, -116.5, -150, -116.5, 2.3);
+  for (const z of [-140, -124]) pole(-139, z, 4.5);
+  d.box(-138.4, .65, -137, 1.1, 1.02, .7, palette.navy);
+  d.box(-138.4, 1.18, -137, 1.25, .12, .8, palette.warm);
+  for (const side of [-1, 1]) {
+    d.box(-128 + side * 5.6, 2.35, -170, .30, 4.7, .30, palette.trim);
+    d.box(-128 + side * 5.6, .10, -170, .90, .20, .90, palette.concrete);
+    bulbs.push(p(-128 + side * 5.6, 5.0, -170));
+  }
+  d.box(-128, 4.65, -170, 12, .7, .30, palette.navy);
+  labels.push({ text: 'CAMPUS / PRUEBAS DE PRECISIÓN', x: -128, y: 4.65, z: -170.17, width: 11.4, yaw: Math.PI });
   for (const road of SPACEPORT_SERVICE_ROADS) {
     const points = roundedServicePath(road.points);
     let carried = 0;
@@ -276,8 +332,6 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   for (let x = .5; x < 6; x += .85) gateParts.box(x, 0, .075, .40, .18, .018, palette.orange);
   gateParts.finish();
   d.box(-100, 1.25, -314, .38, 2.5, .38, palette.trim);
-  d.box(-100, 2.45, -313.85, .75, .36, .42, palette.white);
-  d.cylinder(-100, 2.45, -313.59, .12, .06, palette.black, circle);
   labels.push({ text: 'BASE ESPACIAL / ACCESO AUTORIZADO', x: -107, y: 5.8, z: -311.8, width: 18 });
   for (const x of [-117, -97]) d.box(x, 2.7, -312, .20, 5.7, .20, palette.trim);
   d.box(-107, 5.8, -312, 20.5, 1.2, .25, palette.navy);
@@ -335,17 +389,17 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
     if (!roadClear(x, z, scale)) return;
     for (let i = 0; i < 3; i++) {
       const angle = i * Math.PI * 2 / 3;
-      vegetation.sphere(x + Math.cos(angle) * scale * .3, .4 * scale, z + Math.sin(angle) * scale * .3,
+      plants.sphere(x + Math.cos(angle) * scale * .3, .4 * scale, z + Math.sin(angle) * scale * .3,
         .7 * scale, .55 * scale, .7 * scale, [0x596f4e, 0x687b50, 0x465c46][i]);
     }
     for (let i = 0; i < 4; i++) {
       const angle = i * Math.PI / 2;
-      vegetation.pipe(p(x, .05, z), p(x + Math.cos(angle) * scale * .7, scale * 1.2, z + Math.sin(angle) * scale * .7), .025 * scale, 0x8e945d);
+      plants.pipe(p(x, .05, z), p(x + Math.cos(angle) * scale * .7, scale * 1.2, z + Math.sin(angle) * scale * .7), .025 * scale, 0x8e945d);
     }
   }
   for (let i = 0; i < 64; i++) {
     const side = i % 2 ? -1 : 1;
-    const x = side < 0 ? -185 + rng() * 9 : 218 + rng() * 13, z = -12 - rng() * 347;
+    const x = side < 0 ? -194 + rng() * 4 : 218 + rng() * 13, z = -12 - rng() * 347;
     vegetation.sphere(x, -.03, z, 3 + rng() * 5, .35 + rng() * .70, 4 + rng() * 7, 0xb5aa87);
     bush(x + 1.5, z, .5 + rng() * .6);
   }
@@ -381,9 +435,6 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
     };
     mesh.material.customProgramCacheKey = () => 'campus-coastal-horizon-v1';
   }
-  for (let i = 0; i < 34; i++) {
-    vegetation.box(-220 + rng() * 600, -4.46, -434 - rng() * 160, 8 + rng() * 16, .015, .15, 0xa3bcba);
-  }
 
   person('security', -110.5, -313.0, -.8); person('security', -99.8, -319, 1.1);
   person('security', -114, -308, .7, .10); person('security', 63, -216, -1.2);
@@ -407,13 +458,23 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   person('visitor', -19, .3, 1.0, 5.06);
   person('visitor', -44, 22, Math.PI / 2, .52, [-31, 22]);
   person('scientist', -6, -224, .2); person('technician', -8, -224, -.5);
+  for (const site of SPACEPORT_BUILDINGS.filter(site => site.x < -140)) {
+    const front = site.z + site.depth / 2;
+    person('scientist', site.x - 1.2, front + 2.2, 1, .10);
+    person('technician', site.x + 1.4, front + 2.6, -1, .10);
+  }
+  person('scientist', -174, -132, 0, .05, [-174, -108]);
+  person('visitor', -174, -37, 0, .05, [-174, -16]);
+  person('photographer', -137.4, -128.4, Math.PI / 2, .14);
+  person('visitor', -138.5, -132, Math.PI / 2, .14);
+  person('security', -174, 13, .4, .05);
 
-  d.finish(); vegetation.finish(); siteLabels(group, labels);
+  d.finish(); vegetation.finish(); plants.finish(); siteLabels(group, labels);
   const glow = new THREE.MeshStandardMaterial({ color: 0xe2cf9e, emissive: 0xffbd75, emissiveIntensity: .22, roughness: .5 });
   const glassLights = new THREE.InstancedMesh(boxGeometry, glow, windows.length);
   glassLights.name = 'Ventanas ocupadas y luminarias interiores';
   const matrix = new THREE.Matrix4(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion();
-  windows.forEach((w, i) => glassLights.setMatrixAt(i, matrix.compose(p(w.x, w.y, w.z), rotation, scale.set(w.w, w.h, .035))));
+  windows.forEach((w, i) => glassLights.setMatrixAt(i, matrix.compose(p(w.x, w.y, w.z), rotation.setFromAxisAngle(up, w.yaw ?? 0), scale.set(w.w, w.h, .035))));
   glassLights.computeBoundingSphere(); group.add(glassLights);
   const lamps = new THREE.InstancedMesh(sphere, glow, bulbs.length);
   bulbs.forEach((v, i) => lamps.setMatrixAt(i, matrix.compose(v, rotation, scale.set(.20, .045, .10))));
@@ -449,6 +510,7 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
     },
     setDetail(_detail: boolean) {},
     update(now: number) {
+      wind.value = now * .001;
       // Visitors can observe the checkpoint raising its empty service barrier;
       // moving fleet stays on its own marked campus loop, away from the racetrack.
       const cycle = (now * .001) % 26;

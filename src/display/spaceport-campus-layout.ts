@@ -7,6 +7,9 @@ export const SPACEPORT_BUILDINGS = [
   { id: 'mission', label: 'OPERACIONES / TELEMETRÍA', x: -53, z: -120, width: 22, depth: 18, height: 13, style: 'office' },
   { id: 'substation', label: 'ENERGÍA / ACCESO TÉCNICO', x: -35, z: -256, width: 24, depth: 17, height: 6, style: 'utility' },
   { id: 'gatehouse', label: 'CONTROL DE ACCESO', x: -116, z: -317, width: 9, depth: 13, height: 4, style: 'security' },
+  { id: 'avionics', label: 'AVIÓNICA / ENSAYOS', x: -150, z: -133, width: 18, depth: 23, height: 6.8, style: 'lab' },
+  { id: 'instrumentation', label: 'INSTRUMENTACIÓN', x: -160, z: -77, width: 19, depth: 20, height: 8.5, style: 'utility' },
+  { id: 'crew', label: 'CENTRO DE TRIPULACIONES', x: -156, z: -27, width: 20, depth: 20, height: 5.8, style: 'office' },
 ] as const;
 
 export const SPACEPORT_SERVICE_ROADS: readonly { points: readonly CampusXZ[]; width: number }[] = [

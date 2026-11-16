@@ -40,13 +40,19 @@ function straight(name: string, to: XYZ) {
 
 function bend(name: string, first: XYZ, second: XYZ, to: XYZ) {
   const from = current;
+  appendPath(name, t => cubic(from, first, second, to, t), curveSteps(from, first, second, to));
+}
+
+function curveSteps(from: XYZ, first: XYZ, second: XYZ, to: XYZ) {
   const estimate = Math.hypot(first[0] - from[0], first[1] - from[1], first[2] - from[2])
     + Math.hypot(second[0] - first[0], second[1] - first[1], second[2] - first[2])
     + Math.hypot(to[0] - second[0], to[1] - second[1], to[2] - second[2]);
-  appendPath(name, t => {
-    const u = 1 - t;
-    return [0, 1, 2].map(i => u ** 3 * from[i] + 3 * u * u * t * first[i] + 3 * u * t * t * second[i] + t ** 3 * to[i]) as unknown as XYZ;
-  }, Math.ceil(estimate * 5));
+  return Math.ceil(estimate * 5);
+}
+
+function cubic(from: XYZ, first: XYZ, second: XYZ, to: XYZ, t: number): XYZ {
+  const u = 1 - t;
+  return [0, 1, 2].map(i => u ** 3 * from[i] + 3 * u * u * t * first[i] + 3 * u * t * t * second[i] + t ** 3 * to[i]) as unknown as XYZ;
 }
 
 function verticalLoop(name: string, yaw: number) {
@@ -90,14 +96,51 @@ bend('westTurn', [-196, 14, -470], [-225, 4, -441], [-225, 4, -405]);
 straight('loopTwoEntry', [-225, 4, -360]);
 verticalLoop('loopTwoExit', 0);
 straight('loopTwoLanding', [-201, 0, -270]);
-bend('chicaneIn', [-201, 0, -240], [-161, 0, -238], [-161, 0, -210]);
-bend('chicaneOut', [-161, 0, -182], [-201, 0, -178], [-201, 0, -150]);
-straight('returnStraight', [-201, 0, -70]);
-bend('returnTurn', [-201, 0, -31], [-170, 0, 0], [-131, 0, 0]);
-straight('end', [0, 0, 0]);
-
 const length = DIQUE.length * 2;
-const scale = length / marks.end;
+// Preserve the installed launch-pad/loop footprint while routing the final
+// sector through the campus. Global rescaling would move every rig relative to
+// its buildings. Only the broad final return bend absorbs the distance fit.
+const scale = .7485877167530371;
+const world = (x: number, z: number): XYZ => [x / scale, 0, z / scale];
+type CampusCurve = readonly [string, XYZ, XYZ, XYZ];
+function campusCurves(returnX: number): CampusCurve[] {
+  return [
+    ['campusEntry', world(-150.466, -183), world(-128, -186), world(-128, -170)],
+    ['courtyardApproach', world(-128, -150), world(-128, -134), world(-112, -134)],
+    // Two quarter circles avoid the folded inner ribbon of a single tight
+    // reversing cubic. The eight-metre centreline radius leaves a usable apex.
+    ['chicaneIn', world(-107.581722, -134), world(-104, -130.418278), world(-104, -126)],
+    ['courtyardTurn', world(-104, -121.581722), world(-107.581722, -118), world(-112, -118)],
+    ['chicaneOut', world(-120.836556, -118), world(-128, -110.836556), world(-128, -102)],
+    ['returnStraight', world(-128, -85), world(returnX, -77), world(returnX, -62)],
+    ['returnTurn', world(returnX, -32), world(-124, 0), world(-98, 0)],
+  ];
+}
+const campusStart = current;
+function campusLength(returnX: number) {
+  let total = 98 / scale, from = campusStart;
+  for (const [, first, second, to] of campusCurves(returnX)) {
+    let prior = from;
+    const steps = curveSteps(from, first, second, to);
+    for (let i = 1; i <= steps; i++) {
+      const next = cubic(from, first, second, to, i / steps);
+      total += Math.hypot(next[0] - prior[0], next[1] - prior[1], next[2] - prior[2]);
+      prior = next;
+    }
+    from = to;
+  }
+  return total;
+}
+const remaining = length / scale - marks.loopTwoLanding;
+let west = -148, east = -129;
+if (remaining < campusLength(east) || remaining > campusLength(west)) throw new Error(`Campus return distance ${remaining * scale} is outside ${campusLength(east) * scale}–${campusLength(west) * scale}`);
+for (let i = 0; i < 36; i++) {
+  const middle = (west + east) / 2;
+  if (campusLength(middle) > remaining) west = middle;
+  else east = middle;
+}
+for (const [name, first, second, to] of campusCurves((west + east) / 2)) bend(name, first, second, to);
+straight('end', [0, 0, 0]);
 for (const p of raw) { p.x *= scale; p.y *= scale; p.z *= scale; p.s *= scale; }
 for (const key of Object.keys(marks)) marks[key] *= scale;
 for (const loop of loopSections) { loop.from *= scale; loop.to *= scale; }
@@ -231,8 +274,8 @@ const sectors = [
   sector('bridge', 'Espiral de la torre', marks.eightExit, marks.towerBridge, anchors.spiral),
   sector('back-straight', 'Puente de transferencia', marks.towerBridge, marks.westTurn),
   sector('bridge', 'Ensayo de inversión magnética II', marks.westTurn, marks.loopTwoLanding, anchors.loopTwo),
-  sector('chicane', 'Chicana de aterrizaje', marks.loopTwoLanding, marks.chicaneOut),
-  sector('sweep', 'Retorno al hangar', marks.chicaneOut, length),
+  sector('chicane', 'Patio de integración', marks.loopTwoLanding, marks.chicaneOut),
+  sector('sweep', 'Calle de los laboratorios', marks.chicaneOut, length),
 ];
 const pitSector = sector('pit', 'Boxes de integración', pit.entry, pit.exit, pit.stalls[1]);
 const safetyPanels: Course['safetyPanels'] = [marks.eastTurn - 20, marks.westTurn - 20, marks.chicaneIn, marks.returnTurn - 20]
