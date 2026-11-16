@@ -3,6 +3,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Course, CourseFrame } from '../shared/courses';
 import type { RaceSnapshot } from '../shared/protocol';
 import { box, canvas2d, noiseField, random, texture } from './materials';
+import { buildSpaceportCampus } from './spaceport-campus';
+import { buildSpaceportPeople } from './spaceport-people';
+import { buildSpaceportVehicles } from './spaceport-vehicles';
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
@@ -59,6 +62,9 @@ function parts(parent: THREE.Object3D, material: THREE.MeshStandardMaterial, nam
   function part(geometry: THREE.BufferGeometry, x: number, y: number, z: number, sx: number, sy: number, sz: number,
     tint: number, orientation = identity) {
     const copy = geometry.clone();
+    // RoundedBoxGeometry is non-indexed; keep it compatible with the indexed
+    // primitive fittings in the same spatial batch.
+    if (!copy.index) copy.setIndex(Array.from({ length: copy.getAttribute('position').count }, (_, i) => i));
     copy.deleteAttribute('uv'); copy.clearGroups();
     copy.applyMatrix4(matrix.compose(position.set(x, y, z), orientation, scale.set(sx, sy, sz)));
     const vertices = copy.getAttribute('position'), normals = copy.getAttribute('normal');
@@ -234,20 +240,6 @@ function hangar(d: Parts, x: number, z: number, width: number, depth: number, he
   }
 }
 
-function technician(d: Parts, x: number, z: number, facing = 0) {
-  const q = new THREE.Quaternion().setFromAxisAngle(axisY, facing);
-  for (const side of [-1, 1]) {
-    d.box(x + side * .11, .34, z, .16, .59, .17, tone.navy, q);
-    d.box(x + side * .11, .055, z + .05, .18, .11, .29, tone.rubber, q);
-    d.pipe(p(x + side * .24, 1.08, z), p(x + side * .34, .78, z + .20), .067, tone.blue);
-    d.sphere(x + side * .34, .78, z + .20, .065, .07, .065, tone.white);
-  }
-  d.box(x, .91, z, .40, .52, .23, tone.blue, q);
-  d.box(x, .96, z + .126, .27, .30, .02, tone.orange, q);
-  d.sphere(x, 1.32, z, .12, .16, .12, 0xb89370);
-  d.sphere(x, 1.42, z, .15, .085, .15, tone.white);
-}
-
 function signs(parent: THREE.Group, placements: readonly [string, number, number, number, number][]) {
   if (typeof document === 'undefined') return;
   const { canvas, context } = canvas2d(1024, 1024);
@@ -270,7 +262,7 @@ function signs(parent: THREE.Group, placements: readonly [string, number, number
   }
 }
 
-export function buildSpaceportScene(parent: THREE.Group, course: Course, _wood: THREE.Texture, _compactEnabled = false) {
+export async function buildSpaceportScene(parent: THREE.Group, course: Course, _wood: THREE.Texture, _compactEnabled = false) {
   parent.name = 'SpaceX · Centro de pruebas';
   const metalMap = surfaceTexture('metal'), roadMap = surfaceTexture('road'), concreteMap = surfaceTexture('concrete');
   const metal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .49, metalness: .43,
@@ -405,8 +397,6 @@ export function buildSpaceportScene(parent: THREE.Group, course: Course, _wood: 
     d.box(x + 2.8, .48, z + .5, 1.35, .86, 2.0, tone.navy);
     for (const side of [-1, 1]) d.cylinder(x + 2.8 + side * .68, .27, z + .5, .26, .12, tone.rubber,
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
-    technician(d, x - .8, z - 1.85);
-    technician(d, x + 2.6, z + 1.9);
     lampPoints.push(p(x, 3.4, z + 1.2));
   }
   // Finish gantry, grid markings and the pit service lane.
@@ -428,9 +418,13 @@ export function buildSpaceportScene(parent: THREE.Group, course: Course, _wood: 
     d.box(x, -.02, z, 6.3, .14, 4.2, tone.concrete);
     for (let i = 0; i < 4; i++) d.cylinder(x + (i - 1.5) * .76, .42, z - 1.0, .29, .84, i % 2 ? tone.blue : tone.orange);
     for (let i = 0; i < 3; i++) d.box(x + i * 1.25 - 1.3, .52, z + .7, 1.0, .91, .96, tone.white);
-    technician(d, x - 2, z + .7);
   }
   d.finish();
+  const campus = buildSpaceportCampus(fixed, course, parts, { metal, concrete, roadway });
+  const people = buildSpaceportPeople(animated, course, campus.people);
+  const vehicles = await buildSpaceportVehicles(animated, {
+    ...campus.fleet, routes: campus.fleet.routes.map(route => ({ ...route, cornerRadius: 0 })),
+  });
   const signFrames = parts(fixed, metal, 'Soportes de señalización');
   for (const x of [36, 72]) signFrames.box(x, 4.82, -8.40, .15, 1.65, .15, tone.steel);
   for (const [x, y, z] of [[186, 2.8, -78], [-157, 5.6, -264]] as const) {
@@ -470,15 +464,19 @@ export function buildSpaceportScene(parent: THREE.Group, course: Course, _wood: 
     setNight(value: boolean) {
       night = value; lampMaterial.emissiveIntensity = value ? 3.1 : 1.2;
       groundMaterial.color.setHex(value ? 0x727c7d : tone.sand);
+      campus.setNight(value); people.setNight(value); vehicles.setNight(value);
     },
-    setDetail(value: boolean) { detail = value; },
-    observe(_snapshot: RaceSnapshot) {},
+    setDetail(value: boolean) {
+      detail = value; campus.setDetail(value); people.setDetail(value); vehicles.setDetail(value);
+    },
+    observe(snapshot: RaceSnapshot) { people.observe(snapshot); },
     update(now: number) {
       const time = now * .001;
       radar.rotation.y = time * .23;
       manipulator.rotation.y = Math.sin(time * .42) * .25;
       warningMaterial.emissiveIntensity = (night ? 2.3 : 1.3) * (.65 + .35 * Math.sin(time * 4.5) ** 8);
       radar.visible = manipulator.visible = detail;
+      campus.update(now); people.update(now); vehicles.update(now);
     },
   };
 }

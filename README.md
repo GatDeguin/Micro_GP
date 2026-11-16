@@ -10,6 +10,8 @@ Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para 
 
 **SpaceX · Centro de pruebas** mide 1.941,21 unidades: exactamente el doble del Dique, contando el recorrido tridimensional. Combina un ocho con cruces separados en altura, una espiral elevada y dos loops verticales. Las guías magnéticas mantienen los autos sobre la pista incluso invertidos; el acelerador, el freno, la dirección y la gravedad siguen actuando. La cámara acompaña la orientación del auto en los loops. La partida propone una vuelta en los dos circuitos grandes y recuerda la cantidad elegida en cada uno.
 
+La base espacial tiene recepción, laboratorio, operaciones, depósito logístico, subestación y control de acceso, unidos por caminos de servicio y senderos. Ocho vehículos de servicio modelados en Blender —camiones, camionetas y seguridad— incluyen dos que circulan por la base. Hay 51 científicos, técnicos, guardias, visitantes y fotógrafos animados; el público observa desde un mirador con pasarela sobre la pista. El paisaje costero, las dunas y el mar completan las vistas de persecución. Las piezas repetidas se agrupan para conservar el detalle con pocas llamadas de dibujo.
+
 En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas. Los parciales se guardan por circuito.
 
 ## Jugar en Windows

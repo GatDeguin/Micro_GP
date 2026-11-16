@@ -73,6 +73,7 @@ function shadowPoints(course: Course) {
     const z = p.z + p.dx * offset;
     return [new THREE.Vector3(x, BENCH_SURFACE, z), new THREE.Vector3(x, p.y + 1.3, z)];
   }));
+  if (course.id === 'spaceport') bounds.push(new THREE.Vector3(42, 57, -183), new THREE.Vector3(26, 52, -184));
   if (course.id !== 'taller') return bounds;
   // Include the parts of the bench and the taller tools that can cast back over the course.
   for (const x of [-31, 32]) {
