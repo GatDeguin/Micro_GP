@@ -822,6 +822,9 @@ export function buildCars(parent: THREE.Object3D) {
     let night = false;
     let lit = false;
     let livery: CarView['livery'] = 'original';
+    const roadBasis = new THREE.Matrix4();
+    const roadYaw = new THREE.Quaternion();
+    const upright = new THREE.Vector3(0, 1, 0);
     return {
       setNight(enabled: boolean) { night = enabled; },
       setProjectedShadow(enabled: boolean) { for (const caster of casters) caster.castShadow = enabled; },
@@ -846,9 +849,22 @@ export function buildCars(parent: THREE.Object3D) {
           paint.color.setHex(livery === 'clean' ? cleanEnamels[i] : livery === 'sector' ? sectorEnamels[i] : enamelColors[i]);
           stripes.color.setHex(livery === 'clean' ? 0xffc875 : livery === 'sector' ? sectorStripes[i] : 0xf0e2c7);
         }
-        root.position.set(view.x, view.y + GROUND_CLEARANCE, view.z);
-        root.rotation.y = view.yaw;
-        const pitch = -Math.atan(slope);
+        const spatial = course.frameAt && view.distance !== undefined ? course.frameAt(view.distance) : undefined;
+        if (spatial) {
+          roadBasis.set(spatial.rx, spatial.nx, spatial.tx, 0,
+            spatial.ry, spatial.ny, spatial.ty, 0, spatial.rz, spatial.nz, spatial.tz, 0, 0, 0, 0, 1);
+          const loop = course.loops?.find(loop => view.distance! >= loop.from && view.distance! <= loop.to);
+          const heading = loop?.yaw ?? Math.atan2(spatial.tx, spatial.tz);
+          const yaw = Math.atan2(Math.sin(view.yaw - heading), Math.cos(view.yaw - heading));
+          root.quaternion.setFromRotationMatrix(roadBasis).multiply(roadYaw.setFromAxisAngle(upright, yaw));
+          root.position.set(view.x + spatial.nx * GROUND_CLEARANCE,
+            view.y + spatial.ny * GROUND_CLEARANCE, view.z + spatial.nz * GROUND_CLEARANCE);
+        } else {
+          root.position.set(view.x, view.y + GROUND_CLEARANCE, view.z);
+          root.rotation.set(0, view.yaw, 0);
+        }
+        const pitch = spatial ? 0 : -Math.atan(slope);
+        if (spatial) bankRoll = 0;
         const roll = view.suspension?.roll ?? 0;
         const heave = view.suspension?.heave ?? 0;
         shadow.position.y = 0.009 - (view.arcade?.jump ?? 0);
@@ -858,7 +874,7 @@ export function buildCars(parent: THREE.Object3D) {
         chassis.rotation.z = bankRoll + roll;
         chassis.position.y = heave;
         angle = (angle + view.speed * delta / (WHEEL_RADIUS * scaleY)) % (Math.PI * 2);
-        const road = detail.visible ? course.locate(view.x, view.z, { s: view.distance, y: view.y }) : null;
+        const road = detail.visible && !spatial ? course.locate(view.x, view.z, { s: view.distance, y: view.y }) : null;
         const settle = road !== null && Math.abs(road.offset) < course.wallHalfAt(road.s, Math.sign(road.offset))
           && Math.abs(course.heightAt(road.s, road.offset) - view.y) < 0.10;
         const sinYaw = Math.sin(view.yaw);

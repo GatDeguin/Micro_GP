@@ -24,6 +24,22 @@ dique.push(
 );
 
 export function cinematicStation(s: number, course: Course = TALLER) {
+  if (course.id === 'spaceport') {
+    const loop = course.loops?.find(loop => s >= loop.from - 16 && s <= loop.to + 16);
+    if (loop && course.frameAt) {
+      const top = course.frameAt((loop.from + loop.to) / 2);
+      const entry = course.frameAt(loop.from);
+      const rightX = Math.cos(loop.yaw), rightZ = -Math.sin(loop.yaw);
+      return { id: `test-loop-${loop.from}`, at: (loop.from + loop.to) / 2, range: 40,
+        x: (top.x + entry.x) / 2 + rightX * 26,
+        y: (top.y + entry.y) / 2 + 4, z: (top.z + entry.z) / 2 + rightZ * 26 };
+    }
+    const at = Math.round(s / (course.length / 14)) * (course.length / 14);
+    if (Math.abs(s - at) > 28) return undefined;
+    const p = course.sampleAt(at);
+    return { id: `test-tower-${at}`, at, range: 28, x: p.x + p.dz * 12,
+      y: p.y + 6, z: p.z - p.dx * 12 };
+  }
   if (approachingCover(s, 4, course) > 0.08) return undefined;
   if (course.id === 'dique' && s >= DIQUE.treatmentDetour.from + 4 && s <= DIQUE.treatmentDetour.from + 19) {
     const at = DIQUE.treatmentDetour.from + 12.4;

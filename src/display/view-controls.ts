@@ -87,6 +87,7 @@ export function buildViewControls({ multiplayer, graphics, audio, onAudioChange 
   };
   const shortcuts: Record<string, ViewMode | undefined> = { '1': 'general', '2': 'chase', '3': 'trackside', '4': 'broadcast' };
   let currentMode: ViewMode = 'general';
+  let selection = 0;
   let playerCount = 0;
 
   function showAudioSettings() {
@@ -126,6 +127,7 @@ export function buildViewControls({ multiplayer, graphics, audio, onAudioChange 
 
   function selectMode(mode: ViewMode, moveFocus = false) {
     currentMode = mode;
+    selection++;
     modes[mode].checked = true;
     if (moveFocus) modes[mode].focus();
   }
@@ -179,6 +181,8 @@ export function buildViewControls({ multiplayer, graphics, audio, onAudioChange 
 
   return {
     get mode(): ViewMode { return currentMode; },
+    get selection() { return selection; },
+    showMode(mode: ViewMode) { if (!modes[mode].checked) modes[mode].checked = true; },
     get split(): boolean { return split?.checked ?? false; },
     setPlayerCount(count: number) {
       if (playerCount === count) return;

@@ -14,6 +14,7 @@ import { arcDelta, LapProgress } from './progress.ts';
 import { barrierTangent, slopeFor, tireLoad } from './road-contact.ts';
 import { RaceTiming } from './timing.ts';
 import { AutomaticTransmission } from './transmission.ts';
+import { courseHeading, loopAt, positionOnRoad } from './loop-road.ts';
 
 const GRID_TIME = 3;
 const FINISH_WINDOW = 15;
@@ -82,10 +83,11 @@ function place(car: Car, s: number, offset: number, speed: number, course: Cours
   const point = course.sampleAt(s);
   car.x = point.x - point.dz * offset;
   car.z = point.z + point.dx * offset;
-  car.yaw = Math.atan2(point.dx, point.dz);
+  car.yaw = courseHeading(course, point);
   car.motionYaw = car.yaw;
   car.speed = speed;
   car.road = course.locate(car.x, car.z, point);
+  if (course.frameAt && loopAt(course, point.s)) positionOnRoad(car, point.s, offset, course);
 }
 
 function spawn(course: Course, s: number, index: number, speed: number, offset = laneFor(index),
@@ -118,10 +120,11 @@ function modelAtPose(model: number, previous: Car, pose: Car, course: Course) {
 }
 
 function move(car: Car, input: DriveInput, human: boolean, dt: number, course: Course) {
+  const loop = loopAt(course, car.road.s);
   const forwardX = Math.sin(car.yaw);
   const forwardZ = Math.cos(car.yaw);
-  const along = forwardX * car.road.dx + forwardZ * car.road.dz;
-  const across = forwardZ * car.road.dx - forwardX * car.road.dz;
+  const along = loop ? Math.cos(car.yaw - loop.yaw) : forwardX * car.road.dx + forwardZ * car.road.dz;
+  const across = loop ? -Math.sin(car.yaw - loop.yaw) : forwardZ * car.road.dx - forwardX * car.road.dz;
   const inPit = course.isPitLane(car.road.s, car.road.offset);
   const surface = tireLoad(car.road, car.dimensions, along, across, course);
   car.surfaceSound.curb = surface.curb;
@@ -130,7 +133,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
   car.surfaceSound.grass = surface.grass;
   car.surfaceSound.scrape = Math.max(0, car.surfaceSound.scrape - dt * 4.8);
   const sliding = car.arcade?.skid ?? 0;
-  const airborne = car.arcade?.airborne === true;
+  const airborne = !loop && car.arcade?.airborne === true;
   const boost = !inPit && !airborne && (car.arcade?.turbo ?? 0) > 0;
   const grip = (surface.grip - 0.38 * Math.max(0, car.suspension.heave)) * (1 - Math.min(0.43, sliding * 0.46));
   const { uphill, lateral } = slopeFor(car.road, along, across, course);
@@ -161,7 +164,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
   const speedLimit = inPit ? Math.min(course.pit.speedLimit, limit) : limit;
 
   if (input.brake) {
-    if (human && !car.braking && car.reverseReady && car.speed === 0) car.reversing = true;
+    if (human && !car.braking && car.reverseReady && (car.speed === 0 || (loop && Math.abs(car.speed) < 0.30))) car.reversing = true;
     car.reverseReady = false;
   } else {
     if (human && car.braking && car.speed === 0) car.reverseReady = true;
@@ -177,7 +180,7 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
     const braking = Math.max(0.6, brakeForce + surface.drag * 0.30 + uphill - 1.10 * cornerLoad);
     car.speed = car.reversing
       ? Math.max(-1.9, car.speed - (3.5 * grip + uphill) * dt)
-      : approach(car.speed, 0, braking * dt);
+      : approach(car.speed, 0, (loop ? Math.max(0.6, brakeForce + uphill * Math.sign(car.speed)) : braking) * dt);
   } else if (input.gas) {
     car.reverseReady = false;
     const driveGrip = grip * (1 - 0.09 * cornerLoad) * (airborne ? 0.14 : boost ? 1.31 : 1);
@@ -188,7 +191,16 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
     const acceleration = car.speed > speedLimit
       ? 5 + surface.drag + cornerScrub + uphill
       : Math.max(0, engine - uphill - surface.drag * 0.30 - 1.35 * cornerLoad);
-    car.speed = approach(car.speed, speedLimit, acceleration * dt);
+    if (loop) {
+      // Adhesion supplies normal force only. The same engine must overcome the
+      // tangent component of gravity; slowing on the vertical face is physical.
+      const net = car.speed > speedLimit ? -(5 + surface.drag + cornerScrub + uphill)
+        : engine - uphill - surface.drag * 0.30 - 1.35 * cornerLoad;
+      car.speed += net * dt;
+    } else car.speed = approach(car.speed, speedLimit, acceleration * dt);
+  } else if (loop) {
+    const drag = 1.45 + Math.abs(car.speed) * 0.18 + surface.drag + 1.6 * cornerLoad;
+    car.speed = approach(car.speed, 0, drag * dt) - uphill * dt;
   } else if (car.speed > 0) {
     // Closed-throttle engine braking keeps the car slowing even down the bridge.
     const drag = Math.max(0.35, 1.45 + car.speed * 0.18 + surface.drag + 1.6 * cornerLoad + uphill);
@@ -205,8 +217,14 @@ function move(car: Car, input: DriveInput, human: boolean, dt: number, course: C
   const bankDrift = lateral * Math.sign(car.speed) / (speed + 2.4) * Math.min(1, speed / 2) * dt;
   const skidDrift = (car.arcade?.skidBias ?? 0) * sliding * dt * 1.30;
   car.motionYaw = angleDifference(car.motionYaw + angleDifference(car.yaw - car.motionYaw) * alignment + bankDrift + skidDrift);
-  car.x += Math.sin(car.motionYaw) * car.speed * dt;
-  car.z += Math.cos(car.motionYaw) * car.speed * dt;
+  if (loop && course.frameAt) {
+    const direction = car.motionYaw - loop.yaw;
+    positionOnRoad(car, car.road.s + Math.cos(direction) * car.speed * dt,
+      car.road.offset - Math.sin(direction) * car.speed * dt, course);
+  } else {
+    car.x += Math.sin(car.motionYaw) * car.speed * dt;
+    car.z += Math.cos(car.motionYaw) * car.speed * dt;
+  }
   car.protection = Math.max(0, car.protection - dt);
   if (surface.gravel + surface.grass > 0.22 || surface.escape > 0.28 || car.reversing || inPit) car.timing.dirty();
 }
@@ -219,6 +237,21 @@ function setVelocity(car: Car, x: number, z: number) {
   const direction = car.reversing ? -1 : 1;
   car.speed = Math.hypot(x, z) * direction;
   if (Math.abs(car.speed) > EPSILON) car.motionYaw = Math.atan2(x * direction, z * direction);
+}
+
+function roadVelocity(car: Car, course: Course) {
+  const angle = car.motionYaw - courseHeading(course, car.road);
+  return { x: Math.sin(angle) * car.speed, z: Math.cos(angle) * car.speed };
+}
+
+function setRoadVelocity(car: Car, x: number, z: number, course: Course) {
+  const heading = courseHeading(course, car.road);
+  setVelocity(car, x, z);
+  if (Math.abs(car.speed) > EPSILON) car.motionYaw = angleDifference(car.motionYaw + heading);
+}
+
+function roadPose(car: Car, s: number, course: Course) {
+  return { x: -car.road.offset, z: s, yaw: car.yaw - courseHeading(course, car.road), dimensions: car.dimensions };
 }
 
 function groundHeight(road: TrackLocation, course: Course) {
@@ -234,16 +267,28 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver, course:
       if (!b.active || b.protection > 0) continue;
       const aHeight = groundHeight(a.road, course) + (a.arcade?.jump ?? 0);
       const bHeight = groundHeight(b.road, course) + (b.arcade?.jump ?? 0);
-      const contact = contactBetween(capsule(a, aHeight), capsule(b, bHeight));
+      const onLoop = course.frameAt && (loopAt(course, a.road.s) || loopAt(course, b.road.s));
+      const lead = onLoop ? arcDelta(a.road.s, b.road.s, course.length) : 0;
+      // Adjacent stations share a local tangent plane. Distant branches of a
+      // loop can overlap in XZ but must never collide through the deck.
+      if (onLoop && (Math.abs(lead) > 6 || Math.hypot(a.x - b.x, aHeight - bHeight, a.z - b.z) > 6)) continue;
+      const contact = onLoop
+        ? contactBetween(capsule(roadPose(a, 0, course), a.arcade?.jump ?? 0), capsule(roadPose(b, lead, course), b.arcade?.jump ?? 0))
+        : contactBetween(capsule(a, aHeight), capsule(b, bHeight));
       if (!contact) continue;
       const { nx, nz, depth } = contact;
       const correction = (depth + 0.006) / 2;
-      a.x -= nx * correction;
-      a.z -= nz * correction;
-      b.x += nx * correction;
-      b.z += nz * correction;
-      const va = velocity(a);
-      const vb = velocity(b);
+      if (onLoop) {
+        positionOnRoad(a, a.road.s - nz * correction, a.road.offset + nx * correction, course);
+        positionOnRoad(b, b.road.s + nz * correction, b.road.offset - nx * correction, course);
+      } else {
+        a.x -= nx * correction;
+        a.z -= nz * correction;
+        b.x += nx * correction;
+        b.z += nz * correction;
+      }
+      const va = onLoop ? roadVelocity(a, course) : velocity(a);
+      const vb = onLoop ? roadVelocity(b, course) : velocity(b);
       const approachA = va.x * nx + va.z * nz;
       const approachB = vb.x * nx + vb.z * nz;
       const closing = approachA - approachB;
@@ -263,8 +308,13 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver, course:
       const friction = clamp(tangent * 0.18, -impulse * 0.23, impulse * 0.23);
       const jx = nx * impulse + tx * friction;
       const jz = nz * impulse + tz * friction;
-      setVelocity(a, va.x - jx * aShield, va.z - jz * aShield);
-      setVelocity(b, vb.x + jx * bShield, vb.z + jz * bShield);
+      if (onLoop) {
+        setRoadVelocity(a, va.x - jx * aShield, va.z - jz * aShield, course);
+        setRoadVelocity(b, vb.x + jx * bShield, vb.z + jz * bShield, course);
+      } else {
+        setVelocity(a, va.x - jx * aShield, va.z - jz * aShield);
+        setVelocity(b, vb.x + jx * bShield, vb.z + jz * bShield);
+      }
       if (approachA > 0.25 && approachB < -0.25) {
         // Opposing noses peel off to their own right instead of pushing in a straight line.
         const turn = Math.min(0.14, closing * 0.04);
@@ -275,8 +325,50 @@ function resolveContacts(cars: readonly Car[], observe: ContactObserver, course:
   }
 }
 
+function constrainLoop(car: Car, index: number, observe: ContactObserver, course: Course, arcade?: ArcadeRules) {
+  for (let iteration = 0; iteration < 3; iteration++) {
+    const shape = capsule({ x: -car.road.offset, z: car.road.s,
+      yaw: car.yaw - courseHeading(course, car.road), dimensions: car.dimensions });
+    let boundary = { s: car.road.s, offset: car.road.offset };
+    const overflow = (s: number, offset: number) => Math.abs(offset) - course.wallHalfAt(s, Math.sign(offset));
+    for (const [s, offset] of [[shape.az, -shape.ax], [shape.bz, -shape.bx]]) {
+      if (overflow(s, offset) > overflow(boundary.s, boundary.offset)) boundary = { s, offset };
+    }
+    const penetration = overflow(boundary.s, boundary.offset) + shape.radius;
+    if (penetration <= EPSILON) break;
+    const side = boundary.offset < 0 ? -1 : 1;
+    positionOnRoad(car, car.road.s, car.road.offset - side * (penetration + 0.002), course);
+    const velocity = roadVelocity(car, course);
+    const outward = -velocity.x * side;
+    const along = velocity.z;
+    car.surfaceSound.scrape = Math.max(car.surfaceSound.scrape,
+      clamp(Math.abs(along) / 6.5, 0, 1) * clamp(0.34 + penetration * 15, 0, 1));
+    let impulse = 0;
+    if (outward > 0) {
+      const response = barrierResponse.rail;
+      const rebound = outward * (response.bounce + response.addedBounce * clamp(outward / 5, 0, 1));
+      impulse = outward + rebound;
+      const shielded = impulse >= MIN_AUDIBLE_IMPULSE && arcade?.block(car, index);
+      if (impulse >= MIN_AUDIBLE_IMPULSE && !shielded) car.timing.dirty();
+      const slide = along * (shielded ? 0.98 : response.slide);
+      if (shielded) impulse *= 0.32;
+      setRoadVelocity(car, side * rebound, slide, course);
+      const direction = car.reversing ? -1 : 1;
+      const exit = courseHeading(course, car.road) + Math.atan2(side * 0.27 * direction, Math.sign(along || 1) * direction);
+      const turn = 0.04 + Math.min(0.24, outward * 0.10);
+      car.yaw = angleDifference(car.yaw + clamp(angleDifference(exit - car.yaw), -turn, turn));
+    }
+    const frame = course.frameAt!(boundary.s, side * course.wallHalfAt(boundary.s, side));
+    observe({ source: `barrier:${index}:${side}`, kind: 'fence', impulse,
+      x: frame.x + frame.nx * 0.18, y: frame.y + frame.ny * 0.18, z: frame.z + frame.nz * 0.18,
+      distance: course.wrap(boundary.s), side });
+  }
+  return true;
+}
+
 function constrain(car: Car, index: number, observe: ContactObserver, course: Course, arcade?: ArcadeRules) {
   if (!Number.isFinite(car.x + car.z)) return false;
+  if (course.frameAt && loopAt(course, car.road.s)) return constrainLoop(car, index, observe, course, arcade);
   car.road = course.locate(car.x, car.z, car.road);
   const overflow = (point: TrackLocation) => Math.abs(point.offset) - course.wallHalfAt(point.s, Math.sign(point.offset));
   if (overflow(car.road) > 0.9) return false;
@@ -349,6 +441,7 @@ function recover(car: Car, index: number, previousS: number, racing: boolean, co
   car.exitLoad = 0;
   car.bot.wrongWay = 0;
   car.bot.time = 0;
+  car.bot.commitment = 0;
   car.timing.dirty();
   car.stalled = 0;
   car.protection = 0.86;
@@ -522,7 +615,8 @@ export class Race {
     const arcade = this.arcade;
     arcade?.advance(dt, this.frame);
     const previous = this.cars.map(car => ({
-      x: car.x, y: car.road.y, z: car.z, s: car.road.s, road: car.road, speed: car.speed, motionYaw: car.motionYaw, progress: car.progress.distance,
+      x: car.x, y: course.frameAt ? groundHeight(car.road, course) : car.road.y,
+      z: car.z, s: car.road.s, road: car.road, speed: car.speed, motionYaw: car.motionYaw, progress: car.progress.distance,
     }));
     const commands = this.cars.map((car, i) => {
       if (!car.active) return null;
@@ -551,7 +645,8 @@ export class Race {
       }
       arcade?.stepCar(car, i, from.road, dt, timed);
 
-      const moving = Math.hypot(car.x - from.x, car.z - from.z) > 0.45 * dt;
+      const positionHeight = course.frameAt ? groundHeight(car.road, course) : car.road.y;
+      const moving = Math.hypot(car.x - from.x, positionHeight - from.y, car.z - from.z) > 0.45 * dt;
       const { gas, brake } = command.input;
       const wantsForward = gas && !brake;
       car.stalled = wantsForward && !moving ? car.stalled + dt : 0;
@@ -561,10 +656,18 @@ export class Race {
       }
 
       const road = car.road;
-      const curvature = (course.heightAt(road.s - 0.95, road.offset) + course.heightAt(road.s + 0.95, road.offset)
+      const loop = loopAt(course, road.s);
+      let curvature = (course.heightAt(road.s - 0.95, road.offset) + course.heightAt(road.s + 0.95, road.offset)
         - 2 * groundHeight(road, course)) / 0.95 ** 2;
+      if (loop && course.frameAt) {
+        const before = course.frameAt(road.s - 0.95, road.offset);
+        const after = course.frameAt(road.s + 0.95, road.offset);
+        const normal = course.frameAt(road.s, road.offset);
+        curvature = ((after.tx - before.tx) * normal.nx + (after.ty - before.ty) * normal.ny
+          + (after.tz - before.tz) * normal.nz) / 1.9;
+      }
       const lateral = angleDifference(car.motionYaw - from.motionYaw) * car.speed / dt;
-      const headingDelta = car.motionYaw - Math.atan2(road.dx, road.dz);
+      const headingDelta = car.motionYaw - courseHeading(course, road);
       const gravity = slopeFor(road, Math.cos(headingDelta), -Math.sin(headingDelta), course);
       const roughness = car.surfaceSound.curb + 0.45 * car.surfaceSound.gravel + 0.28 * car.surfaceSound.grass;
       loadSuspension(car.suspension, car.handling, (car.speed - from.speed) / dt, lateral - gravity.lateral,
@@ -572,7 +675,7 @@ export class Race {
 
       if (timed) {
         if (car.registeredDriver && !command.human && moving) car.timing.assisted();
-        const fraction = car.progress.advance(from, { x: car.x, y: car.road.y, z: car.z, s: car.road.s }, car.speed > 0);
+        const fraction = car.progress.advance(from, { x: car.x, y: positionHeight, z: car.z, s: car.road.s }, car.speed > 0);
         if (racing) car.timing.recordProgress(from.progress, car.progress.distance, this.clock, dt);
         if (fraction !== null) {
           const time = this.clock - dt + fraction * dt;

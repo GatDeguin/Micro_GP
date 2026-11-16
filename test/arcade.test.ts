@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { arcadeLayout } from '../src/shared/arcade.ts';
-import { DIQUE, TALLER, type Course } from '../src/shared/courses.ts';
+import { DIQUE, SPACEPORT, TALLER, type Course } from '../src/shared/courses.ts';
 import { defaultRaceConfig, normalizeRaceConfig } from '../src/shared/protocol.ts';
 import { ArcadeRules, newArcadeCar } from '../src/sim/arcade.ts';
 import { Race } from '../src/sim/race.ts';
@@ -16,20 +16,22 @@ function actor(course: Course, s: number, offset: number, speed = 8) {
   };
 }
 
-test('arcade is optional and both layouts keep equipment inside the road and outside the tunnels', () => {
+test('arcade is optional and all layouts keep equipment inside the road and outside tunnels and loops', () => {
   assert.equal(normalizeRaceConfig({}).arcade, undefined);
   assert.equal(normalizeRaceConfig({ arcade: 'true' }).arcade, undefined);
   assert.equal(normalizeRaceConfig({ arcade: true }).arcade, true);
-  for (const course of [TALLER, DIQUE]) {
+  for (const course of [TALLER, DIQUE, SPACEPORT] as Course[]) {
     const { pickups, ramps } = arcadeLayout(course);
     assert.deepEqual(new Set(pickups.map(pickup => pickup.kind)), new Set(['turbo', 'shield', 'oil', 'pop']));
     for (const item of pickups) {
       assert.ok(Math.abs(item.offset) + 0.42 < course.roadHalfAt(item.s));
       assert.ok(!course.isPitLane(item.s, item.offset));
+      assert.ok(!course.loops?.some(loop => item.s >= loop.from - 18 && item.s <= loop.to + 18));
     }
     for (const ramp of ramps) {
       const start = ramp.s - ramp.length;
       assert.ok(ramp.s < course.tunnel.from - 10 || start > course.tunnel.to + 2);
+      assert.ok(!course.loops?.some(loop => ramp.s >= loop.from - 18 && start <= loop.to + 18));
       for (let s = start; s <= ramp.s; s += 0.2) {
         assert.ok(Math.abs(ramp.offset) + ramp.halfWidth < course.roadHalfAt(s));
         assert.ok(!course.isPitLane(s, ramp.offset));

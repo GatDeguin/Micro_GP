@@ -81,6 +81,12 @@ const ambience = {
     river: { ...diquePlanPoint(90, 51), y: -1.15 },
     pond: { ...diquePlanPoint(134, 102), y: -1.15 },
   },
+  spaceport: {
+    pit: getCourse('spaceport').sampleAt(48),
+    crowd: getCourse('spaceport').sampleAt(12),
+    river: getCourse('spaceport').sampleAt(180),
+    pond: getCourse('spaceport').sampleAt(1010),
+  },
 };
 
 function emitter(context: AudioContext, destination: AudioNode) {
@@ -468,10 +474,10 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
     if (!setMix) return;
     const damp = 1 - pace * 0.42;
     locate(camera, riverSource.x, riverSource.y, riverSource.z, wide);
-    river.gain.setTargetAtTime(damp * loudness * 0.070, now, 0.25);
+    river.gain.setTargetAtTime(damp * loudness * (course.id === 'spaceport' ? .016 : .070), now, 0.25);
     river.pan.setTargetAtTime(pan, now, 0.18);
     locate(camera, pondSource.x, pondSource.y, pondSource.z, wide);
-    pond.gain.setTargetAtTime(damp * loudness * 0.031, now, 0.25);
+    pond.gain.setTargetAtTime(damp * loudness * (course.id === 'spaceport' ? .004 : .031), now, 0.25);
     pond.pan.setTargetAtTime(pan, now, 0.18);
     locate(camera, grandstand.x, grandstand.y, grandstand.z, wide);
     const cheer = limit((crowdUntil - now) / 1.4);

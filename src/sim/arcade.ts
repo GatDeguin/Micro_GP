@@ -5,6 +5,7 @@ import {
 import type { Course } from '../shared/courses.ts';
 import type { TrackLocation } from '../shared/track.ts';
 import { arcDelta } from './progress.ts';
+import { loopAt } from './loop-road.ts';
 
 export function newArcadeCar() {
   return { turbo: 0, shield: 0, skid: 0, skidBias: 0, jump: 0, rise: 0, airborne: false, immunity: 0 };
@@ -35,6 +36,10 @@ const eventLifetime = 46;
 const gravity = 14;
 
 function point(course: Course, s: number, offset: number) {
+  if (course.frameAt) {
+    const { x, y, z } = course.frameAt(s, offset);
+    return { x, y, z };
+  }
   const { x, z, dx, dz } = course.sampleAt(s);
   return { x: x - dz * offset, z: z + dx * offset, y: course.heightAt(s, offset) };
 }
@@ -125,7 +130,8 @@ export class ArcadeRules {
       const hazard = this.hazards[i];
       if (hazard.owner === slot || this.time < hazard.armed
         || Math.abs(arcDelta(hazard.station, car.road.s, this.course.length)) > 1.75
-        || Math.hypot(hazard.x - car.x, hazard.z - car.z) > arcadeTrapRadius[hazard.kind] + 0.29) continue;
+        || Math.hypot(hazard.x - car.x, hazard.y - this.course.heightAt(car.road.s, car.road.offset), hazard.z - car.z)
+          > arcadeTrapRadius[hazard.kind] + 0.29) continue;
       const pop = hazard.kind === 'pop';
       if (pop) {
         this.hazards.splice(i, 1);
@@ -149,6 +155,13 @@ export class ArcadeRules {
     state.shield = Math.max(0, state.shield - dt);
     state.skid = Math.max(0, state.skid - dt);
     state.immunity = Math.max(0, state.immunity - dt);
+    // The magnetic loop road holds the tires to its local normal. A jump from
+    // an earlier ramp cannot detach a car halfway through the vertical circuit.
+    const onLoop = loopAt(this.course, car.road.s);
+    if (onLoop) {
+      state.jump = state.rise = 0;
+      state.airborne = false;
+    }
 
     if (state.airborne) {
       state.jump += (state.rise - gravity * dt / 2) * dt;
@@ -171,6 +184,7 @@ export class ArcadeRules {
     };
     state.jump = 0;
     for (const ramp of this.layout.ramps) {
+      if (onLoop) break;
       if (collect && car.speed > 2.8 && crosses(ramp.s, ramp.offset, ramp.halfWidth)) {
         state.jump = ramp.height;
         state.rise = Math.min(4.15, 0.69 + car.speed * 0.212);

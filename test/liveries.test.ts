@@ -39,6 +39,15 @@ test('configuration without a circuit keeps Taller and unfinished Dique setup de
   assert.equal(normalizeRaceConfig({ course: 'missing' }).course, 'taller');
 });
 
+test('spaceport records survive saves without replacing either earlier circuit', () => {
+  const old = normalizeLiveryProgress({ bestSectors: [12, 13, 14, 15], diqueTreatmentBestSectors: [30, 31, 32, 33] });
+  const next = advanceLiveryProgress(old, { ...car, sectorTimes: [60, 61, 62, 63] }, 'spaceport');
+  const restored = normalizeLiveryProgress(JSON.parse(JSON.stringify(next)));
+  assert.deepEqual(bestSectorsFor(restored, 'spaceport'), [60, 61, 62, 63]);
+  assert.deepEqual(bestSectorsFor(restored, 'taller'), [12, 13, 14, 15]);
+  assert.deepEqual(bestSectorsFor(restored, 'dique'), [30, 31, 32, 33]);
+});
+
 test('the second Dique detour has its own timings and preserves both sets of previous records', () => {
   const archived = [25, 18, 27, 14];
   const port = [29, 21, 25, 14];

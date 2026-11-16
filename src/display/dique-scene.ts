@@ -17,6 +17,7 @@ import { buildDiqueTerminal } from './dique-terminal';
 import { buildDiqueTrack, diqueConcrete } from './dique-track';
 import { buildDiqueTreatment } from './dique-treatment';
 import { buildDiqueWorkers } from './dique-workers';
+import { buildDiqueWorkstations } from './dique-workstations';
 import { buildDiqueYard } from './dique-yard';
 
 export async function buildDiqueScene(parent: THREE.Group, course: Course, wood: THREE.Texture, compactEnabled = false) {
@@ -57,15 +58,16 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   const roadworks = buildDiqueRoadworks(infrastructure, course);
   const treatment = buildDiqueTreatment(props, course, concrete);
   buildDiqueDetails(dock, props, course, !!garage);
+  const workstations = buildDiqueWorkstations(props, course, !!garage);
 
-  const movingProps = new Set<THREE.Object3D>([equipment.crane]);
+  const movingProps = new Set<THREE.Object3D>([equipment.crane, workstations.animated]);
   if (treatment) movingProps.add(treatment.animated);
   if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, ...movingProps]));
   mergeStatic(dock, new Set([harbor.backWall]), 45);
   mergeStatic(infrastructure, undefined, 48);
   mergeStatic(props, movingProps, 33);
   const yard = buildDiqueYard(parent, course);
-  const workers = buildDiqueWorkers(parent, course);
+  const workers = buildDiqueWorkers(parent, course, workstations.stations);
   const craneActivity = crane ? buildDiqueCraneActivity(equipment.crane, course, crane) : undefined;
   if (craneActivity) equipment.placeholder.removeFromParent();
   else instanceStatic(equipment.placeholder);
@@ -87,6 +89,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       yard.setNight(night);
       craneActivity?.setNight?.(night);
       workers.setNight(night);
+      workstations.setNight(night);
     },
     setDetail(detail: boolean) {
       craneActivity?.setDetail?.(detail);
@@ -107,6 +110,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       ship.update(now);
       workers.setPortActivity(ship.isTransferring(), terminal.isInspecting());
       workers.update(now);
+      workstations.update(now);
     },
   };
 }

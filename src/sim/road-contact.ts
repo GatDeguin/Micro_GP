@@ -1,6 +1,7 @@
 import type { CarDimensions } from '../shared/car-dimensions.ts';
 import { TALLER, type Course } from '../shared/courses.ts';
 import type { TrackLocation } from '../shared/track.ts';
+import { loopAt } from './loop-road.ts';
 
 const TIRE_PATCH = 0.125;
 const GRAVITY = 9.8;
@@ -40,6 +41,13 @@ export function tireLoad(road: TrackLocation, car: CarDimensions, along: number,
 }
 
 export function slopeFor(road: TrackLocation, along: number, across: number, course: Course = TALLER) {
+  if (course.frameAt && loopAt(course, road.s)) {
+    const frame = course.frameAt(road.s, road.offset);
+    return {
+      uphill: GRAVITY * (frame.ty * along - frame.ry * across),
+      lateral: GRAVITY * (-frame.ry * along - frame.ty * across),
+    };
+  }
   const grade = (course.heightAt(road.s + 0.65, road.offset) - course.heightAt(road.s - 0.65, road.offset)) / 1.30;
   const bank = course.bankAt(road.s);
   const scale = GRAVITY / Math.hypot(1, grade, bank);

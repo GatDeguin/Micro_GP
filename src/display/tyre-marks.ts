@@ -44,6 +44,23 @@ export function buildTyreMarks(parent: THREE.Object3D, course: Course = TALLER) 
 
   function wheelEdges(car: CarView, slot: number, side: number, width: number, first: number) {
     const tyre = CAR_DIMENSIONS[slot];
+    if (course.frameAt && car.distance !== undefined) {
+      const frame = course.frameAt(car.distance);
+      const lane = -((car.x - frame.x) * frame.rx + (car.y - frame.y) * frame.ry + (car.z - frame.z) * frame.rz);
+      const loop = course.loops?.find(loop => car.distance! >= loop.from && car.distance! <= loop.to);
+      const yaw = car.yaw - (loop?.yaw ?? Math.atan2(frame.tx, frame.tz));
+      const sin = Math.sin(yaw), cos = Math.cos(yaw);
+      for (const edge of [0, 1]) {
+        const across = side * tyre.tireOffset + (edge - .5) * width;
+        const at = car.distance - tyre.axle * cos - across * sin;
+        const offset = lane + tyre.axle * sin - across * cos;
+        const surface = course.surfaceAt(at, offset);
+        if (surface === 'gravel' || surface === 'grass') return false;
+        const contact = course.frameAt(at, offset);
+        corners[first + edge].set(contact.x + contact.nx * .013, contact.y + contact.ny * .013, contact.z + contact.nz * .013);
+      }
+      return true;
+    }
     const sin = Math.sin(car.yaw), cos = Math.cos(car.yaw);
     for (const edge of [0, 1]) {
       const offset = side * tyre.tireOffset + (edge - 0.5) * width;
@@ -91,7 +108,7 @@ export function buildTyreMarks(parent: THREE.Object3D, course: Course = TALLER) 
         previous[slot] = car;
         continue;
       }
-      const travel = Math.hypot(car.x - from.x, car.z - from.z);
+      const travel = Math.hypot(car.x - from.x, car.y - from.y, car.z - from.z);
       if (travel < 0.13) continue;
       previous[slot] = car;
       if (travel > 0.92 || Math.abs(car.y - from.y) > 0.39) continue;

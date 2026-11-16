@@ -21,7 +21,8 @@ export class Room<Peer> {
   private seats = new Seats<Peer>();
   private eligibleHosts = new Set<Peer>();
   private config = normalizeRaceConfig(defaultRaceConfig);
-  private lapsByCourse = { taller: COURSE_OPTIONS.taller.laps, dique: COURSE_OPTIONS.dique.laps };
+  private lapsByCourse = { taller: COURSE_OPTIONS.taller.laps, dique: COURSE_OPTIONS.dique.laps,
+    spaceport: COURSE_OPTIONS.spaceport.laps };
   private active = false;
   private phase: LobbyState["phase"] = "lobby";
   private drivers = this.seats.drivers(0);

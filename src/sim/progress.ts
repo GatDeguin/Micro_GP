@@ -11,6 +11,20 @@ export function arcDelta(from: number, to: number, length = TALLER.length) {
 }
 
 function crossGate(from: CrossingPoint, to: CrossingPoint, gate: TrackPoint, course: Course) {
+  if (course.frameAt) {
+    const frame = course.frameAt(gate.s);
+    const distance = (point: CrossingPoint) => (point.x - frame.x) * frame.tx
+      + (point.y - frame.y) * frame.ty + (point.z - frame.z) * frame.tz;
+    const before = distance(from), after = distance(to);
+    if (before > 0 || after <= 0) return null;
+    const fraction = -before / (after - before);
+    const x = from.x + (to.x - from.x) * fraction - frame.x;
+    const y = from.y + (to.y - from.y) * fraction - frame.y;
+    const z = from.z + (to.z - from.z) * fraction - frame.z;
+    const offset = -(x * frame.rx + y * frame.ry + z * frame.rz);
+    const normal = x * frame.nx + y * frame.ny + z * frame.nz;
+    return Math.abs(normal) <= 0.45 && Math.abs(offset) <= course.wallHalfAt(gate.s, Math.sign(offset)) ? fraction : null;
+  }
   const before = (from.x - gate.x) * gate.dx + (from.z - gate.z) * gate.dz;
   const after = (to.x - gate.x) * gate.dx + (to.z - gate.z) * gate.dz;
   if (before > 0 || after <= 0) return null;
@@ -55,7 +69,7 @@ export class LapProgress {
 
   advance(from: CrossingPoint, to: CrossingPoint, forward: boolean) {
     const delta = arcDelta(from.s, to.s, this.course.length);
-    if (Math.abs(delta) > 1.2 || Math.hypot(to.x - from.x, to.z - from.z) > 0.55) return null;
+    if (Math.abs(delta) > 1.2 || Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) > 0.55) return null;
 
     this.routeDistance += delta;
     this.rankedDistance += forward ? delta : Math.min(0, delta);

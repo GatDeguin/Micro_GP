@@ -10,15 +10,16 @@ export const FORWARD_GEARS = 5;
 
 export type Difficulty = 'rookie' | 'club' | 'pro';
 export type Livery = 'original' | 'clean' | 'sector';
-export type CourseId = 'taller' | 'dique';
+export type CourseId = 'taller' | 'dique' | 'spaceport';
 
 export const COURSE_OPTIONS = {
   taller: { label: 'Taller 07', laps: 3 },
   dique: { label: 'Gran Premio del Dique', laps: 1 },
+  spaceport: { label: 'SpaceX · Centro de pruebas', laps: 1 },
 } satisfies Record<CourseId, { label: string; laps: number }>;
 
 export function isCourseId(value: unknown): value is CourseId {
-  return value === 'taller' || value === 'dique';
+  return value === 'taller' || value === 'dique' || value === 'spaceport';
 }
 
 export interface RaceConfig {

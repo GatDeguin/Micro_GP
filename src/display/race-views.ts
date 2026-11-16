@@ -15,6 +15,7 @@ function followCamera(slot: number, course: Course) {
   const target = new THREE.Vector3();
   const aim = new THREE.Vector3();
   const subject = new THREE.Vector3();
+  const normal = new THREE.Vector3(0, 1, 0);
   let previousMode: ViewMode | undefined;
   let previousStation: string | undefined;
   let direction = 1;
@@ -23,22 +24,40 @@ function followCamera(slot: number, course: Course) {
   return (mode: ViewMode, car: CarView, width: number, height: number, dt: number, qrSize = 0, compact = false) => {
     cameraLights(camera, compact, slot);
     const aspect = width / height;
-    const road = course.locate(car.x, car.z, { s: car.distance, y: car.y });
+    const frame = course.frameAt && car.distance !== undefined ? course.frameAt(car.distance) : undefined;
+    const road = frame ? { ...course.sampleAt(car.distance!),
+      offset: -((car.x - frame.x) * frame.rx + (car.y - frame.y) * frame.ry + (car.z - frame.z) * frame.rz) }
+      : course.locate(car.x, car.z, { s: car.distance, y: car.y });
+    const loop = course.loops?.find(loop => road.s >= loop.from - 8 && road.s <= loop.to + 8);
     const cover = approachingCover(road.s, 6, course);
     const heading = road.dx * Math.sin(car.yaw) + road.dz * Math.cos(car.yaw);
     const station = mode === 'broadcast' ? cinematicStation(road.s, course) : undefined;
     const changed = previousMode !== mode || previousStation !== station?.id;
-    if (changed || Math.abs(heading) > 0.72) direction = heading >= 0 ? 1 : -1;
+    if (loop) direction = car.speed >= 0 ? 1 : -1;
+    else if (changed || Math.abs(heading) > 0.72) direction = heading >= 0 ? 1 : -1;
     if (changed) side = road.offset > 0.3 ? -1 : 1;
     let cameraRoad: TrackPoint = road;
 
-    if (station) {
+    if (frame && loop && !station) {
+      // Ride the complete 3D road frame through a loop, including its inverted apex.
+      const chase = mode === 'chase' || mode === 'general';
+      const eye = course.frameAt!(road.s + direction * (chase ? -4.2 : 3.2),
+        chase ? road.offset * .55 : THREE.MathUtils.clamp(road.offset + side * 2.6, -2.8, 2.8));
+      const lift = chase ? 2.6 : 1.75;
+      position.set(eye.x + eye.nx * lift, eye.y + eye.ny * lift, eye.z + eye.nz * lift);
+      const aim = course.frameAt!(road.s + direction * (chase ? .7 : 0), road.offset);
+      target.set(aim.x + aim.nx * .55, aim.y + aim.ny * .55, aim.z + aim.nz * .55);
+      normal.set(frame.nx, frame.ny, frame.nz);
+    } else if (station) {
+      normal.set(0, 1, 0);
       position.set(station.x, station.y, station.z);
       target.set(car.x + Math.sin(car.yaw) * 0.45, car.y + 0.37, car.z + Math.cos(car.yaw) * 0.45);
     } else if (mode === 'general' && cover === 0) {
+      normal.set(0, 1, 0);
       position.set(car.x - 5, car.y + 14, car.z + 10);
       target.set(car.x, car.y, car.z);
     } else if (mode === 'chase' || mode === 'general') {
+      normal.set(0, 1, 0);
       const behind = course.sampleAt(road.s - direction * THREE.MathUtils.lerp(5.4, 3.4, cover));
       const ahead = course.sampleAt(road.s + direction * 4.4);
       cameraRoad = behind;
@@ -52,6 +71,7 @@ function followCamera(slot: number, course: Course) {
           THREE.MathUtils.lerp(car.y + 14, position.y, cover), THREE.MathUtils.lerp(car.z + 10, position.z, cover));
       }
     } else {
+      normal.set(0, 1, 0);
       const ahead = course.sampleAt(road.s + direction * THREE.MathUtils.lerp(4.3, 3.1, cover));
       cameraRoad = ahead;
       const left = THREE.MathUtils.lerp(course.wallHalfAt(ahead.s, -1) - 0.35, 1.64, cover);
@@ -65,7 +85,8 @@ function followCamera(slot: number, course: Course) {
     const blend = changed || camera.position.distanceToSquared(position) > 28 ? 1 : 1 - Math.exp(-dt * 15);
     camera.position.lerp(position, blend);
     aim.lerp(target, blend);
-    if (!station && (mode === 'trackside' || mode === 'broadcast' || cover > 0)) {
+    camera.up.lerp(normal, changed ? 1 : 1 - Math.exp(-dt * 18)).normalize();
+    if (!loop && !station && (mode === 'trackside' || mode === 'broadcast' || cover > 0)) {
       const ground = course.locate(camera.position.x, camera.position.z, { s: cameraRoad.s, y: cameraRoad.y });
       const inside = Math.abs(ground.offset) < course.wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25;
       const floor = course.heightAt(ground.s, ground.offset);
@@ -77,7 +98,7 @@ function followCamera(slot: number, course: Course) {
       : mode === 'general' ? 44 : mode === 'chase' ? 48 : 42;
     const fov = lens
       + THREE.MathUtils.clamp((1.25 - aspect) * 22, 0, 22) + (qrSize ? 4 : 0);
-    const far = compact ? (mode === 'general' ? 46 : 34) : 160;
+    const far = compact ? (mode === 'general' ? 46 : 34) : course.id === 'spaceport' ? 430 : 160;
     if (camera.view?.enabled || camera.aspect !== aspect || camera.fov !== fov || camera.far !== far) {
       camera.aspect = aspect;
       camera.fov = fov;
@@ -129,7 +150,7 @@ export function buildRaceViews(
     const room = scene.background;
     const roomBlur = scene.backgroundBlurriness;
     const roomIntensity = scene.backgroundIntensity;
-    const collector = mode === 'general' ? undefined : backdrop.build();
+    const collector = mode === 'general' || course.id === 'spaceport' ? undefined : backdrop.build();
     const draw = (camera: THREE.PerspectiveCamera, following: boolean) => {
       const background = following ? collector : undefined;
       scene.background = background ?? room;

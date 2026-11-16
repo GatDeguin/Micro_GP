@@ -86,3 +86,32 @@ test('the requested recap plays an overtake, a return to the track and a close f
   replay.stop();
   assert.equal(replay.sample(12750), null);
 });
+
+test('a recap remains active before its first animation frame and releases controls at its end', () => {
+  const replay = new ReplayHistory(false);
+  for (let frame = 3; frame <= 144; frame += 3) replay.add(snapshot(frame, { flag: frame >= 120 }), frame / 0.06);
+  replay.add(snapshot(147, { phase: 'results', flag: true }), 2450);
+  assert.equal(replay.startSummary(3000), true);
+  assert.equal(replay.sample(2999), null);
+  assert.equal(replay.playing, true);
+  assert.ok(replay.sample(3000));
+  assert.equal(replay.sample(10000), null);
+  assert.equal(replay.playing, false);
+  assert.equal(replay.startSummary(11000), true);
+  replay.stop();
+  assert.equal(replay.playing, false);
+  assert.equal(replay.sample(11001), null);
+});
+
+test('a slow rendered frame does not consume the whole recap when display time is bounded', () => {
+  const replay = new ReplayHistory(false);
+  for (let frame = 3; frame <= 144; frame += 3) replay.add(snapshot(frame, { flag: frame >= 120 }), frame / .06);
+  replay.add(snapshot(147, { phase: 'results', flag: true }), 2450);
+  replay.startSummary(3000);
+  const first = replay.sample(3000, 100)!;
+  const afterCompilation = replay.sample(21300, 100);
+  assert.ok(afterCompilation, 'the recap must still be visible after a long GPU stall');
+  assert.ok(afterCompilation.to.frame - first.to.frame <= 6);
+  replay.stop();
+  assert.equal(replay.sample(21350, 100), null);
+});

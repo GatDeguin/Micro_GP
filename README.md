@@ -6,7 +6,9 @@ Carrera web 3D de cuatro autitos en una maqueta de circuito GP. La PC muestra la
 
 Abrí [Micro GP](https://gatdeguin.github.io/Micro_GP/) y elegí **Jugar** para salir con la última configuración, o **Preparar partida** para elegir el circuito, el auto, la librea, la cantidad de vueltas, los rivales, la dificultad y el modo nocturno. Usá las flechas o WASD para manejar y las teclas 1 a 4 para cambiar de cámara. En una pantalla táctil aparecen los controles al empezar.
 
-**Taller 07** forma un ocho con un cruce a dos alturas y una grada frente a meta. **Gran Premio del Dique** mide 759,35 unidades, cuatro veces la longitud de Taller 07. La recta del muelle desemboca en la horquilla de la grúa. La chicana de contenedores precede al puente y el descenso del vertedero lleva al túnel de retorno bajo el mismo cruce. Las zonas mojadas tienen el 82 % del agarre seco. La partida propone una vuelta en el Dique y recuerda cuántas elegiste para cada circuito.
+**Taller 07** forma un ocho con un cruce a dos alturas y una grada frente a meta. **Gran Premio del Dique** mide 970,61 unidades, incluidos los desvíos del puerto y la depuradora. La recta del muelle desemboca en la horquilla de la grúa. La chicana de contenedores precede al puente y el descenso del vertedero lleva al túnel de retorno bajo el mismo cruce. Las zonas mojadas tienen el 82 % del agarre seco. Sus boxes y el puerto incluyen operarios con tareas sincronizadas: motor, equilibrado de ruedas, soldadura y embalaje.
+
+**SpaceX · Centro de pruebas** mide 1.941,21 unidades: exactamente el doble del Dique, contando el recorrido tridimensional. Combina un ocho con cruces separados en altura, una espiral elevada y dos loops verticales. Las guías magnéticas mantienen los autos sobre la pista incluso invertidos; el acelerador, el freno, la dirección y la gravedad siguen actuando. La cámara acompaña la orientación del auto en los loops. La partida propone una vuelta en los dos circuitos grandes y recuerda la cantidad elegida en cada uno.
 
 En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas. Los parciales se guardan por circuito.
 
@@ -29,9 +31,11 @@ El motor de cada auto combina bucles de bajas, medias y altas revoluciones, con 
 
 Hay cuatro plazas. Los bots pueden cubrir los lugares libres, adelantar y retomar el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
 
-Al terminar, el tablero muestra la clasificación, los tiempos, las diferencias y la mejor vuelta de cada piloto. **Ver resumen** reproduce las maniobras registradas y **Resultados** abre los tiempos en pantalla. Podés volver a la sala o a exhibición cuando termines de revisarlos.
+Al terminar aparece un podio con los tres primeros autos que llegaron, sus pilotos y sus tiempos. **Ver tiempos** abre la clasificación completa, incluidas las diferencias, la mejor vuelta y los abandonos. **Ver resumen** prepara los efectos antes de reproducir las maniobras registradas y regresa al podio al terminar. Podés cerrar la pantalla con **Volver al circuito** y abrirla de nuevo con **Ver podio**.
 
 En la pantalla de carrera, usá **1** para la cámara general, **2** para persecución, **3** para ver a ras de pista y **4** para las cámaras fijas del circuito con seguimiento. **M** activa o desactiva la pantalla dividida. Con dos o más mandos conectados, cada jugador tiene un panel para su auto. Con tres mandos, el cuarto panel muestra el circuito completo.
+
+En la sala o exhibición, las cuatro cámaras se alternan cada cuatro segundos. Una elección manual reinicia ese intervalo. Al comenzar una carrera o práctica se conserva la cámara elegida y se detiene el recorrido automático.
 
 La chicana antes del puente y las curvas peraltadas permiten elegir distintas trayectorias. El asfalto de escape, la grava y el césped cambian el agarre. Los frenajes fuertes dejan goma y las protecciones absorben los golpes antes de recuperar su forma.
 

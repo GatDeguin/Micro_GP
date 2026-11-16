@@ -73,7 +73,7 @@ function shadowPoints(course: Course) {
     const z = p.z + p.dx * offset;
     return [new THREE.Vector3(x, BENCH_SURFACE, z), new THREE.Vector3(x, p.y + 1.3, z)];
   }));
-  if (course.id === 'dique') return bounds;
+  if (course.id !== 'taller') return bounds;
   // Include the parts of the bench and the taller tools that can cast back over the course.
   for (const x of [-31, 32]) {
     for (const z of [-19, 17.7]) bounds.push(new THREE.Vector3(x, BENCH_SURFACE, z));
@@ -133,6 +133,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   let points = shadowPoints(TALLER);
   const lightCenter = new THREE.Vector3();
   let dique = false;
+  let spaceport = false;
   const trackLamps: { light: THREE.SpotLight; day: number }[] = [];
   const diffusers = new Set<THREE.MeshStandardMaterial>();
   const halos = new Set<THREE.SpriteMaterial>();
@@ -183,6 +184,14 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     scene.environmentIntensity = dique ? (night ? 0.45 : 0.49) : (night ? 0.19 : close ? 0.42 : 0.38);
     renderer.toneMappingExposure = dique ? (night ? 1.12 : 1.06) : (night ? 1.01 : close ? 1.015 : 1.075);
     scene.background = dique ? (night ? harborNight : harborSky) : (night ? nightBackground : dayBackground);
+    if (spaceport) {
+      key.color.setHex(night ? 0xb3cce8 : 0xffe9ca);
+      key.intensity = night ? 1.35 : 2.6;
+      fill.intensity = night ? .58 : .75;
+      bounce.intensity = night ? .64 : .66;
+      scene.environmentIntensity = night ? .42 : .56;
+      scene.background = night ? harborNight : harborSky;
+    }
     scene.backgroundIntensity = dayBackgroundIntensity * (night ? 0.64 : 1);
     if (!lowQuality) {
       fitShadow(key, points, close);
@@ -193,7 +202,8 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   return {
     restoreReflections,
     setCourse(course: Course) {
-      dique = course.id === 'dique';
+      dique = course.id !== 'taller';
+      spaceport = course.id === 'spaceport';
       points = shadowPoints(course);
       lightCenter.set(0, 0, 0);
       if (dique) new THREE.Box3().setFromPoints(points).getCenter(lightCenter);

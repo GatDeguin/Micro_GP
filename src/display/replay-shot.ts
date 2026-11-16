@@ -86,13 +86,28 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer, course: Course = 
   quad.frustumCulled = false;
   imageScene.add(quad);
   let lastStation: string | undefined;
+  let preparation: Promise<unknown> | undefined;
 
   return {
+    prepare(scene: THREE.Scene) {
+      if (!preparation) {
+        // Offscreen HDR rendering uses different material programs from the race view.
+        // Prepare those programs before the replay clock starts, while the podium stays usable.
+        const previousTarget = renderer.getRenderTarget();
+        renderer.setRenderTarget(target);
+        const scenery = renderer.compileAsync(scene, camera);
+        renderer.setRenderTarget(previousTarget);
+        preparation = Promise.all([scenery, renderer.compileAsync(imageScene, imageCamera)]);
+      }
+      return preparation;
+    },
     stop() { active = false; lastStation = undefined; },
     dispose() { target.dispose(); quad.geometry.dispose(); material.dispose(); },
     render(scene: THREE.Scene, car: CarView, rival: CarView | undefined, width: number, height: number, dt: number,
       placard: ReturnType<typeof buildPlacard>, kind: ReplayKind, lowQuality: boolean) {
       const lane = course.locate(car.x, car.z, { s: car.distance, y: car.y });
+      const loop = course.loops?.find(loop => lane.s >= loop.from - 8 && lane.s <= loop.to + 8);
+      const frame = loop ? course.frameAt?.(lane.s) : undefined;
       const cover = approachingCover(lane.s, 5, course);
       const station = kind === 'recovery' ? undefined : cinematicStation(lane.s, course);
       if (station?.id !== lastStation) active = false;
@@ -104,10 +119,15 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer, course: Course = 
       const shoulder = kind === 'recovery' ? lane.offset * 0.46
         : THREE.MathUtils.clamp(lane.offset + 3.83 * side, -3.4 + 1.76 * cover, 3.4 - 1.76 * cover);
       const eyeHeight = kind === 'recovery' ? THREE.MathUtils.lerp(2.45, 1.18, cover) : kind === 'overtake' ? 1.15 : 0.75;
-      if (station) position.set(station.x, station.y, station.z);
+      if (frame && !station) {
+        const eye = course.frameAt!(ahead.s, shoulder);
+        position.set(eye.x + eye.nx * eyeHeight, eye.y + eye.ny * eyeHeight, eye.z + eye.nz * eyeHeight);
+      } else if (station) position.set(station.x, station.y, station.z);
       else position.set(ahead.x - ahead.dz * shoulder, course.heightAt(ahead.s, shoulder) + eyeHeight, ahead.z + ahead.dx * shoulder);
-      subject.set(car.x, car.y + 0.54, car.z);
-      groupAim.set(car.x, car.y + 0.24, car.z);
+      subject.set(car.x + (frame?.nx ?? 0) * .54, car.y + (frame?.ny ?? 1) * .54, car.z + (frame?.nz ?? 0) * .54);
+      groupAim.set(car.x + (frame?.nx ?? 0) * .24, car.y + (frame?.ny ?? 1) * .24, car.z + (frame?.nz ?? 0) * .24);
+      if (frame && !station) camera.up.set(frame.nx, frame.ny, frame.nz);
+      else camera.up.set(0, 1, 0);
       if (rival && Math.abs(rival.y - car.y) < 1.1 && Math.hypot(rival.x - car.x, rival.z - car.z) < 9) {
         groupAim.lerp(sight.set(rival.x, rival.y + 0.29, rival.z), kind === 'overtake' ? 0.36 : 0.22);
       }
@@ -119,7 +139,7 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer, course: Course = 
         aim.copy(groupAim);
       }
       active = true;
-      if (cover > 0) {
+      if (cover > 0 && !loop) {
         const ground = course.locate(camera.position.x, camera.position.z, { s: ahead.s, y: ahead.y });
         if (Math.abs(ground.offset) < course.wallHalfAt(ground.s, Math.sign(ground.offset)) + 0.25) {
           camera.position.y = Math.min(camera.position.y, course.heightAt(ground.s, ground.offset) + coverClearance(ground.s, course) - 0.23);
@@ -142,29 +162,32 @@ export function buildReplayShot(renderer: THREE.WebGLRenderer, course: Course = 
       camera.getWorldDirection(sight);
       material.uniforms.focus.value = subject.sub(camera.position).dot(sight);
 
-      if (lowQuality) {
-        placard.resize(camera, width, height, ahead.y);
-        renderer.render(scene, camera);
-        return camera;
-      }
-      renderer.getDrawingBufferSize(buffer);
-      const ratio = Math.min(1, 1600 / Math.max(buffer.x, buffer.y));
-      const targetWidth = Math.max(1, Math.round(buffer.x * ratio));
-      const targetHeight = Math.max(1, Math.round(buffer.y * ratio));
-      target.setSize(targetWidth, targetHeight);
-      pixel.set(1 / targetWidth, 1 / targetHeight);
       const plate = placard.object;
+      // The physical plaque intersects a horizontal support plane. Give that
+      // overlay a stable view even when the race camera is inverted or looks up.
       plateCamera.copy(camera);
+      plateCamera.up.set(0, 1, 0);
+      plateCamera.position.set(0, 4, 6);
+      plateCamera.lookAt(0, 0, 0);
       plateCamera.updateMatrixWorld();
-      placard.resize(plateCamera, width, height, ahead.y);
+      placard.resize(plateCamera, width, height, 0);
       plateScene.add(plate);
-      renderer.setRenderTarget(target);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
-      renderer.render(imageScene, imageCamera);
+      if (lowQuality) renderer.render(scene, camera);
+      else {
+        renderer.getDrawingBufferSize(buffer);
+        const ratio = Math.min(1, 1600 / Math.max(buffer.x, buffer.y));
+        const targetWidth = Math.max(1, Math.round(buffer.x * ratio));
+        const targetHeight = Math.max(1, Math.round(buffer.y * ratio));
+        target.setSize(targetWidth, targetHeight);
+        pixel.set(1 / targetWidth, 1 / targetHeight);
+        renderer.setRenderTarget(target);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        renderer.render(imageScene, imageCamera);
+      }
 
       // The etched code stays pixel-sharp, even when the track is out of focus.
-      plateKey.position.set(-2, 5, 3).applyMatrix4(camera.matrixWorld);
+      plateKey.position.set(-2, 5, 3).applyMatrix4(plateCamera.matrixWorld);
       plateKey.target.position.copy(plate.position);
       plateKey.target.updateMatrixWorld();
       renderer.autoClear = false;

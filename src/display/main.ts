@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { COURSE_OPTIONS, type CarView, type CourseId, type RaceSnapshot } from '../shared/protocol';
-import { DIQUE, TALLER, type Course } from '../shared/courses';
+import { DIQUE, SPACEPORT, TALLER, type Course } from '../shared/courses';
 import type { TrackPoint } from '../shared/track';
 import { raceAudio } from './audio';
 import { instanceStatic, mergeStatic } from './batches';
 import { buildCars } from './cars';
+import { lobbyCameraTour } from './camera-tour';
 import { buildCircuit } from './circuit';
 import { buildCollectorBackdrop, disposeCollectorBackdrop } from './collector-backdrop';
 import { buildCompactScenery } from './compact-scenery';
@@ -62,7 +63,7 @@ function atEdge(p: TrackPoint, offset: number, y: number) {
 }
 
 function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
-  const dique = course.id === 'dique';
+  const dique = course.id !== 'taller';
   const samples = dique ? course.samples.filter((_, i) => i % 4 === 0) : course.samples;
   const deck = samples.flatMap(p => [-1, 1].map(side =>
     atEdge(p, side * (course.wallHalfAt(p.s, side) + 1.4), BENCH_SURFACE)));
@@ -73,8 +74,10 @@ function cameraFit(camera: THREE.PerspectiveCamera, course: Course) {
   const target = new THREE.Vector3(-1.1, 0.11, -0.6);
   if (dique) {
     new THREE.Box3().setFromPoints(deck).getCenter(target);
-    target.z += 17.4;
+    target.z += course.id === 'dique' ? 17.4 : 0;
+    if (course.id === 'spaceport') target.y = 7;
   }
+  if (course.id === 'spaceport') fence.push(new THREE.Vector3(target.x, 62, target.z));
   const eyeDirection = (dique ? new THREE.Vector3(0, 0.788, 0.616) : new THREE.Vector3(-0.338, 0.779, 0.625)).normalize();
   const reservesPlacard = !dique || !pages;
   const point = new THREE.Vector3();
@@ -190,8 +193,12 @@ async function bootstrap() {
     camera => cameraFit(camera, next.course), { wall: next.backWall, build: () => displayWindow }, next.course);
   let renderViews = viewsFor(taller);
   const replay = new ReplayHistory(false);
-  const results = buildRaceResults(replay);
+  const cameraTour = lobbyCameraTour();
   let replayShot: ReturnType<typeof buildReplayShot> | undefined;
+  const results = buildRaceResults(replay, () => {
+    replayShot ??= buildReplayShot(renderer, stage.course);
+    return lowQuality ? Promise.resolve() : replayShot.prepare(scene);
+  });
   let replaying = false;
   let replayClip = -1;
   let night = false;
@@ -232,18 +239,20 @@ async function bootstrap() {
   });
 
   let desiredCourse: CourseId = 'taller';
-  let dique: Promise<CourseStage> | undefined;
-  let warmedDique = false;
+  const loadedCourses = new Map<CourseId, Promise<CourseStage>>();
+  const warmedCourses = new Set<CourseId>();
   let changingCourse = false;
-  async function loadDique(): Promise<CourseStage> {
-    const { buildDiqueScene } = await import('./dique-scene');
+  async function loadCourse(id: CourseId): Promise<CourseStage> {
+    const course = id === 'spaceport' ? SPACEPORT : DIQUE;
+    const build = id === 'spaceport' ? (await import('./spaceport-scene')).buildSpaceportScene
+      : (await import('./dique-scene')).buildDiqueScene;
     await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
     const root = new THREE.Group();
-    const diorama = await buildDiqueScene(root, DIQUE, wood, !pages);
+    const diorama = await build(root, course, wood, !pages);
     return {
-      ...diorama, root, course: DIQUE,
-      barriers: buildSafetyBarriers(root, DIQUE), tyreMarks: buildTyreMarks(root, DIQUE),
-      signs: buildRaceSigns(root, DIQUE),
+      ...diorama, root, course,
+      barriers: buildSafetyBarriers(root, course), tyreMarks: buildTyreMarks(root, course),
+      signs: buildRaceSigns(root, course),
     };
   }
 
@@ -253,7 +262,7 @@ async function bootstrap() {
     stage = next;
     scene.add(stage.root);
     // The Dique floodlights have baked pools for the overview and direct beams for closer views.
-    if (stage.course.id === 'dique') camera.layers.disable(sceneryLights);
+    if (stage.course.id !== 'taller') camera.layers.disable(sceneryLights);
     else camera.layers.enable(sceneryLights);
     canvas.setAttribute('aria-label', `Micro GP · ${COURSE_OPTIONS[stage.course.id].label}`);
     preview = exhibition(stage.course);
@@ -287,11 +296,12 @@ async function bootstrap() {
     }
     changingCourse = true;
     splash.dataset.stage = 'loading';
-    const request = dique ??= loadDique();
+    let request = loadedCourses.get(course);
+    if (!request) { request = loadCourse(course); loadedCourses.set(course, request); }
     void request.then(async next => {
       if (desiredCourse !== course) return;
       if (next !== stage) activateCourse(next);
-      if (!warmedDique && !lowQuality && !lostContext) {
+      if (!warmedCourses.has(course) && !lowQuality && !lostContext) {
         await renderer.compileAsync(scene, camera);
         if (desiredCourse !== course || lostContext) return;
         renderer.render(scene, camera);
@@ -302,13 +312,15 @@ async function bootstrap() {
           if (desiredCourse !== course || lostContext) return;
           renderer.render(scene, compactCamera);
         }
-        warmedDique = true;
+        warmedCourses.add(course);
       }
       changingCourse = false;
     }).catch(error => {
-      console.error('No se pudo cargar el Gran Premio del Dique.', error);
-      dique = undefined;
+      console.error(`No se pudo cargar ${COURSE_OPTIONS[course].label}.`, error);
+      loadedCourses.delete(course);
+      if (desiredCourse !== course) return;
       desiredCourse = 'taller';
+      if (stage !== taller) activateCourse(taller);
       changingCourse = false;
     });
   }
@@ -393,7 +405,10 @@ async function bootstrap() {
     displayWindow = buildCollectorBackdrop(renderer);
     resize();
     lostContext = false;
-    warmedDique = false;
+    warmedCourses.clear();
+    replay.stop();
+    replayShot?.dispose();
+    replayShot = undefined;
     changingCourse = false;
     if (stage.course.id !== desiredCourse) {
       const pending = desiredCourse;
@@ -414,10 +429,11 @@ async function bootstrap() {
     solo?.advance(dt, now);
     const course = stage.course;
     stage.update(now);
-    const mode = controls.mode;
+    const mode = cameraTour(now, current.phase, controls.mode, controls.selection, course.id);
+    controls.showMode(mode);
     const split = controls.split && ownedSlots.length > 1;
     const matchingCourse = (current.config?.course ?? 'taller') === course.id;
-    const moment = matchingCourse ? replay.sample(now) : null;
+    const moment = matchingCourse ? replay.sample(now, 100) : null;
     const nextFourPanes = split && ownedSlots.length > 2 && !moment;
     if (fourPanes !== nextFourPanes) {
       fourPanes = nextFourPanes;

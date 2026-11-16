@@ -121,7 +121,8 @@ function raceBoard(parent: THREE.Object3D, course: Course) {
     context.strokeRect(8, 8, 1008, 349);
     context.fillStyle = '#d5b390';
     context.font = 'bold 31px ui-monospace, monospace';
-    context.fillText(course.id === 'dique' ? 'GRAN PREMIO DEL DIQUE' : 'TALLER 07   /   MESA DE CARRERA', 32, 57);
+    context.fillText(course.id === 'spaceport' ? 'SPACEX   /   CENTRO DE PRUEBAS'
+      : course.id === 'dique' ? 'GRAN PREMIO DEL DIQUE' : 'TALLER 07   /   MESA DE CARRERA', 32, 57);
     context.strokeStyle = '#6f5946';
     context.beginPath();
     context.moveTo(32, 78);
@@ -265,7 +266,7 @@ export function buildRaceSigns(parent: THREE.Object3D, course: Course = TALLER) 
 }
 
 export function overviewPlacardLimit(course: Course) {
-  return course.id === 'dique' ? 124 : 210;
+  return course.id !== 'taller' ? 124 : 210;
 }
 
 export function placardLayout(width: number, height: number, maxSize = 210) {

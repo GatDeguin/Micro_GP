@@ -17,11 +17,11 @@ function loadGarage() {
   try { saved = JSON.parse(localStorage.getItem(soloSaveKey) ?? 'null'); } catch { /* Use defaults. */ }
   const slot = CAR_SPECS.findIndex((_, index) => index === saved?.slot);
   const config = normalizeRaceConfig(saved?.config);
-  const lapsByCourse = {
-    taller: normalizeRaceConfig({ course: 'taller', laps: saved?.lapsByCourse?.taller }).laps,
-    dique: normalizeRaceConfig({ course: 'dique', laps: saved?.lapsByCourse?.dique }).laps,
-    [config.course]: config.laps,
-  };
+  const lapsByCourse = Object.fromEntries(Object.keys(COURSE_OPTIONS).map(id => {
+    const course = id as CourseId;
+    return [course, normalizeRaceConfig({ course, laps: saved?.lapsByCourse?.[course] }).laps];
+  })) as Record<CourseId, number>;
+  lapsByCourse[config.course] = config.laps;
   const progress = CAR_SPECS.map((_, index) => normalizeLiveryProgress(saved?.progress?.[index]));
   const liveries = progress.map((record, index): Livery => {
     const savedLivery = saved?.liveries?.[index];
@@ -166,7 +166,7 @@ export function startSolo(
     const selected = course.value;
     const previous = garage.config.course;
     if (previous === selected) return;
-    const config = { ...garage.config, course: selected, laps: garage.lapsByCourse[selected] };
+    const config = normalizeRaceConfig({ ...garage.config, course: selected, laps: garage.lapsByCourse[selected] });
     if (!race.configure(config)) return;
     const editedLaps = laps.valueAsNumber;
     if (Number.isInteger(editedLaps) && editedLaps >= 1 && editedLaps <= 12) garage.lapsByCourse[previous] = editedLaps;

@@ -48,18 +48,21 @@ export class ReplayHistory {
   private outside = new Set<number>();
   private index = 0;
   private starts = Infinity;
+  private sampledAt: number | undefined;
   private automatic: boolean;
 
   constructor(automatic = true) { this.automatic = automatic; }
 
   get available() { return this.previous?.phase === 'results' && this.moments.some(moment => moment.frames.length >= 2); }
   get count() { return this.moments.filter(moment => moment.frames.length >= 2).length; }
+  get playing() { return this.previous?.phase === 'results' && this.index < this.playlist.length; }
 
   startSummary(now: number) {
     if (!this.available) return false;
     this.playlist = this.moments.filter(moment => moment.frames.length >= 2);
     this.index = 0;
     this.starts = now;
+    this.sampledAt = now;
     return true;
   }
 
@@ -67,6 +70,7 @@ export class ReplayHistory {
     this.playlist = [];
     this.index = 0;
     this.starts = Infinity;
+    this.sampledAt = undefined;
   }
 
   add(state: RaceSnapshot, now: number) {
@@ -125,7 +129,12 @@ export class ReplayHistory {
     }
   }
 
-  sample(now: number) {
+  sample(now: number, maxFrameMs = Infinity) {
+    if (this.playing && this.sampledAt !== undefined && now >= this.starts) {
+      // Shader preparation, a suspended tab or a long frame must not skip unseen footage.
+      this.starts += Math.max(0, now - Math.max(this.sampledAt, this.starts) - maxFrameMs);
+    }
+    this.sampledAt = now;
     if (this.previous?.phase !== 'results' || now < this.starts) return null;
     for (; this.index < this.playlist.length; this.index++) {
       const { frames, slot, kind, rival } = this.playlist[this.index];

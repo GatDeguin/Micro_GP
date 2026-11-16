@@ -6,6 +6,8 @@ import { DIQUE_GROUND, diqueEdge, diqueRoadClear } from './dique-geometry';
 import { freightLane } from './dique-terminal-layout';
 import { standard } from './materials';
 import { marshalSignal, nearestCar } from './world-cues';
+import { createDiqueWorkCycle, sampleDiqueWork } from './dique-work-cycle';
+import type { DiqueWorkstation } from './dique-workstations';
 
 type Point = readonly [number, number, number];
 type Role = 'mechanic' | 'marshal' | 'gate' | 'dock' | 'clerk' | 'rigger' | 'mooring' | 'dispatcher';
@@ -25,6 +27,7 @@ interface Worker {
   look?: { x: number; z: number };
   cautionUntil: number;
   signal: Signal;
+  task?: DiqueWorkstation;
 }
 
 function batch(parent: THREE.Group, name: string, geometry: THREE.BufferGeometry, material: THREE.Material, capacity: number) {
@@ -76,7 +79,7 @@ function contactMap() {
   return map;
 }
 
-export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
+export function buildDiqueWorkers(parent: THREE.Group, course: Course, stations: readonly DiqueWorkstation[] = []) {
   const group = new THREE.Group();
   group.name = 'Personal de operación y comisarios del Dique';
   parent.add(group);
@@ -91,8 +94,10 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
       const point = from.clone().lerp(to, i / steps);
       if (!diqueRoadClear(course, point.x, point.z, clearance)) return;
     }
-    workers.push({ role, from, to, position: from.clone(), distance, facing, yaw: facing,
-      phase: workers.length * 1.31, colors, cue, cautionUntil: 0, signal: 'idle' });
+    const worker: Worker = { role, from, to, position: from.clone(), distance, facing, yaw: facing,
+      phase: workers.length * 1.31, colors, cue, cautionUntil: 0, signal: 'idle' };
+    workers.push(worker);
+    return worker;
   }
 
   function plan(x: number, z: number, y = DIQUE_GROUND) {
@@ -112,10 +117,15 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
     };
     add(role, point(from), point(to), facing + site.yaw, colors);
   }
-  for (const [i, stall] of [course.pit.stalls[0], course.pit.stalls[2]].entries()) {
+  for (const [i, stall] of (stations.length ? [] : [course.pit.stalls[0], course.pit.stalls[2]]).entries()) {
     const point = course.sampleAt(stall + (i ? -0.95 : 0.72));
     const from = diqueEdge(course, point, course.pit.stationOffset - 1.49, -0.026);
     add('mechanic', from, from, i ? 0.56 : -0.48, mechanic);
+  }
+  for (const task of stations) {
+    const worker = add('mechanic', task.position, task.position, task.yaw,
+      task.kind === 'weld' || task.kind === 'cargo' ? workwear : mechanic);
+    if (worker) worker.task = task;
   }
   const gateAnchor = course.sampleAt(88.9);
   const gate = diqueEdge(course, gateAnchor, -9.66);
@@ -183,13 +193,17 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   accents.emissive.setHex(0x665034);
   accents.emissiveIntensity = 0.08;
   const people = workers.length;
-  const box = batch(group, 'Uniformes, equipo y pasarela', new THREE.BoxGeometry(1, 1, 1), coated, people * 14 + 20);
-  const joint = batch(group, 'Mangas y pantalones', new THREE.CapsuleGeometry(0.5, 0.01, 2, 6), coated, people * 8);
-  const round = batch(group, 'Caras y guantes', new THREE.SphereGeometry(0.5, 8, 5), coated, people * 4);
+  const hoseSegments = workers.reduce((count, worker) => count +
+    (worker.task?.kind === 'wheel' || worker.task?.kind === 'weld' ? 2 : 0), 0);
+  const box = batch(group, 'Uniformes, equipo y pasarela', new THREE.BoxGeometry(1, 1, 1), coated, people * 14 + 100);
+  const joint = batch(group, 'Mangas y pantalones', new THREE.CapsuleGeometry(0.5, 0.01, 2, 6), coated, people * 8 + hoseSegments);
+  const round = batch(group, 'Caras y guantes', new THREE.SphereGeometry(0.5, 8, 5), coated, people * 4 + 16);
   const chest = batch(group, 'Torsos de los operarios', new THREE.CylinderGeometry(0.5, 0.39, 1, 7), coated, people);
   const brim = batch(group, 'Viseras de protección', new THREE.CylinderGeometry(0.5, 0.5, 1, 9), coated, people * 2);
   const helmet = batch(group, 'Cascos', new THREE.SphereGeometry(0.5, 9, 5, 0, 2 * Math.PI, 0, Math.PI / 2), coated, people);
-  const detailBox = batch(group, 'Cintas reflectantes y detalle del uniforme', new THREE.BoxGeometry(1, 1, 1), accents, people * 6);
+  const detailBox = batch(group, 'Cintas reflectantes y detalle del uniforme', new THREE.BoxGeometry(1, 1, 1), accents, people * 6 + 20);
+  const hotMetal = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const sparks = batch(group, 'Soldadura y virutas calientes', new THREE.SphereGeometry(.5, 5, 3), hotMetal, 12);
   const flagPlane = new THREE.PlaneGeometry(1, 1);
   const flag = batch(group, 'Banderas de pista', flagPlane, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), 6);
   const checker = batch(group, 'Bandera a cuadros', flagPlane, new THREE.MeshBasicMaterial({
@@ -198,7 +212,8 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   const shadows = batch(group, 'Contacto de los operarios', new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ map: contactMap(), transparent: true, opacity: 0.72, depthWrite: false, polygonOffset: true,
       polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), people);
-  const batches = [box, joint, round, chest, brim, helmet, detailBox, flag, checker, shadows];
+  const batches = [box, joint, round, chest, brim, helmet, detailBox, flag, checker, shadows, sparks];
+  const taskCycle = createDiqueWorkCycle();
   const root = new THREE.Object3D();
   const part = new THREE.Object3D();
   const matrix = new THREE.Matrix4();
@@ -269,7 +284,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
   }
 
   function pose(worker: Worker, now: number, dt: number) {
-    const { role, signal, colors: [uniform, vest, cap, skin] } = worker;
+    const { role, signal, task, colors: [uniform, vest, cap, skin] } = worker;
     const clock = now + worker.phase;
     let stride = 0;
     let lift = 0;
@@ -296,7 +311,9 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
     const turn = Math.atan2(Math.sin(heading - worker.yaw), Math.cos(heading - worker.yaw));
     worker.yaw += turn * (1 - Math.exp(-dt * 8));
     at(worker.position, worker.yaw);
-    const tinkering = role === 'mechanic' ? THREE.MathUtils.smoothstep(Math.sin(clock * 0.88), -0.55, 0.55) : 0;
+    if (task) sampleDiqueWork(now, task.phase, taskCycle);
+    const tinkering = task ? taskCycle.engage * .27 : role === 'mechanic'
+      ? THREE.MathUtils.smoothstep(Math.sin(clock * 0.88), -0.55, 0.55) : 0;
     const settle = Math.sin(clock * 2.05) * 0.009 + Math.abs(lift) * 0.018 - tinkering * 0.23;
     const lean = tinkering * 0.14;
     const flagsUp = role === 'marshal' && (signal === 'red' || signal === 'yellow' || signal === 'checkered' || worker.look);
@@ -326,7 +343,25 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
       const shoulder: Point = [side * 0.206, 1.071 + settle, lean];
       let elbow: Point = [side * 0.25, 0.873 + settle, lean + side * stride * -0.075];
       let hand: Point = [side * 0.243, 0.704 + settle, lean + side * stride * -0.155 + 0.025];
-      if (role === 'dock' || role === 'clerk' || role === 'dispatcher') {
+      if (task) {
+        const [tx, ty, tz] = task.contact;
+        const reach = task.kind === 'wheel' ? taskCycle.wheelGrip : taskCycle.engage;
+        // Both hands reach a machine-defined contact; the torso never drives the tool tip.
+        const right = side > 0;
+        const stroke = taskCycle.stroke;
+        const grip: Point = right
+          ? task.kind === 'engine' ? [tx + .10 * Math.sin(stroke * .34), ty + .055, tz - .20 * Math.cos(stroke * .34)]
+            : task.kind === 'wheel' ? [tx, ty + .02, tz - .12]
+              : task.kind === 'weld' ? [tx + .07, ty + .10, tz - .18]
+                : [tx + stroke * .055, ty + .045, tz - .055]
+          : task.kind === 'engine' ? [tx - .23, ty - .10, tz - .07]
+            : task.kind === 'wheel' ? [tx - .28, ty + .18, tz + .02]
+              : task.kind === 'weld' ? [tx - .12, ty + .05, tz - .07]
+                : [tx - .26, ty - .01, tz + .04];
+        hand = [hand[0] + (grip[0] - hand[0]) * reach,
+          hand[1] + (grip[1] - hand[1]) * reach, hand[2] + (grip[2] - hand[2]) * reach];
+        elbow = [side * .29, .87 + settle + (hand[1] - .8) * .32, .13 + hand[2] * .25];
+      } else if (role === 'dock' || role === 'clerk' || role === 'dispatcher') {
         elbow = [side * 0.225, 0.845 + settle, 0.113];
         const writing = role === 'dispatcher' && truckInspection && side > 0 ? Math.sin(clock * 5.2) * 0.034 : 0;
         hand = [side * (role === 'dock' ? 0.199 : 0.133) + writing, 0.815 + settle, 0.287];
@@ -355,7 +390,47 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course) {
       shape(detailBox, [side * 0.05, 1.28 + settle, headZ + 0.107], [0.023, 0.014, 0.011], 0x3d2f2a);
     }
 
-    if (role === 'dock') {
+    if (task) {
+      const [x, y, z] = rightHand;
+      const [tx, ty, tz] = task.contact;
+      const reach = task.kind === 'wheel' ? taskCycle.wheelGrip : taskCycle.engage;
+      // The business end stays on the bolt, spindle, seam or parcel throughout work.
+      const tip: Point = [x + (tx - x) * reach, y - .03 + (ty - y + .03) * reach,
+        z + .13 + (tz - z - .13) * reach];
+      if (task.kind === 'engine') {
+        limb(box, rightHand, tip, .028, 0xa8aea5);
+        shape(brim, [tip[0], tip[1] + .025, tip[2]], [.071, .071, .071], 0xc5c5b7);
+        shape(box, [x, y, z], [.064, .045, .10], 0x34454b, 0, taskCycle.stroke * .34);
+      } else if (task.kind === 'wheel') {
+        shape(box, [x, y - .045, z], [.087, .13, .066], 0x315c69, -.2);
+        limb(box, rightHand, tip, .052, 0x9b9e96);
+        // Reusable pneumatic hose moves with the hand and terminates at the machine.
+        limb(joint, [x, y - .12, z], [.30, .21, .30], .028, 0x323936);
+        limb(joint, [.30, .21, .30], [.54, .17, .69], .028, 0x323936);
+      } else if (task.kind === 'weld') {
+        shape(box, [0, 1.255 + settle, headZ + .144], [.284, .26, .078], 0x354644, -.12);
+        shape(box, [0, 1.295 + settle, headZ + .189], [.152, .065, .016], 0x607d6b, -.12);
+        limb(box, rightHand, tip, .042, 0x626f6d);
+        shape(box, rightHand, [.09, .077, .14], 0x343c39, -.25);
+        limb(joint, [x + .03, y - .025, z - .07], [.44, .15, .23], .026, 0x2d3533);
+        limb(joint, [.44, .15, .23], [.72, .10, .67], .026, 0x2d3533);
+        if (taskCycle.arc > .10) {
+          const glow = .038 + .025 * taskCycle.arc;
+          shape(sparks, tip, [glow, glow, glow], 0xa5d9e0);
+          if (detail) for (let i = 0; i < 7; i++) {
+            const age = (now * 2.3 + i * .137) % 1;
+            const angle = i * 2.399;
+            shape(sparks, [tx + Math.cos(angle) * age * .26,
+              ty + .12 * Math.sin(age * Math.PI) - age * age * .28,
+              tz + Math.sin(angle) * age * .19], [.011, .017 + .019 * (1 - age), .011], 0xffbc62);
+          }
+        }
+      } else {
+        shape(box, [x, y + .018, z + .021], [.10, .084, .16], 0x9f6036, 0, taskCycle.stroke * .08);
+        shape(brim, [x + .045, y + .074, z], [.10, .035, .10], 0xc3a773, 0, 0, Math.PI / 2);
+        limb(box, [x, y - .015, z + .055], tip, .019, 0xb5b5a7);
+      }
+    } else if (role === 'dock') {
       shape(box, [0, 0.844 + settle, 0.31], [0.352, 0.185, 0.246], 0x6c523c);
       for (const x of [-0.11, 0.11]) {
         shape(box, [x, 0.85 + settle, 0.438], [0.021, 0.175, 0.014], 0xb09370);
