@@ -18,13 +18,13 @@ test('forklift raises before travelling and transfers a supported pallet without
     assert.ok(pose.z >= -194.701 && pose.z <= -185.199, 'stays in the warehouse apron');
     assert.ok(Math.abs(pose.z - previous.z) < .07, 'continuous speed through every stage boundary');
     assert.ok(Math.abs(pose.palletBase - previous.palletBase) < .025, 'cargo never changes support abruptly');
-    assert.ok(pose.palletBase >= .019 && pose.palletBase <= 1.051);
+    assert.ok(pose.palletBase >= -.046 && pose.palletBase <= 1.051);
     const travelling = Math.abs(pose.z - previous.z) > .001;
     if (travelling) assert.ok(pose.palletBase > 1.04, 'pallet clears the 0.8 m loading platform');
     assert.ok(Math.abs(pose.fork - .14 - pose.palletBase) < .001, 'fork carriage remains under the pallet');
     previous = pose;
   }
-  assert.equal(spaceportForkliftPose(20).palletBase.toFixed(2), '0.02', 'delivery rests on the apron');
+  assert.ok(Math.abs(spaceportForkliftPose(20).palletBase - (-.046)) < .002, 'delivery touches the actual parking slab, not the nominal ground zero');
   assert.equal(spaceportForkliftPose(42).palletBase.toFixed(2), '0.80', 'return rests on the dock');
   assert.deepEqual(spaceportForkliftPose(0), spaceportForkliftPose(44));
 });

@@ -15,10 +15,10 @@ export interface SpaceportActivityOptions {
 export function spaceportForkliftPose(seconds: number) {
   const t = THREE.MathUtils.euclideanModulo(seconds, 44);
   const outbound = smooth(t, 3, 14), inbound = smooth(t, 26, 37);
-  const fork = .94 + .25 * smooth(t, 0, 3) - 1.03 * smooth(t, 14, 18)
-    + 1.03 * smooth(t, 22, 26) - .25 * smooth(t, 37, 41);
+  const fork = .94 + .25 * smooth(t, 0, 3) - 1.095 * smooth(t, 14, 18)
+    + 1.095 * smooth(t, 22, 26) - .25 * smooth(t, 37, 41);
   return { z: -194.7 + 9.5 * (outbound - inbound), fork,
-    palletBase: Math.max(t < 3 || t > 37 ? .8 : .02, fork - .14) };
+    palletBase: Math.max(t < 3 || t > 37 ? .8 : -.045, fork - .14) };
 }
 
 /** Six small, related systems, fourteen draws; no lights or extra render passes. */
