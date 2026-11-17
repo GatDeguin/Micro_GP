@@ -212,6 +212,9 @@ export function buildEngineSamples<T extends MonoBuffer>(context: BufferWriter<T
 
 export function buildAudioSamples<T extends MonoBuffer>(context: BufferWriter<T>) {
   return {
+    rocket: loop(context, 4, 95471, .72, [
+      [28, 160, .95, 7, .24], [155, 680, .61, 19, .30], [650, 3800, .27, 47, .32],
+    ], samples => grains(samples, 443, 115, .10, 730, .022, .33)),
     asphalt: loop(context, 2.25, 1417, 0.51, [
       [170, 670, 0.49, 3, 0.16], [720, 2650, 0.63, 5, 0.10], [2870, 6500, 0.18, 13, 0.11],
     ]),

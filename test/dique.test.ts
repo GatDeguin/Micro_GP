@@ -288,7 +288,7 @@ test('the fourth pit stall connects to the dock straight without losing pit spee
   assert.ok(enteredTrack);
 });
 
-const racePaces = [['rookie', 122, 139], ['club', 105, 120], ['pro', 100, 115]] as const;
+const racePaces = [['rookie', 95, 110], ['club', 80, 94], ['pro', 74, 87]] as const;
 for (const [difficulty, fastest, slowest] of racePaces) {
   test(`four ${difficulty} Dique drivers finish through both mandatory bypasses and both decks`, () => {
     const race = new Race({ manual: true });

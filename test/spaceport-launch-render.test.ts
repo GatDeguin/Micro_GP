@@ -6,7 +6,7 @@ import type { RaceSnapshot } from '../src/shared/protocol.ts';
 import { buildSpaceportLaunch } from '../src/display/spaceport-launch.ts';
 import { buildSpaceportIllumination } from '../src/display/spaceport-illumination.ts';
 
-test('prelaunch reuses bounded particle buffers, leaves the pad grounded and works at both detail levels', () => {
+test('liftoff reuses bounded buffers, follows altitude, clears and rearms at both detail levels', () => {
   const root = new THREE.Group(), rocket = new THREE.Group(), arms = [new THREE.Group(), new THREE.Group()];
   rocket.position.set(26, 0, -184); root.add(rocket, ...arms);
   const launch = buildSpaceportLaunch(root, rocket, arms);
@@ -17,9 +17,13 @@ test('prelaunch reuses bounded particle buffers, leaves the pad grounded and wor
   root.traverse(object => { if (object instanceof THREE.InstancedMesh) meshes.push(object); if (object instanceof THREE.Light) lights.push(object); });
   assert.equal(lights.length, 1); assert.equal(lights[0].castShadow, false);
   const attributes = meshes.map(mesh => mesh.instanceMatrix);
+  let highest = 0, vanished = false, returned = false;
   for (let i = 0; i < 900; i++) {
     launch.setNight(i > 450); launch.setDetail(i % 200 < 100); launch.update(i * 1000 / 60);
-    assert.equal(rocket.position.y, 0, 'preflight must never lift the vehicle');
+    highest = Math.max(highest, rocket.position.y);
+    if (!rocket.visible) vanished = true;
+    if (vanished && rocket.visible && rocket.position.y === 0) returned = true;
+    assert.equal(rocket.position.y, launch.state.altitude);
     assert.ok(Math.abs(rocket.position.x - 26) < .019);
     for (const [index, mesh] of meshes.entries()) {
       assert.equal(mesh.instanceMatrix, attributes[index], 'no dynamic attribute allocation');
@@ -27,9 +31,11 @@ test('prelaunch reuses bounded particle buffers, leaves the pad grounded and wor
       assert.ok(mesh.instanceMatrix.array.every(Number.isFinite));
       const alpha = mesh.geometry.getAttribute('instanceAlpha');
       if (alpha) assert.ok(Array.from(alpha.array).every(value => Number.isFinite(value) && value >= 0 && value <= 1));
+      if (mesh.name === 'Seis chorros de escape') assert.ok(mesh.boundingSphere!.containsPoint(new THREE.Vector3(26, launch.state.altitude, -184)));
     }
   }
-  assert.ok(arms[0].rotation.y > .28 && arms[1].rotation.y < -.25);
+  assert.ok(highest > 400 && vanished && returned);
+  assert.equal(rocket.position.y, 0); assert.equal(arms[0].rotation.y, 0); assert.equal(launch.state.phase, 'ready');
   launch.observe({ ...snapshot, heat: 2, phase: 'grid' }); launch.update(15001);
   assert.equal(rocket.position.x, 26); assert.equal(rocket.rotation.z, 0); assert.equal(lights[0].intensity, 0);
 });

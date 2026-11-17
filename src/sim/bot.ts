@@ -4,14 +4,15 @@ import type { Course } from '../shared/courses.ts';
 import type { TrackLocation } from '../shared/track.ts';
 import { arcDelta } from './progress.ts';
 import { courseHeading, loopAt } from './loop-road.ts';
+import { BASE_TOP_SPEED, STRAIGHT_SPEED_GAIN } from './handling.ts';
 
 const pace = [7.92, 7.86, 8.08, 7.96];
 const cornering = [1, 1.015, 0.93, 1.10];
 const previewStep = 1.8;
 const behavior = {
-  rookie: { pace: 0.86, diquePace: 1.11, spaceportPace: 1.22, reaction: 0.30, precision: 1.66, prediction: 0.33, room: 0.17, lateral: 10.3 },
-  club: { pace: 1.0, diquePace: 1.11, spaceportPace: 1.28, reaction: 0.16, precision: 1.85, prediction: 0.43, room: 0.10, lateral: 12.2 },
-  pro: { pace: 1.105, diquePace: 1.067, spaceportPace: 1.38, reaction: 0.085, precision: 2.07, prediction: 0.56, room: 0.06, lateral: 13.7 },
+  rookie: { pace: 0.86, diquePace: .64, spaceportPace: .80, reaction: 0.30, precision: 1.66, prediction: 0.33, room: 0.17, lateral: 10.3 },
+  club: { pace: 1.0, diquePace: .80, spaceportPace: 1, reaction: 0.16, precision: 1.85, prediction: 0.43, room: 0.10, lateral: 12.2 },
+  pro: { pace: 1.105, diquePace: .92, spaceportPace: 1.05, reaction: 0.085, precision: 2.07, prediction: 0.56, room: 0.06, lateral: 13.7 },
 } satisfies Record<Difficulty, Record<string, number>>;
 
 export function angleDifference(angle: number) {
@@ -164,13 +165,17 @@ export function botDrive(cars: readonly BotCar[], index: number, preferred: numb
   const sweptLimit = changingLane && target > following(current) ? Math.max(0.42, following(current)) : Infinity;
   const surface = course.surfaceAt(car.road.s, car.road.offset);
   const offRoadLimit = surface === 'grass' ? 4.6 : surface === 'gravel' ? 5.3 : Infinity;
-  const coursePace = course.id === 'spaceport' ? settings.spaceportPace : course.id === 'dique' ? settings.diquePace : 1;
-  const topPace = pace[index] * settings.pace * coursePace;
+  // Long circuits share the player's current engine/gearbox ceiling. The old
+  // workshop-era target left Club bots at 10 m/s while players reached 15–16.
+  const physicalTop = (BASE_TOP_SPEED + STRAIGHT_SPEED_GAIN) * pace[index] / 7.96;
+  const topPace = course.id === 'taller' ? pace[index] * settings.pace
+    : physicalTop * (course.id === 'spaceport' ? settings.spaceportPace : settings.diquePace);
   // Following a distant aim point at racing speed after a spin only widens the excursion.
   const alignment = Math.abs(angleDifference(car.yaw - heading));
   const recoveryLimit = alignment > 0.75 ? Math.max(2.2, 5.2 - alignment * 1.5) : Infinity;
   const desired = Math.min(
-    curvePace(car, coolingDown ? 4.7 : topPace, settings.lateral * cornering[index], course),
+    curvePace(car, coolingDown ? 4.7 : topPace,
+      settings.lateral * cornering[index] * (course.id === 'spaceport' && difficulty === 'pro' ? 1.20 : 1), course),
     Math.max(0, target), sweptLimit, offRoadLimit, recoveryLimit,
   );
   const brakingMargin = desired < 1.4 ? 0.045 : 0.35;

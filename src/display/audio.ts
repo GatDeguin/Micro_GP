@@ -9,6 +9,8 @@ import type { prepareAudioBank } from './audio-samples';
 import type { PCMBank, PCMClip } from './audio-worker';
 import { defaultAudioSettings, type AudioSettings } from './settings';
 import { coverClearance } from './track-cover';
+import { createRocketVoice } from './rocket-audio';
+import { LAUNCH_SITE, type RocketLaunchState } from './spaceport-launch-state';
 
 type View = 'general' | 'chase' | 'trackside' | 'broadcast' | 'replay';
 
@@ -20,6 +22,7 @@ interface RaceMix {
   focus: number;
   tick: number;
   dt: number;
+  launch?: Readonly<RocketLaunchState>;
 }
 
 const limit = (value: number, low = 0, high = 1) => Math.max(low, Math.min(high, value));
@@ -202,6 +205,7 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
   const effects = context.createGain();
   effects.gain.value = initial.effects;
   effects.connect(master);
+  const rocket = createRocketVoice(context, samples.rocket, effects);
 
   const voices = engines.map((clips, slot) => carVoice(context, master, samples, clips, slot));
   const arcadeClips = {
@@ -275,7 +279,7 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
     source.start();
   }
 
-  function update({ state, cars, camera, view, focus, tick, dt }: RaceMix) {
+  function update({ state, cars, camera, view, focus, tick, dt, launch }: RaceMix) {
     if (context.state !== 'running' || muted) return;
     const course = getCourse(state.config?.course);
     const { pit: pitSource, crowd: grandstand, river: riverSource, pond: pondSource } = ambience[course.id];
@@ -339,6 +343,11 @@ function createMixer(context: AudioContext, initial: AudioSettings, { effects: s
     if (setMix) nextMix = now + 0.028;
     const target = (parameter: AudioParam, value: number, response = 0.075) =>
       parameter.setTargetAtTime(value, now, response);
+    if (setMix) {
+      locate(camera, LAUNCH_SITE.x, (launch?.altitude ?? 0) + 3, LAUNCH_SITE.z, wide);
+      rocket.update(launch, distance, pan, course.id === 'spaceport' && !replay
+        && ['race', 'practice', 'demo'].includes(state.phase));
+    }
     let pace = 0;
     let crowdPass = 0;
     for (let slot = 0; slot < cars.length; slot++) {

@@ -35,6 +35,7 @@ import { buildWorldActivity } from './world-activity';
 
 type DisplayMessage = { type: 'hello'; url: string } | { type: 'state'; state: RaceSnapshot };
 type CourseStage = {
+  launchState?: Readonly<import('./spaceport-launch-state').RocketLaunchState>;
   root: THREE.Group;
   course: Course;
   backWall: THREE.Object3D;
@@ -305,6 +306,8 @@ async function bootstrap() {
         await renderer.compileAsync(scene, camera);
         if (desiredCourse !== course || lostContext) return;
         renderer.render(scene, camera);
+        await warmCloseView(next);
+        if (desiredCourse !== course || lostContext) return;
         if (!pages) {
           const compactCamera = camera.clone();
           cameraLights(compactCamera, true, 0);
@@ -323,6 +326,25 @@ async function bootstrap() {
       if (stage !== taller) activateCourse(taller);
       changingCourse = false;
     });
+  }
+
+  async function warmCloseView(expected: CourseStage) {
+    // Overview excludes the harbor's direct lights and the detailed car glass.
+    // Compile that distinct shader set behind the loading logo, before the
+    // first chase camera can incur a synchronous driver compilation mid-race.
+    const closeCamera = camera.clone(); cameraLights(closeCamera, false);
+    const background = scene.background;
+    for (const car of cars) car.setDetail(true);
+    if (expected.course.id !== 'spaceport') scene.background = displayWindow;
+    try {
+      await renderer.compileAsync(scene, closeCamera);
+      if (stage === expected && !lostContext) renderer.render(scene, closeCamera);
+    } finally {
+      if (stage === expected) {
+        scene.background = background;
+        for (const car of cars) car.setDetail(false);
+      }
+    }
   }
 
   const lobby = pages ? undefined : buildMultiplayerLobby(selectCourse);
@@ -569,6 +591,7 @@ async function bootstrap() {
     }
     if (splash.dataset.stage === 'loading') splash.dataset.stage = 'ready';
     audio.update({
+      launch: stage.launchState,
       state: moment?.from ?? display,
       cars: interpolated,
       camera: listener,
@@ -582,6 +605,7 @@ async function bootstrap() {
     await renderer.compileAsync(scene, camera);
     // Draw once behind the loading screen so the GPU uploads the visible meshes and textures before play.
     if (!lostContext) renderer.render(scene, camera);
+    await warmCloseView(stage);
     if (!pages) {
       const compactCamera = camera.clone();
       cameraLights(compactCamera, true, 0);

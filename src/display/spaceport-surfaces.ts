@@ -24,9 +24,11 @@ function maps(kind: Surface) {
     const grain = hash(x, y), broad = noise(u, v, 5) * .65 + noise(u, v, 13) * .35 - .5;
     const pore = Math.max(0, .12 - grain) / .12;
     let c = 242, h = .5, r = .8, warm = 0;
-    if (kind === 'concrete') { c = 229 + grain * 18 + broad * 7 - pore * 22; h = .50 + (grain - .5) * .18 - pore * .20; r = .84 + grain * .12; }
-    if (kind === 'plaster') { c = 244 + (grain - .5) * 10 + broad * 3; h = .5 + (grain - .5) * .12; r = .84 + grain * .08; }
-    if (kind === 'paint') { c = 246 + (grain - .5) * 7 + broad * 2; h = .5 + (grain - .5) * .05; r = .40 + grain * .13; }
+    const stain = Math.max(0, noise(u, v, 7) - .55) * 2.2;
+    const scratch = Math.max(0, noise(u * 2, v * .25, 29) - .72) * 3;
+    if (kind === 'concrete') { c = 229 + grain * 18 + broad * 10 - pore * 22 - stain * 8; h = .50 + (grain - .5) * .18 - pore * .20; r = .80 + grain * .17 - stain * .08; warm = stain * 4; }
+    if (kind === 'plaster') { c = 239 + (grain - .5) * 12 + broad * 11 - stain * 15; h = .5 + (grain - .5) * .14; r = .78 + grain * .16; }
+    if (kind === 'paint') { c = 245 + (grain - .5) * 7 + broad * 8 - stain * 14 - scratch * 32; h = .5 + (grain - .5) * .05 - scratch * .06; r = .28 + grain * .15 + stain * .27 + scratch * .30; }
     if (kind === 'steel') { const scratch = hash(x, 0); c = 239 + scratch * 13 + (grain - .5) * 3; h = .5 + (scratch - .5) * .035; r = .24 + scratch * .24; }
     if (kind === 'wood') {
       const ring = Math.sin(u * Math.PI * 22 + Math.sin(v * Math.PI * 2) * .70 + Math.sin(v * Math.PI * 6) * .16);
@@ -54,7 +56,9 @@ export function createSpaceportSurfaces() {
     ...maps(kind), color: 0xffffff, vertexColors: true, roughness: 1, metalness, bumpScale,
   });
   const concrete = material('concrete', 0, .027), plaster = material('plaster', 0, .009);
-  const paint = material('paint', .12, .004), steel = material('steel', .82, .003);
+  const paint = new THREE.MeshPhysicalMaterial({ ...maps('paint'), color: 0xffffff, vertexColors: true,
+    metalness: .18, roughness: 1, bumpScale: .004, clearcoat: .28, clearcoatRoughness: .34 });
+  const steel = material('steel', .82, .003);
   const wood = material('wood', 0, .010), asphalt = material('asphalt', .02, .008);
   const rubber = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .96, metalness: 0 });
   const glass = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .17, metalness: .28, envMapIntensity: 1.6 });
@@ -81,10 +85,11 @@ export function spaceportEnvironment(renderer: THREE.WebGLRenderer) {
     const horizon = Math.exp(-Math.abs(dy) * 5), sky = Math.max(0, dy);
     const sunspot = Math.pow(Math.max(0, dx * sun.x + dy * sun.y + dz * sun.z), 180) * 3.4;
     const cloud = Math.max(0, Math.sin(phi * 3 + dy * 7)) * sky * .16;
+    const buildings = dy < .08 && dy > -.28 && (Math.sin(phi * 9) > .25) ? .18 : 0;
     const i = (y * width + x) * 4;
-    pixels[i] = (dy > 0 ? .42 + horizon * .18 + cloud : .13 + horizon * .14) + sunspot;
-    pixels[i + 1] = (dy > 0 ? .57 + horizon * .15 + cloud : .14 + horizon * .17) + sunspot * .91;
-    pixels[i + 2] = (dy > 0 ? .76 + horizon * .07 + cloud : .15 + horizon * .18) + sunspot * .72;
+    pixels[i] = Math.max(.04, (dy > 0 ? .42 + horizon * .18 + cloud : .13 + horizon * .14) + sunspot - buildings);
+    pixels[i + 1] = Math.max(.05, (dy > 0 ? .57 + horizon * .15 + cloud : .14 + horizon * .17) + sunspot * .91 - buildings);
+    pixels[i + 2] = Math.max(.06, (dy > 0 ? .76 + horizon * .07 + cloud : .15 + horizon * .18) + sunspot * .72 - buildings);
     pixels[i + 3] = 1;
   }
   const source = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat, THREE.FloatType);

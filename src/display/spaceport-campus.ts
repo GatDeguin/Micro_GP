@@ -442,6 +442,33 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
     vegetation.sphere(x, -.03, z, 3 + rng() * 5, .35 + rng() * .70, 4 + rng() * 7, 0xb5aa87);
     bush(x + 1.5, z, .5 + rng() * .6);
   }
+  // Small coastal vegetation and stone clusters break up the large bare plinth.
+  // Keep all dressing away from racing, service roads and occupied aprons.
+  const grass = new THREE.BufferGeometry();
+  grass.setAttribute('position', new THREE.Float32BufferAttribute([
+    -.24, 0, 0, .24, 0, 0, .10, 1, .04,
+    0, 0, -.22, 0, 0, .22, -.09, .83, .06,
+    -.16, 0, -.16, .16, 0, .16, .18, .72, -.10,
+  ], 3));
+  grass.computeVertexNormals();
+  const serviceClear = (x: number, z: number) => SPACEPORT_SERVICE_ROADS.every(road => road.points.every((b, i) => {
+    if (!i) return true; const a = road.points[i - 1], dx = b[0] - a[0], dz = b[1] - a[1];
+    const t = THREE.MathUtils.clamp(((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz), 0, 1);
+    return Math.hypot(x - a[0] - t * dx, z - a[1] - t * dz) > road.width * .5 + 2;
+  }));
+  for (const [cx, cz] of [[123, -284], [151, -220], [12, -315], [14, -53], [-20, -345], [180, -340]]) {
+    for (let i = 0; i < 58; i++) {
+      const angle = rng() * Math.PI * 2, radius = Math.sqrt(rng()) * 15;
+      const x = cx + Math.cos(angle) * radius, z = cz + Math.sin(angle) * radius;
+      if (!roadClear(x, z, 1.1) || !serviceClear(x, z)) continue;
+      if (SPACEPORT_BUILDINGS.some(b => Math.abs(x - b.x) < b.width * .5 + 4 && Math.abs(z - b.z) < b.depth * .5 + 4)) continue;
+      const size = .24 + rng() * .54;
+      plants.part(grass, x, -.065, z, size, size, size, i % 3 ? 0x7d8957 : 0xb2a46b,
+        new THREE.Quaternion().setFromAxisAngle(up, angle));
+      if (i % 4 === 0) vegetation.sphere(x + .4, -.03, z + .2, .18 + rng() * .3, .10 + rng() * .12, .25, 0x8c8876);
+    }
+  }
+  grass.dispose();
   for (const [x, z] of [[-121, -36], [-121, -41], [-85, -45], [-78, -78], [-78, -90], [-62, -119], [-62, -124], [-83, -214], [-83, -222], [-87, 25], [31, 20], [58, -54], [67, -80]]) {
     vegetation.box(x, .11, z, 3.3, .3, 3.3, palette.concrete); bush(x, z, 1.2);
   }

@@ -1,0 +1,254 @@
+{
+  "date": "2026-11-16",
+  "sampleSeconds": 8,
+  "spaceport": [
+    {
+      "label": "overview",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.6,
+      "gpu95": 6.82,
+      "gpuSamples": 241,
+      "draws": 503,
+      "offscreen": 0
+    },
+    {
+      "label": "spiral-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 5.2,
+      "gpu95": 6.37,
+      "gpuSamples": 241,
+      "draws": 331,
+      "offscreen": 0
+    },
+    {
+      "label": "night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 6.1,
+      "gpu95": 12.57,
+      "gpuSamples": 240,
+      "draws": 556,
+      "offscreen": 0
+    },
+    {
+      "label": "campus-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 17,
+      "cpu95": 5.9,
+      "gpu95": 10.44,
+      "gpuSamples": 242,
+      "draws": 168,
+      "offscreen": 0
+    },
+    {
+      "label": "campus-night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 17,
+      "cpu95": 8.8,
+      "gpu95": 10.31,
+      "gpuSamples": 241,
+      "draws": 627,
+      "offscreen": 0
+    },
+    {
+      "label": "launch-approach",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.7,
+      "gpu95": 6.24,
+      "gpuSamples": 241,
+      "draws": 198,
+      "offscreen": 0
+    },
+    {
+      "label": "launch-night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 6.6,
+      "gpu95": 8.67,
+      "gpuSamples": 241,
+      "draws": 617,
+      "offscreen": 0
+    }
+  ],
+  "dique": [
+    {
+      "label": "day-general",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 9.1,
+      "gpu95": 9.39,
+      "gpuSamples": 241,
+      "draws": 1172,
+      "offscreen": 0
+    },
+    {
+      "label": "day-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 17,
+      "cpu95": 5.4,
+      "gpu95": 6.77,
+      "gpuSamples": 240,
+      "draws": 190,
+      "offscreen": 0
+    },
+    {
+      "label": "night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 8.2,
+      "gpu95": 9.57,
+      "gpuSamples": 242,
+      "draws": 770,
+      "offscreen": 0
+    },
+    {
+      "label": "port-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 5.1,
+      "gpu95": 6.96,
+      "gpuSamples": 240,
+      "draws": 280,
+      "offscreen": 0
+    },
+    {
+      "label": "day-river",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 5.4,
+      "gpu95": 5.93,
+      "gpuSamples": 241,
+      "draws": 349,
+      "offscreen": 0
+    }
+  ],
+  "audio": [
+    {
+      "label": "near",
+      "peak": 0.07949815690517426,
+      "rms": 0.0071762101022475175,
+      "tailRms": 0,
+      "rightToLeft": 12.458805787476374
+    },
+    {
+      "label": "far",
+      "peak": 0.004011871758848429,
+      "rms": 0.00047130617304288455,
+      "tailRms": 0,
+      "rightToLeft": 12.498693072879885
+    },
+    {
+      "label": "effects-muted",
+      "peak": 0,
+      "rms": 0,
+      "tailRms": 0,
+      "rightToLeft": 0
+    },
+    {
+      "label": "other-course",
+      "peak": 0,
+      "rms": 0,
+      "tailRms": 0,
+      "rightToLeft": 0
+    }
+  ]
+}

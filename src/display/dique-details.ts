@@ -29,6 +29,7 @@ function finishMap(kind: Surface) {
   const runoff = noiseField(41, 8, rng);
   const scratches = noiseField(96, 27, rng);
   const pixels = context.createImageData(size, size);
+  const relief = new Uint8Array(size * size * 4);
   const masonry = kind === 'quay';
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const u = x / size;
@@ -48,17 +49,27 @@ function finishMap(kind: Surface) {
     pixels.data[i + 1] = shade - 14 * rust + 11 * salt + 7 * flake;
     pixels.data[i + 2] = shade - 22 * rust - 10 * salt + 4 * flake;
     pixels.data[i + 3] = 255;
+    // Linear data: pores and grain are relief; moisture, salt and worn paint
+    // change the reflected highlight independently of the diffuse colour.
+    relief[i] = THREE.MathUtils.clamp(143 + (grit - .5) * 35 - pore * 60 + layers * .6 - flake * 14, 0, 255);
+    relief[i + 1] = THREE.MathUtils.clamp((kind === 'steel' ? 106 : kind === 'paint' ? 139 : 218)
+      + drip * 69 + pore * 25 + flake * 31 - salt * 34, 0, 255);
+    relief[i + 2] = 255; relief[i + 3] = 255;
   }
   context.putImageData(pixels, 0, 0);
   const map = texture(canvas);
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.anisotropy = 4;
-  return map;
+  map.anisotropy = 8;
+  const data = new THREE.DataTexture(relief, size, size);
+  data.wrapS = data.wrapT = THREE.RepeatWrapping; data.colorSpace = THREE.NoColorSpace;
+  data.minFilter = THREE.LinearMipmapLinearFilter; data.magFilter = THREE.LinearFilter;
+  data.generateMipmaps = true; data.anisotropy = 8; data.needsUpdate = true;
+  return { map, bumpMap: data, roughnessMap: data };
 }
 
 export function detailDiqueModels(garage?: THREE.Object3D, quay?: THREE.Object3D,
   pier?: THREE.Object3D, buildings?: THREE.Object3D) {
-  const maps = new Map<Surface, THREE.Texture>();
+  const maps = new Map<Surface, ReturnType<typeof finishMap>>();
   const materials = new Map<string, THREE.MeshStandardMaterial>();
   const matrix = new THREE.Matrix4();
   const normalMatrix = new THREE.Matrix3();
@@ -87,8 +98,9 @@ export function detailDiqueModels(garage?: THREE.Object3D, quay?: THREE.Object3D
         }
         weathered = material.clone();
         weathered.name = material.name + ' · patinado';
-        weathered.map = map;
-        weathered.roughness = Math.max(material.roughness, type === 'steel' ? .49 : .72);
+        Object.assign(weathered, map);
+        weathered.bumpScale = type === 'quay' ? .036 : type === 'timber' ? .018 : .009;
+        weathered.roughness = 1;
         materials.set(key, weathered);
       }
       const geometry = object.geometry;
@@ -340,8 +352,8 @@ function serviceGround(parent: THREE.Group, course: Course, material: THREE.Mesh
 
 export function buildDiqueDetails(dock: THREE.Group, props: THREE.Group, course: Course, authoredGarage: boolean) {
   const finish = finishMap('steel');
-  const enamel = new THREE.MeshStandardMaterial({ map: finish, bumpMap: finish, bumpScale: .018,
-    vertexColors: true, roughness: .76, metalness: .14 });
+  const enamel = new THREE.MeshStandardMaterial({ ...finish, bumpScale: .018,
+    vertexColors: true, roughness: 1, metalness: .24 });
   enamel.name = 'Herrajes, umbrales y equipo portuario';
   if (authoredGarage) garageDetails(props, enamel);
   quayDetails(dock, course, enamel);

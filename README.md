@@ -18,7 +18,7 @@ El hangar de integración está abierto y equipado con un motor de cohete sobre 
 
 Hormigón, revoque, chapa pintada, acero cepillado, madera, goma, vidrio y asfalto tienen acabados diferenciados. El circuito espacial usa un entorno de reflejos exterior filtrado una sola vez; las bases, drenajes, rejillas, paneles solares y sombras de contacto dan escala a los edificios. El informe y las capturas de esta revisión están en [referencias/spaceport/materials-workplaces-review.md](referencias/spaceport/materials-workplaces-review.md).
 
-Al acercarte a la plataforma principal, el cohete prepara el despegue: aumenta el vapor criogénico, se retiran los brazos umbilicales, parpadean las balizas y aparecen vibración y resplandor en los seis motores. La intensidad acompaña la proximidad de los jugadores y disminuye suavemente al alejarse. El cohete permanece sujeto a la plataforma. La iluminación espacial combina sol cálido, relleno frío, dos reflectores locales y zonas de luz que siguen la pista, incluidos los loops. Detalles y verificación en [referencias/spaceport/prelaunch-review.md](referencias/spaceport/prelaunch-review.md).
+Al pasar cerca de la plataforma principal, el cohete enciende sus seis motores, retrae los umbilicales y despega con fuego, humo y un rugido espacial atenuado por distancia. El ciclo dura 14 segundos y rearma el cohete para la siguiente vuelta; quedarse junto a la plataforma no repite el lanzamiento. La secuencia respeta el volumen de efectos y se silencia en las repeticiones. Detalles y verificación en [referencias/spaceport/liftoff-review.md](referencias/spaceport/liftoff-review.md).
 
 En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas. Los parciales se guardan por circuito.
 
@@ -39,7 +39,7 @@ Los cuatro autitos tienen caja automática de cinco marchas. La quinta aprovecha
 
 El motor de cada auto combina bucles de bajas, medias y altas revoluciones, con un timbre al acelerar y otro al soltar el gas. Micro GP genera esos bucles con Web Audio. El diseño toma como referencia la [guía de audio vehicular de Wreckfest](https://www.audiokinetic.com/media/blog/LoopBasedCarEngineDesign/vehicle_audio_modding_guide_for_wreckfest-Wwise2019_2_9.pdf).
 
-Hay cuatro plazas. Los bots pueden cubrir los lugares libres, adelantar y retomar el volante si se pierde la conexión. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
+Hay cuatro plazas. Los bots pueden cubrir los lugares libres, adelantar y retomar el volante si se pierde la conexión. En Dique y SpaceX aprovechan la velocidad de los motores actuales, con anticipación de curvas y límites según dificultad; usan la misma física, caja y contactos que los jugadores. Tenés 15 segundos para reabrir el mando y recuperar el auto. Si reiniciás el servidor, escaneá el QR nuevo.
 
 Al terminar aparece un podio con los tres primeros autos que llegaron, sus pilotos y sus tiempos. **Ver tiempos** abre la clasificación completa, incluidas las diferencias, la mejor vuelta y los abandonos. **Ver resumen** prepara los efectos antes de reproducir las maniobras registradas y regresa al podio al terminar. Podés cerrar la pantalla con **Volver al circuito** y abrirla de nuevo con **Ver podio**.
 
@@ -76,3 +76,5 @@ El puerto predeterminado es 4173. `PORT` y `HOST` permiten cambiarlo. Para un de
 - El diseño inicial está en **Micro GP - Dossier visual.pdf** y **Micro GP - Prompt maestro.md**. El trazado y el perfil del Dique se documentan en `referencias/gran-premio-del-dique/`. La grúa, las celosías del puente, los boxes y el muelle se modelaron en Blender y se exportaron a GLB. En esa carpeta están los dos modelos editables.
 
 La verificación en Chrome cubre partida individual, cámaras, pantalla dividida, lectura del QR y mandos con emulación móvil. Las pruebas de red también comprueban las cuatro plazas, la reconexión del mando y el relevo del anfitrión tras un corte silencioso.
+
+La revisión de materiales y detalle de los tres circuitos, junto con las pruebas de IA y rendimiento, está en [referencias/calidad-circuitos-2026-11-16.md](referencias/calidad-circuitos-2026-11-16.md).

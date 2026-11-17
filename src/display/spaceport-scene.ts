@@ -80,7 +80,14 @@ function parts(parent: THREE.Object3D, material: THREE.MeshStandardMaterial, nam
       uv[i * 2 + 1] = ny > Math.max(nx, nz) ? vertices.getZ(i) : vertices.getY(i);
     }
     color.setHex(tint);
-    for (let i = 0; i < colors.length; i += 3) color.toArray(colors, i);
+    const baseR = color.r, baseG = color.g, baseB = color.b;
+    for (let i = 0; i < vertices.count; i++) {
+      // Baked local contact darkening remains attached to each manufactured
+      // part, including the launch vehicle, after spatial geometry batching.
+      const foot = 1 - THREE.MathUtils.smoothstep(vertices.getY(i), y - sy * .5, y - sy * .5 + Math.min(.7, sy * .7));
+      const shade = 1 - .13 * foot - .05 * Math.max(0, -normals.getY(i));
+      colors.set([baseR * shade, baseG * shade, baseB * shade], i * 3);
+    }
     copy.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     copy.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     const mineral = concrete && (tint === tone.concrete || tint === 0xaaa99b || tint === 0x777e78);
@@ -321,10 +328,16 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   for (let s = 0; s < course.length; s += 12) {
     const f = course.frameAt!(s), wall = course.wallHalfAt(s, 1);
     if (f.y < 1.8 || f.ny < .75 || course.loops?.some(loop => s > loop.from - 4 && s < loop.to + 4)) continue;
+    if (Math.round(s / 12) % 2 === 0) d.pipe(point(f, -wall, .018), point(f, wall, .018), .024, tone.dark);
     for (const side of [-1, 1]) {
       const top = point(f, side * (wall + .75), -.30);
       if (!clear(top.x, top.z, top.y)) continue;
       d.box(top.x, -.04, top.z, 2.3, .48, 2.3, tone.concrete);
+      d.box(top.x, .225, top.z, 1.35, .07, 1.35, tone.dark);
+      for (const dx of [-.49, .49]) for (const dz of [-.49, .49]) {
+        d.cylinder(top.x + dx, .285, top.z + dz, .105, .065, tone.silver);
+        d.cylinder(top.x + dx, .31, top.z + dz, .058, .105, tone.steel);
+      }
       d.box(top.x, top.y / 2 - .02, top.z, .68, top.y, .68, tone.steel);
       d.pipe(p(top.x, .4, top.z), point(f, side * (wall - .25), -1.2), .17, tone.navy);
       d.pipe(top, point(f, side * (wall - .4), -.32), .20, tone.steel);
@@ -366,8 +379,10 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
     const angle = i * Math.PI / 4, x = 26 + Math.cos(angle) * 11.8, z = -184 + Math.sin(angle) * 11.8;
     d.cylinder(x, .19, z, .12, .38, tone.steel); d.cylinder(x, .04, z, .29, .08, tone.concrete);
   }
-  const launchVehicle = new THREE.Group(); launchVehicle.name = 'Cohete sujeto a la plataforma'; launchVehicle.position.set(26, 0, -184); animated.add(launchVehicle);
+  const launchVehicle = new THREE.Group(); launchVehicle.name = 'Cohete reutilizable · ascenso'; launchVehicle.position.set(26, 0, -184); animated.add(launchVehicle);
   const vehicleParts = batch(launchVehicle, metal, 'Cuerpo móvil del cohete'); rocket(vehicleParts, 0, 0, 1.32, true, false); vehicleParts.finish();
+  const rocketBeacon = new THREE.Mesh(new THREE.SphereGeometry(.18, 8, 5), warningMaterial);
+  rocketBeacon.name = 'Baliza solidaria al cohete'; rocketBeacon.position.set(0, 51.6, 0); launchVehicle.add(rocketBeacon);
   tower(d, 42, -183);
   const umbilicals = [21, 35].map(y => {
     const arm = new THREE.Group(); arm.name = 'Brazo umbilical retráctil'; arm.position.set(42, y, -183); animated.add(arm);
@@ -486,7 +501,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
     mesh.computeBoundingSphere(); animated.add(mesh); return mesh;
   }
   lights(lampPoints, lampMaterial, .105);
-  lights([...beaconPoints, p(42, 57, -183), p(26, 51.6, -184)], warningMaterial, .18);
+  lights([...beaconPoints, p(42, 57, -183)], warningMaterial, .18);
   const radar = new THREE.Group(); radar.position.set(-30, 9.0, -114); animated.add(radar);
   const r = batch(radar, metal, 'Antena de telemetría');
   r.cylinder(0, .48, 0, .16, .96, tone.steel);
@@ -505,6 +520,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   let night = false, detail = true;
   return {
     backWall,
+    launchState: launch.state,
     setNight(value: boolean) {
       night = value; lampMaterial.emissiveIntensity = value ? 3.1 : 1.2;
       groundMaterial.color.setHex(value ? 0x727c7d : tone.sand);
