@@ -31,12 +31,12 @@ function campusSky(parent: THREE.Group) {
     vertexShader: `varying vec3 direction; void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader: `varying vec3 direction;uniform float night;
       void main(){vec3 d=normalize(direction);float h=smoothstep(-.06,.80,d.y);
-        vec3 day=mix(vec3(.63,.70,.69),vec3(.16,.34,.49),h);
+        vec3 day=mix(vec3(.72,.68,.56),vec3(.16,.34,.49),h);
         vec3 dark=mix(vec3(.055,.105,.15),vec3(.009,.022,.055),h);
         float cloud=sin(d.x*14.+d.z*8.)+sin(d.x*31.-d.z*12.)*.35+sin(d.z*40.)*.16;
         cloud=smoothstep(.44,1.04,cloud)*smoothstep(.08,.19,d.y)*(1.-smoothstep(.30,.56,d.y));
         day=mix(day,vec3(.78,.79,.73),cloud*.44);
-        float glow=pow(max(0.,dot(d,normalize(vec3(-.52,.44,.35)))),32.);
+        float glow=pow(max(0.,dot(d,normalize(vec3(-110.,115.,160.)))),32.);
         day+=vec3(.14,.075,.02)*glow;
         gl_FragColor=vec4(mix(day,dark,night),1.);
         #include <tonemapping_fragment>
@@ -509,7 +509,7 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   // Blend distant ground and sea into the same linear horizon as the sky.
   // This hides far-plane cutoffs in chase, overview and split-screen cameras
   // without fogging nearby models or adding an offscreen render pass.
-  const horizon = { value: new THREE.Color().setRGB(.63, .70, .69) };
+  const horizon = { value: new THREE.Color().setRGB(.72, .68, .56) };
   for (const mesh of [coast, coastalPlain]) {
     const far = { value: 1000 };
     mesh.onBeforeRender = (_renderer, _scene, camera) => { far.value = (camera as THREE.PerspectiveCamera).far; };
@@ -592,7 +592,7 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
       coastMaterial.color.setHex(value ? 0x1c3748 : 0x608d91);
       plainMaterial.color.setHex(value ? 0x637078 : 0xa69a7b);
       if (value) horizon.value.setRGB(.055, .105, .15);
-      else horizon.value.setRGB(.63, .70, .69);
+      else horizon.value.setRGB(.72, .68, .56);
     },
     setDetail(_detail: boolean) {},
     update(now: number) {

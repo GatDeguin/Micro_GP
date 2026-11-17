@@ -9,6 +9,8 @@ import { buildSpaceportVehicles } from './spaceport-vehicles';
 import { buildSpaceportActivity } from './spaceport-activity';
 import { createSpaceportSurfaces } from './spaceport-surfaces';
 import { buildSpaceportWorkplaces } from './spaceport-workplaces';
+import { buildSpaceportLaunch } from './spaceport-launch';
+import { buildSpaceportIllumination } from './spaceport-illumination';
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
@@ -177,11 +179,9 @@ function track(parent: THREE.Group, course: Course, material: THREE.MeshStandard
   }
 }
 
-function rocket(d: Parts, x: number, z: number, scale: number, booster = true) {
+function rocket(d: Parts, x: number, z: number, scale: number, booster = true, includePad = true) {
   const base = .7, body = booster ? 30 : 19, tip = booster ? 8 : 5.5;
-  d.cylinder(x, -.25, z, 11.5 * scale, .5, tone.concrete);
-  d.cylinder(x, .12, z, 7.4 * scale, .22, tone.dark);
-  d.part(unitRing, x, .25, z, 9 * scale, 9 * scale, 9 * scale, tone.white, flat);
+  if (includePad) rocketPad(d, x, z, scale);
   d.cylinder(x, base + body * scale / 2, z, 2.15 * scale, body * scale, tone.silver);
   d.part(unitCone, x, base + (body + tip / 2) * scale, z, 2.15 * scale, tip * scale, 2.15 * scale, tone.white);
   d.cylinder(x, base + 2.6 * scale, z, 2.22 * scale, 3.9 * scale, tone.dark);
@@ -199,6 +199,12 @@ function rocket(d: Parts, x: number, z: number, scale: number, booster = true) {
   }
 }
 
+function rocketPad(d: Parts, x: number, z: number, scale: number) {
+  d.cylinder(x, -.25, z, 11.5 * scale, .5, tone.concrete);
+  d.cylinder(x, .12, z, 7.4 * scale, .22, tone.dark);
+  d.part(unitRing, x, .25, z, 9 * scale, 9 * scale, 9 * scale, tone.white, flat);
+}
+
 function tower(d: Parts, x: number, z: number) {
   d.box(x, -.17, z, 12, .65, 12, tone.concrete);
   for (const dx of [-3.6, 3.6]) for (const dz of [-3.6, 3.6]) d.box(x + dx, 27, z + dz, .55, 55, .55, tone.steel);
@@ -211,10 +217,6 @@ function tower(d: Parts, x: number, z: number) {
     }
     for (const dx of [-3.6, 3.6]) d.pipe(p(x + dx, y, z - 3.6), p(x + dx, y + 6.1, z + 3.6), .16, tone.silver);
     d.box(x - 4.18, y + .45, z, .07, .7, 7.8, tone.orange);
-  }
-  for (const y of [21, 35]) {
-    d.box(x - 9, y, z, 18, .68, 1.0, tone.steel);
-    d.pipe(p(x - 1, y + 5.6, z), p(x - 16, y, z), .13, tone.silver);
   }
   d.box(x, 56, z, 9.5, .44, 9.5, tone.white);
 }
@@ -359,8 +361,27 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
     if (clear(pad.x, pad.z, 50)) d.box(pad.x, .12, pad.z, 4, .36, 7, tone.navy);
   }
 
-  rocket(d, 26, -184, 1.32);
+  rocketPad(d, 26, -184, 1.32);
+  for (let i = 0; i < 8; i++) {
+    const angle = i * Math.PI / 4, x = 26 + Math.cos(angle) * 11.8, z = -184 + Math.sin(angle) * 11.8;
+    d.cylinder(x, .19, z, .12, .38, tone.steel); d.cylinder(x, .04, z, .29, .08, tone.concrete);
+  }
+  const launchVehicle = new THREE.Group(); launchVehicle.name = 'Cohete sujeto a la plataforma'; launchVehicle.position.set(26, 0, -184); animated.add(launchVehicle);
+  const vehicleParts = batch(launchVehicle, metal, 'Cuerpo móvil del cohete'); rocket(vehicleParts, 0, 0, 1.32, true, false); vehicleParts.finish();
   tower(d, 42, -183);
+  const umbilicals = [21, 35].map(y => {
+    const arm = new THREE.Group(); arm.name = 'Brazo umbilical retráctil'; arm.position.set(42, y, -183); animated.add(arm);
+    const a = batch(arm, metal, 'Mecanismo umbilical'); a.box(-9, 0, 0, 18, .68, 1, tone.steel);
+    a.pipe(p(0, 5.6, 0), p(-16, 0, 0), .13, tone.silver); a.finish();
+    // Spaceport caches its large static shadow map. Moving umbilicals must not
+    // leave a frozen shadow in their original position after they retract.
+    arm.traverse(object => { if (object instanceof THREE.Mesh) object.castShadow = false; });
+    const lower = y === 21 ? 19.1 : 31.3;
+    d.cylinder(42, (lower + y + 5.6) / 2, -183, .24, y + 5.6 - lower, tone.steel);
+    return arm;
+  });
+  const launch = buildSpaceportLaunch(animated, launchVehicle, umbilicals);
+  const illumination = buildSpaceportIllumination(fixed, course);
   rocket(d, -76, -273, .80, false);
   hangar(d, -32, -76, 45, 36, 13);
   hangar(d, -94, -162, 31, 25, 10, true);
@@ -490,13 +511,15 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       campus.setNight(value); people.setNight(value); vehicles.setNight(value);
       activity.setNight(value);
       workplaces.setNight(value);
+      launch.setNight(value); illumination.setNight(value);
     },
     setDetail(value: boolean) {
       detail = value; campus.setDetail(value); people.setDetail(value); vehicles.setDetail(value);
       activity.setDetail(value);
       workplaces.setDetail(value);
+      launch.setDetail(value);
     },
-    observe(snapshot: RaceSnapshot) { people.observe(snapshot); activity.observe(snapshot); },
+    observe(snapshot: RaceSnapshot) { people.observe(snapshot); activity.observe(snapshot); launch.observe(snapshot); },
     update(now: number) {
       const time = now * .001;
       radar.rotation.y = time * .23;
@@ -506,6 +529,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       campus.update(now); people.update(now); vehicles.update(now);
       activity.update(now);
       workplaces.update(now);
+      launch.update(now);
     },
   };
 }

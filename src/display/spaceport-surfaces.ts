@@ -72,7 +72,7 @@ export function createSpaceportSurfaces() {
 /** Static outdoor reflection probe; generated/filtered only when first needed. */
 export function spaceportEnvironment(renderer: THREE.WebGLRenderer) {
   const width = 256, height = 128, pixels = new Float32Array(width * height * 4);
-  const sun = new THREE.Vector3(-31, 29, 29).normalize();
+  const sun = new THREE.Vector3(-110, 115, 160).normalize();
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const phi = x / width * Math.PI * 2, theta = y / height * Math.PI;
     // Equirect UV.y is asin(direction.y) / PI + .5. DataTexture row 0

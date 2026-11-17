@@ -18,6 +18,8 @@ El hangar de integración está abierto y equipado con un motor de cohete sobre 
 
 Hormigón, revoque, chapa pintada, acero cepillado, madera, goma, vidrio y asfalto tienen acabados diferenciados. El circuito espacial usa un entorno de reflejos exterior filtrado una sola vez; las bases, drenajes, rejillas, paneles solares y sombras de contacto dan escala a los edificios. El informe y las capturas de esta revisión están en [referencias/spaceport/materials-workplaces-review.md](referencias/spaceport/materials-workplaces-review.md).
 
+Al acercarte a la plataforma principal, el cohete prepara el despegue: aumenta el vapor criogénico, se retiran los brazos umbilicales, parpadean las balizas y aparecen vibración y resplandor en los seis motores. La intensidad acompaña la proximidad de los jugadores y disminuye suavemente al alejarse. El cohete permanece sujeto a la plataforma. La iluminación espacial combina sol cálido, relleno frío, dos reflectores locales y zonas de luz que siguen la pista, incluidos los loops. Detalles y verificación en [referencias/spaceport/prelaunch-review.md](referencias/spaceport/prelaunch-review.md).
+
 En **Práctica libre**, entrá al carril interior de boxes y detenete en una plaza señalizada para cambiar de auto. Cada autito tiene su propio manejo. Completá una vuelta limpia o mejorá un tiempo de sector por al menos 0,05 s para desbloquear las dos libreas. Los parciales se guardan por circuito.
 
 ## Jugar en Windows

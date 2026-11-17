@@ -178,6 +178,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     if (night) key.position.set(-12.0, 24.0, -17.0);
     else key.position.set(close ? -19.1 : -17.7, close ? 16.7 : 24.8, close ? 13.0 : -8.2);
     if (dique) key.position.set(night ? -28 : -31, close ? 24 : 29, close ? 23 : 29).multiplyScalar(5.2);
+    if (spaceport) key.position.set(night ? -95 : -110, night ? 190 : 115, night ? -130 : 160);
     key.position.add(lightCenter);
     key.target.position.copy(lightCenter);
     key.color.setHex(dique ? (night ? 0xb7d0f2 : 0xffe0c3) : (night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9));
@@ -200,11 +201,14 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     renderer.toneMappingExposure = dique ? (night ? 1.12 : 1.06) : (night ? 1.01 : close ? 1.015 : 1.075);
     scene.background = dique ? (night ? harborNight : harborSky) : (night ? nightBackground : dayBackground);
     if (spaceport) {
-      key.color.setHex(night ? 0xb3cce8 : 0xffe9ca);
-      key.intensity = night ? 1.35 : 2.6;
-      fill.intensity = night ? .58 : .75;
-      bounce.intensity = night ? .64 : .66;
-      scene.environmentIntensity = night ? .42 : .56;
+      key.color.setHex(night ? 0xb8d1ec : 0xffd8aa);
+      key.intensity = night ? .78 : 3.15;
+      fill.position.set(110, 65, -90).add(lightCenter);
+      fill.color.setHex(0xb6d4ff); fill.intensity = night ? .22 : .36;
+      bounce.color.setHex(0xc3dafe); bounce.groundColor.setHex(night ? 0x39434f : 0x83705a);
+      bounce.intensity = night ? .40 : .46;
+      scene.environmentIntensity = night ? .30 : .78;
+      renderer.toneMappingExposure = night ? 1.13 : 1.03;
       scene.environmentRotation.y = 0;
       scene.background = night ? harborNight : harborSky;
     }
