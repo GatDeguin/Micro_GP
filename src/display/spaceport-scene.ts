@@ -7,6 +7,8 @@ import { buildSpaceportCampus } from './spaceport-campus';
 import { buildSpaceportPeople } from './spaceport-people';
 import { buildSpaceportVehicles } from './spaceport-vehicles';
 import { buildSpaceportActivity } from './spaceport-activity';
+import { createSpaceportSurfaces } from './spaceport-surfaces';
+import { buildSpaceportWorkplaces } from './spaceport-workplaces';
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
@@ -53,11 +55,11 @@ function point(frame: CourseFrame, offset: number, lift = 0) {
     frame.z - frame.rz * offset + frame.nz * lift);
 }
 
-// One opaque material, spatial batches and low-poly repeated fittings keep the
-// test centre inexpensive in four simultaneous race views.
+// Large surfaces use spatial batches; small fittings share material batches.
+// Surface separation preserves physical highlights without one draw per prop.
 function parts(parent: THREE.Object3D, material: THREE.MeshStandardMaterial, name: string, cell = 52,
-  concrete?: THREE.MeshStandardMaterial) {
-  const groups = new Map<string, THREE.BufferGeometry[]>();
+  concrete?: THREE.MeshStandardMaterial, routes?: ReadonlyMap<number, THREE.MeshStandardMaterial>) {
+  const groups = new Map<string, { material: THREE.MeshStandardMaterial; pieces: THREE.BufferGeometry[] }>();
   const matrix = new THREE.Matrix4(), color = new THREE.Color(), position = new THREE.Vector3(), scale = new THREE.Vector3();
   const direction = new THREE.Vector3(), rotation = new THREE.Quaternion();
   function part(geometry: THREE.BufferGeometry, x: number, y: number, z: number, sx: number, sy: number, sz: number,
@@ -80,8 +82,11 @@ function parts(parent: THREE.Object3D, material: THREE.MeshStandardMaterial, nam
     copy.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     copy.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     const mineral = concrete && (tint === tone.concrete || tint === 0xaaa99b || tint === 0x777e78);
-    const key = mineral ? 'concreto' : `${Math.floor(x / cell)},${Math.floor(z / cell)}`, bucket = groups.get(key);
-    if (bucket) bucket.push(copy); else groups.set(key, [copy]);
+    const surface = routes?.get(tint) ?? (mineral ? concrete! : material);
+    const global = surface !== material && surface.metalness < .3;
+    const key = `${surface.uuid}:${global || mineral ? 'global' : `${Math.floor(x / cell)},${Math.floor(z / cell)}`}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.pieces.push(copy); else groups.set(key, { material: surface, pieces: [copy] });
   }
   return {
     part,
@@ -97,11 +102,11 @@ function parts(parent: THREE.Object3D, material: THREE.MeshStandardMaterial, nam
       part(unitCylinder, position.x, position.y, position.z, radius, length, radius, tint, rotation);
     },
     finish() {
-      for (const [key, pieces] of groups) {
+      for (const [key, { pieces, material: surface }] of groups) {
         const geometry = mergeGeometries(pieces);
         for (const piece of pieces) piece.dispose();
         if (!geometry) continue;
-        const mesh = new THREE.Mesh(geometry, key === 'concreto' ? concrete! : material); mesh.name = name + ' · ' + key;
+        const mesh = new THREE.Mesh(geometry, surface); mesh.name = name + ' · ' + key;
         mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh);
       }
     },
@@ -224,18 +229,36 @@ function tank(d: Parts, x: number, z: number, radius: number, height: number) {
   d.pipe(p(x, .40, z - radius), p(x, .40, z - radius - 4), .22, tone.steel);
 }
 
-function hangar(d: Parts, x: number, z: number, width: number, depth: number, height: number) {
+function hangar(d: Parts, x: number, z: number, width: number, depth: number, height: number, openBay = false) {
   d.box(x, -.30, z, width + 3, .6, depth + 3, tone.concrete);
-  d.box(x, height / 2, z, width, height, depth, tone.navy);
+  if (openBay) {
+    // A real shell leaves the integration bay visible from the campus route.
+    // The workplace module owns the shutters, floor and equipment inside it.
+    const opening = 14, lintel = 6.6, pier = (width - opening) / 2;
+    d.box(x, height / 2, z - depth / 2, width, height, .28, tone.navy);
+    for (const side of [-1, 1]) {
+      d.box(x + side * (width / 2 - .14), height / 2, z, .28, height, depth, tone.navy);
+      d.box(x + side * (opening / 2 + pier / 2), height / 2, z + depth / 2, pier, height, .28, tone.navy);
+    }
+    d.box(x, (height + lintel) / 2, z + depth / 2, opening, height - lintel, .28, tone.navy);
+    d.box(x, lintel + .18, z + depth / 2 + .2, opening + .6, .36, .7, tone.steel);
+    for (const side of [-1, 1]) d.box(x + side * 7.15, 3.3, z + depth / 2 + .18, .28, 6.6, .4, tone.steel);
+  } else {
+    d.box(x, height / 2, z, width, height, depth, tone.navy);
+    d.box(x, height * .42, z + depth / 2 + .03, width * .76, height * .76, .09, tone.dark);
+    for (let y = .6; y < height * .78; y += .45) d.box(x, y, z + depth / 2 + .09, width * .75, .035, .06, tone.steel);
+  }
   d.box(x, height + .22, z, width + .65, .44, depth + .65, tone.silver);
-  d.box(x, height * .42, z + depth / 2 + .03, width * .76, height * .76, .09, tone.dark);
-  for (let y = .6; y < height * .78; y += .45) d.box(x, y, z + depth / 2 + .09, width * .75, .035, .06, tone.steel);
   for (let i = 0; i < 7; i++) {
     const sx = x + (i - 3) * width / 7;
     d.box(sx, height / 2, z - depth / 2 - .025, .10, height, .11, tone.steel);
     d.box(sx, height + .50, z, width / 8, .14, depth * .6, tone.blue);
   }
   for (const side of [-1, 1]) {
+    const xx = x + side * (width / 2 + .08);
+    for (let zz = z - depth / 2 + .7; zz < z + depth / 2; zz += 1.1) d.box(xx, height * .5, zz, .09, height - .4, .055, tone.steel);
+    d.pipe(p(xx, .15, z + depth / 2 - .35), p(xx, height, z + depth / 2 - .35), .08, tone.steel);
+    d.box(xx, .035, z + depth / 2 - .35, .65, .04, 1.3, tone.dark);
     d.box(x + side * width * .43, 1.0, z + depth / 2 + .2, .24, 2.0, .24, tone.orange);
     d.box(x + side * width * .38, height * .88, z + depth / 2 + .08, width * .10, .5, .07, tone.white);
   }
@@ -265,14 +288,11 @@ function signs(parent: THREE.Group, placements: readonly [string, number, number
 
 export async function buildSpaceportScene(parent: THREE.Group, course: Course, _wood: THREE.Texture, _compactEnabled = false) {
   parent.name = 'SpaceX · Centro de pruebas';
-  const metalMap = surfaceTexture('metal'), roadMap = surfaceTexture('road'), concreteMap = surfaceTexture('concrete');
-  const metal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .49, metalness: .43,
-    map: metalMap ?? null, bumpMap: metalMap ?? null, bumpScale: .005 });
-  const roadway = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .87, metalness: .04,
-    map: roadMap ?? null, bumpMap: roadMap ?? null, bumpScale: .014 });
-  const concrete = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, metalness: 0,
-    map: concreteMap ?? null, bumpMap: concreteMap ?? null, bumpScale: .024 });
-  const groundGrain = concreteMap?.clone();
+  const surfaces = createSpaceportSurfaces();
+  const metal = surfaces.paint, roadway = surfaces.asphalt, concrete = surfaces.concrete;
+  const batch = (parent: THREE.Object3D, material: THREE.MeshStandardMaterial, name: string, cell = 52, concrete?: THREE.MeshStandardMaterial) =>
+    parts(parent, material, name, cell, concrete, surfaces.routes);
+  const groundGrain = concrete.bumpMap?.clone();
   groundGrain?.repeat.set(105, 99);
   const groundMaterial = new THREE.MeshStandardMaterial({ color: tone.sand, roughness: .98,
     map: surfaceTexture('ground') ?? null, bumpMap: groundGrain ?? null, bumpScale: .026 });
@@ -284,7 +304,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   const center = bounds.getCenter(new THREE.Vector3()), size = bounds.getSize(new THREE.Vector3());
   const ground = box(fixed, groundMaterial, center.x, -.88, center.z, size.x + 74, 1.6, size.z + 70, false);
   ground.name = 'Plataforma del centro de ensayos';
-  const d = parts(fixed, metal, 'Equipamiento espacial', 52, concrete);
+  const d = batch(fixed, metal, 'Equipamiento espacial', 52, concrete);
   track(fixed, course, roadway);
   // Concrete service aprons and expansion joints make the diorama read as a
   // working launch facility instead of isolated models on an empty ground plane.
@@ -343,7 +363,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   tower(d, 42, -183);
   rocket(d, -76, -273, .80, false);
   hangar(d, -32, -76, 45, 36, 13);
-  hangar(d, -94, -162, 31, 25, 10);
+  hangar(d, -94, -162, 31, 25, 10, true);
   hangar(d, 130, -106, 29, 27, 9);
   for (let i = 0; i < 5; i++) tank(d, -22 + i * 8.2, -153, 2.4 + i % 2 * .5, 9.0 + i % 2 * 3);
   for (const z of [-143, -140.8, -138.6]) {
@@ -421,13 +441,14 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
     for (let i = 0; i < 3; i++) d.box(x + i * 1.25 - 1.3, .52, z + .7, 1.0, .91, .96, tone.white);
   }
   d.finish();
-  const campus = buildSpaceportCampus(fixed, course, parts, { metal, concrete, roadway });
-  const people = buildSpaceportPeople(animated, course, campus.people);
+  const campus = buildSpaceportCampus(fixed, course, batch, { metal, concrete, roadway });
+  const workplaces = buildSpaceportWorkplaces(animated, course, { ...surfaces, metal: surfaces.steel });
+  const people = buildSpaceportPeople(animated, course, [...campus.people, ...workplaces.people]);
   const vehicles = await buildSpaceportVehicles(animated, {
     ...campus.fleet, routes: campus.fleet.routes.map(route => ({ ...route, cornerRadius: 0 })),
   });
   const activity = buildSpaceportActivity(animated, { material: metal });
-  const signFrames = parts(fixed, metal, 'Soportes de señalización');
+  const signFrames = batch(fixed, metal, 'Soportes de señalización');
   for (const x of [36, 72]) signFrames.box(x, 4.82, -8.40, .15, 1.65, .15, tone.steel);
   for (const [x, y, z] of [[186, 2.8, -78], [-157, 5.6, -264]] as const) {
     for (const side of [-1, 1]) signFrames.box(x + side * 5.5, (y - .30) / 2, z - .10, .17, y + .30, .17, tone.steel);
@@ -446,13 +467,13 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   lights(lampPoints, lampMaterial, .105);
   lights([...beaconPoints, p(42, 57, -183), p(26, 51.6, -184)], warningMaterial, .18);
   const radar = new THREE.Group(); radar.position.set(-30, 9.0, -114); animated.add(radar);
-  const r = parts(radar, metal, 'Antena de telemetría');
+  const r = batch(radar, metal, 'Antena de telemetría');
   r.cylinder(0, .48, 0, .16, .96, tone.steel);
   r.box(0, 1.2, 0, 4.1, 1.6, .16, tone.white);
   for (const x of [-1.6, -.8, 0, .8, 1.6]) r.box(x, 1.2, .10, .05, 1.4, .03, tone.steel);
   r.pipe(p(0, .4, .2), p(0, 1.2, 1.4), .06, tone.orange); r.finish();
   const manipulator = new THREE.Group(); manipulator.position.set(88, .10, -12.0); animated.add(manipulator);
-  const arm = parts(manipulator, metal, 'Brazo de integración');
+  const arm = batch(manipulator, metal, 'Brazo de integración');
   arm.cylinder(0, .36, 0, .45, .72, tone.dark);
   arm.pipe(p(0, .6, 0), p(0, 2.0, .7), .17, tone.orange);
   arm.pipe(p(0, 2.0, .7), p(0, 1.7, 1.8), .13, tone.orange);
@@ -468,10 +489,12 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       groundMaterial.color.setHex(value ? 0x727c7d : tone.sand);
       campus.setNight(value); people.setNight(value); vehicles.setNight(value);
       activity.setNight(value);
+      workplaces.setNight(value);
     },
     setDetail(value: boolean) {
       detail = value; campus.setDetail(value); people.setDetail(value); vehicles.setDetail(value);
       activity.setDetail(value);
+      workplaces.setDetail(value);
     },
     observe(snapshot: RaceSnapshot) { people.observe(snapshot); activity.observe(snapshot); },
     update(now: number) {
@@ -482,6 +505,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       radar.visible = manipulator.visible = detail;
       campus.update(now); people.update(now); vehicles.update(now);
       activity.update(now);
+      workplaces.update(now);
     },
   };
 }

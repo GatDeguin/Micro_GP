@@ -179,6 +179,45 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
     d.box(x, h + .58, z - depth / 2, w, .8, .18, palette.trim);
     d.box(x, h + .58, front, w, .8, .18, palette.trim);
     for (const side of [-1, 1]) d.box(x + side * w / 2, h + .58, z, .18, .8, depth, palette.trim);
+    // Architectural scale: waterproof plinths, panel joints, roof drains and
+    // anchored downpipes. Kept inside each existing foundation footprint.
+    for (const side of [-1, 1]) {
+      const wallX = x + side * (w / 2 + .07);
+      d.box(wallX, .28, z, .16, .55, depth, palette.navy);
+      for (let zz = z - depth / 2 + 3; zz < front - 1; zz += 5.8) {
+        d.box(wallX, h * .53, zz, .025, h - 1.0, .034, palette.trim);
+      }
+      const drainZ = z - depth / 2 + .55;
+      d.pipe(p(wallX + side * .19, .32, drainZ), p(wallX + side * .19, h + .3, drainZ), .065, palette.trim);
+      d.pipe(p(wallX + side * .19, .32, drainZ), p(wallX + side * .55, .08, drainZ), .065, palette.trim);
+      for (let yy = 1.3; yy < h; yy += 2.6) d.box(wallX + side * .14, yy, drainZ, .29, .055, .22, palette.navy);
+      d.box(wallX + side * .45, .025, drainZ, .7, .025, 1.05, palette.black);
+      for (let i = 0; i < 7; i++) d.box(wallX + side * .45, .043, drainZ + (i - 3) * .13, .62, .025, .028, palette.trim);
+    }
+    // A front emergency station, door hardware and real louver fins give each
+    // building a serviced facade without blocking its protected access path.
+    const serviceX = x + w * .40;
+    d.box(serviceX, 1.40, front + .22, .62, .88, .26, palette.orange);
+    d.box(serviceX, 1.40, front + .36, .49, .74, .025, palette.white);
+    d.box(serviceX + .17, 1.40, front + .39, .024, .19, .04, palette.trim);
+    d.box(serviceX, 2.04, front + .18, .65, .28, .06, palette.navy);
+    const grilleX = x - w * .39;
+    d.box(grilleX, h * .60, front + .12, 1.4, 1.2, .13, palette.black);
+    for (let i = 0; i < 8; i++) d.box(grilleX, h * .60 + (i - 3.5) * .13, front + .22, 1.3, .045, .16, palette.trim);
+    if (site.id === 'instrumentation' || site.id === 'crew' || site.id === 'laboratory') {
+      // Small solar strings occupy the clear half of the roof, beside HVAC.
+      const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -.16);
+      for (let i = 0; i < 3; i++) {
+        const xx = x + (i - 1) * 3.0, zz = z + depth * .22;
+        for (const dx of [-1.15, 1.15]) for (const dz of [-1, 1]) {
+          const top = 1.01 + dz * Math.sin(.16) - .05 * Math.cos(.16), leg = top - .36;
+          d.box(xx + dx, h + .36 + leg / 2, zz + dz, .08, leg, .08, palette.trim);
+        }
+        d.box(xx, h + 1.01, zz, 2.65, .10, 3.5, palette.trim, tilt);
+        d.box(xx, h + 1.07, zz, 2.48, .025, 3.3, palette.glass, tilt);
+        for (let j = 0; j < 5; j++) d.box(xx + (j - 2) * .48, h + 1.095, zz, .02, .018, 3.24, palette.trim, tilt);
+      }
+    }
     if (style === 'warehouse') {
       for (const dx of [-10, 0, 10]) {
         d.box(x + dx, 2.9, front + .06, 7.6, 5.8, .17, palette.black);
@@ -385,16 +424,16 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   const rng = random(71234);
   const roadClear = (x: number, z: number, radius: number) => !course.samples.some((point, i) => i % 8 === 0 && point.y < 4
     && Math.hypot(point.x - x, point.z - z) < course.wallHalfAt(point.s, 1) + radius + 1.1);
-  function bush(x: number, z: number, scale: number) {
+  function bush(x: number, z: number, scale: number, base = 0) {
     if (!roadClear(x, z, scale)) return;
     for (let i = 0; i < 3; i++) {
       const angle = i * Math.PI * 2 / 3;
-      plants.sphere(x + Math.cos(angle) * scale * .3, .4 * scale, z + Math.sin(angle) * scale * .3,
+      plants.sphere(x + Math.cos(angle) * scale * .3, base + .4 * scale, z + Math.sin(angle) * scale * .3,
         .7 * scale, .55 * scale, .7 * scale, [0x596f4e, 0x687b50, 0x465c46][i]);
     }
     for (let i = 0; i < 4; i++) {
       const angle = i * Math.PI / 2;
-      plants.pipe(p(x, .05, z), p(x + Math.cos(angle) * scale * .7, scale * 1.2, z + Math.sin(angle) * scale * .7), .025 * scale, 0x8e945d);
+      plants.pipe(p(x, base + .05, z), p(x + Math.cos(angle) * scale * .7, base + scale * 1.2, z + Math.sin(angle) * scale * .7), .025 * scale, 0x8e945d);
     }
   }
   for (let i = 0; i < 64; i++) {
@@ -406,6 +445,53 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   for (const [x, z] of [[-121, -36], [-121, -41], [-85, -45], [-78, -78], [-78, -90], [-62, -119], [-62, -124], [-83, -214], [-83, -222], [-87, 25], [31, 20], [58, -54], [67, -80]]) {
     vegetation.box(x, .11, z, 3.3, .3, 3.3, palette.concrete); bush(x, z, 1.2);
   }
+  // The racing street passes a working rover checkout pad, instead of an empty
+  // strip between instrument and crew buildings. Its entire 8×10 m apron is
+  // separated from the track by >4 m; staff enter from the west promenade.
+  d.box(-145, -.025, -53, 8, .13, 10, palette.paving);
+  walkway(-174, -53, -149, -53, 2.1);
+  railing(-140.8, -58, -140.8, -48, .04, 1.1);
+  for (const z of [-57.5, -48.5]) {
+    vegetation.box(-145, .21, z, 6.0, .34, 1.0, palette.concrete);
+    for (const x of [-147, -145, -143]) bush(x, z, .42, .36);
+  }
+  // Six-wheel test rover: suspended chassis, steering hubs, solar deck,
+  // instrument mast and a camera pointed toward its calibration target.
+  const wheelQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+  d.box(-145.8, .90, -54.9, 1.60, .45, 2.25, palette.white);
+  d.box(-145.8, 1.16, -54.9, 2.05, .075, 2.5, palette.trim);
+  d.box(-145.8, 1.21, -54.9, 1.94, .03, 2.38, palette.glass);
+  for (const dx of [-.66, 0, .66]) d.box(-145.8 + dx, 1.235, -54.9, .025, .015, 2.38, palette.trim);
+  for (const side of [-1, 1]) for (const dz of [-.84, 0, .84]) {
+    d.pipe(p(-145.8 + side * .55, .74, -54.9), p(-145.8 + side * 1.05, .40, -54.9 + dz), .055, palette.trim);
+    d.cylinder(-145.8 + side * 1.08, .40, -54.9 + dz, .35, .25, palette.black, wheelQ);
+    d.cylinder(-145.8 + side * 1.22, .40, -54.9 + dz, .18, .025, palette.trim, wheelQ);
+  }
+  d.cylinder(-145.8, 1.79, -55.55, .075, 1.10, palette.trim);
+  d.box(-145.8, 2.35, -55.55, .64, .24, .32, palette.white);
+  for (const dx of [-.19, .19]) d.cylinder(-145.8 + dx, 2.35, -55.36, .085, .055, palette.black, circle);
+  // Diagnostic cart, tether and checker target are tied to this task.
+  for (const dx of [-.53, .53]) for (const dz of [-.30, .30]) {
+    d.cylinder(-142.6 + dx, .17, -52 + dz, .12, .07, palette.black, wheelQ);
+    d.box(-142.6 + dx, .62, -52 + dz, .06, .85, .06, palette.trim);
+  }
+  d.box(-142.6, 1.07, -52, 1.35, .08, .83, palette.trim);
+  d.box(-142.6, 1.54, -52.27, 1.05, .63, .10, palette.navy);
+  d.box(-142.6, 1.54, -52.205, .93, .50, .025, palette.glass);
+  for (let i = 0; i < 4; i++) d.box(-142.91, 1.35 + i * .11, -52.185, .25 + i * .12, .025, .01, palette.white);
+  for (const [a, b] of [[[-145, .78, -53.8], [-145, .06, -53.8]], [[-145, .06, -53.8], [-144.4, .06, -52.4]], [[-144.4, .06, -52.4], [-142.6, .06, -51.8]],
+    [[-142.6, .06, -51.8], [-142.6, 1.06, -51.8]]] as const) d.pipe(p(a[0], a[1], a[2]), p(b[0], b[1], b[2]), .025, palette.black);
+  d.box(-145.8, .65, -51.65, .06, 1.2, .06, palette.trim);
+  d.box(-145.8, 1.25, -51.65, 1.24, .94, .06, palette.white);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) if ((i + j) % 2) {
+    d.box(-145.8 + (i - 1.5) * .29, 1.25 + (j - 1) * .29, -51.69, .29, .29, .025, palette.black);
+  }
+  labels.push({ text: 'ENSAYO ROVER', x: -140.72, y: .64, z: -49.6, width: 2.6, yaw: Math.PI / 2 });
+  d.box(-140.8, .64, -49.6, .12, .72, 2.8, palette.navy);
+  person('scientist', -143.0, -50.9, Math.PI, .04);
+  person('technician', -144.2, -54.6, -Math.PI / 2, .04);
+  person('scientist', -148, -51.8, .8, .04);
+  person('technician', -163, -53, Math.PI / 2, .05, [-151, -53]);
   // Low distant coastal terrain remains visible from chase cameras, while the
   // raised plinth keeps the toy-diorama boundary legible from the overview.
   for (let i = 0; i < 24; i++) {

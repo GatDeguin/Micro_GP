@@ -3,6 +3,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TALLER, type Course } from '../shared/courses';
 import { BENCH_SURFACE } from './materials';
 import { sceneryLights } from './render-layers';
+import { spaceportEnvironment } from './spaceport-surfaces';
+import { SPACEPORT_BUILDINGS } from './spaceport-campus-layout';
 
 function panelFalloff() {
   const width = 128;
@@ -73,7 +75,12 @@ function shadowPoints(course: Course) {
     const z = p.z + p.dx * offset;
     return [new THREE.Vector3(x, BENCH_SURFACE, z), new THREE.Vector3(x, p.y + 1.3, z)];
   }));
-  if (course.id === 'spaceport') bounds.push(new THREE.Vector3(42, 57, -183), new THREE.Vector3(26, 52, -184));
+  if (course.id === 'spaceport') {
+    bounds.push(new THREE.Vector3(42, 57, -183), new THREE.Vector3(26, 52, -184));
+    for (const site of SPACEPORT_BUILDINGS) for (const x of [-1, 1]) for (const z of [-1, 1]) {
+      bounds.push(new THREE.Vector3(site.x + x * (site.width / 2 + 1), site.height + 2, site.z + z * (site.depth / 2 + 1)));
+    }
+  }
   if (course.id !== 'taller') return bounds;
   // Include the parts of the bench and the taller tools that can cast back over the course.
   for (const x of [-31, 32]) {
@@ -107,12 +114,20 @@ function fitShadow(key: THREE.DirectionalLight, points: readonly THREE.Vector3[]
 
 export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRenderer, lowQuality: boolean) {
   let environment: THREE.WebGLRenderTarget | undefined;
+  let outdoorEnvironment: THREE.WebGLRenderTarget | undefined;
+  let spaceport = false;
   function restoreReflections() {
     if (lowQuality) return;
     const next = prefilterWorkshop(renderer);
     environment?.dispose();
     environment = next;
-    scene.environment = next.texture;
+    outdoorEnvironment?.dispose(); outdoorEnvironment = undefined;
+    selectReflections();
+  }
+  function selectReflections() {
+    if (lowQuality) return;
+    if (spaceport) outdoorEnvironment ??= spaceportEnvironment(renderer);
+    scene.environment = (spaceport ? outdoorEnvironment : environment)?.texture ?? null;
   }
   restoreReflections();
 
@@ -134,7 +149,6 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   let points = shadowPoints(TALLER);
   const lightCenter = new THREE.Vector3();
   let dique = false;
-  let spaceport = false;
   const trackLamps: { light: THREE.SpotLight; day: number }[] = [];
   const diffusers = new Set<THREE.MeshStandardMaterial>();
   const halos = new Set<THREE.SpriteMaterial>();
@@ -191,6 +205,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
       fill.intensity = night ? .58 : .75;
       bounce.intensity = night ? .64 : .66;
       scene.environmentIntensity = night ? .42 : .56;
+      scene.environmentRotation.y = 0;
       scene.background = night ? harborNight : harborSky;
     }
     scene.backgroundIntensity = dayBackgroundIntensity * (night ? 0.64 : 1);
@@ -205,6 +220,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     setCourse(course: Course) {
       dique = course.id !== 'taller';
       spaceport = course.id === 'spaceport';
+      selectReflections();
       points = shadowPoints(course);
       lightCenter.set(0, 0, 0);
       if (dique) new THREE.Box3().setFromPoints(points).getCenter(lightCenter);

@@ -1,0 +1,196 @@
+{
+  "date": "2026-11-16",
+  "device": "NVIDIA GeForce RTX 3060 Ti / Chrome ANGLE D3D11",
+  "quality": "Adaptativa (60 FPS)",
+  "output": [
+    1920,
+    1080
+  ],
+  "secondsPerCase": 8,
+  "scope": "Five warmed scenarios, single-player 1080p and four views at internal 1536x864; not a universal device guarantee.",
+  "webglContextRestoration": "Passed",
+  "before": [
+    {
+      "label": "overview",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.8,
+      "cpu95": 4.9,
+      "gpu95": 5.42,
+      "gpuSamples": 241,
+      "draws": 368,
+      "offscreen": 0
+    },
+    {
+      "label": "spiral-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.7,
+      "gpu95": 7.42,
+      "gpuSamples": 240,
+      "draws": 256,
+      "offscreen": 0
+    },
+    {
+      "label": "night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.8,
+      "gpu95": 7.05,
+      "gpuSamples": 242,
+      "draws": 496,
+      "offscreen": 0
+    },
+    {
+      "label": "campus-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.9,
+      "gpu95": 6.59,
+      "gpuSamples": 241,
+      "draws": 150,
+      "offscreen": 0
+    },
+    {
+      "label": "campus-night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.8,
+      "cpu95": 4.9,
+      "gpu95": 7.58,
+      "gpuSamples": 241,
+      "draws": 547,
+      "offscreen": 0
+    }
+  ],
+  "after": [
+    {
+      "label": "overview",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.8,
+      "cpu95": 4.9,
+      "gpu95": 7.02,
+      "gpuSamples": 241,
+      "draws": 469,
+      "offscreen": 0
+    },
+    {
+      "label": "spiral-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 5,
+      "gpu95": 7.52,
+      "gpuSamples": 241,
+      "draws": 319,
+      "offscreen": 0
+    },
+    {
+      "label": "night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.8,
+      "gpu95": 7.13,
+      "gpuSamples": 240,
+      "draws": 552,
+      "offscreen": 0
+    },
+    {
+      "label": "campus-chase",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1920x1080"
+      ],
+      "frames": 480,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.8,
+      "long": 0,
+      "max": 16.8,
+      "cpu95": 4.7,
+      "gpu95": 6.88,
+      "gpuSamples": 242,
+      "draws": 167,
+      "offscreen": 0
+    },
+    {
+      "label": "campus-night-split4",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti (0x00002489) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sizes": [
+        "1536x864"
+      ],
+      "frames": 479,
+      "fps": 60,
+      "frame95": 16.8,
+      "frame99": 16.9,
+      "long": 0,
+      "max": 16.9,
+      "cpu95": 4.9,
+      "gpu95": 6.59,
+      "gpuSamples": 240,
+      "draws": 623,
+      "offscreen": 0
+    }
+  ]
+}
