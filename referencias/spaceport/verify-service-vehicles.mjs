@@ -18,6 +18,18 @@ asset.scene.traverse(object => {
     min: bounds.min.toArray(), max: bounds.max.toArray() });
   assert.ok(geometry.getAttribute('color'), `${object.name} must retain paint`);
   for (const coordinate of geometry.getAttribute('position').array) assert.ok(Number.isFinite(coordinate));
+  if (object.name === 'shared_wheel') {
+    const position = geometry.getAttribute('position'), normal = geometry.getAttribute('normal');
+    let outerVertices = 0;
+    for (let i = 0; i < position.count; i++) {
+      const radius = Math.hypot(position.getY(i), position.getZ(i));
+      if (radius < .99) continue;
+      outerVertices++;
+      assert.ok(position.getY(i) * normal.getY(i) + position.getZ(i) * normal.getZ(i) >= -.001,
+        'tread and shoulder normals face outward');
+    }
+    assert.ok(outerVertices > 100);
+  }
 });
 assert.equal(geometryReport.length, 13, 'Only the fleet belongs in the runtime GLB');
 const source = await readFile(new URL('src/display/spaceport-vehicles.ts', root), 'utf8');

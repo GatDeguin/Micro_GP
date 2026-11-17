@@ -16,14 +16,14 @@ function meshes(parent: THREE.Group) {
   return (parent.children[0] as THREE.Group).children as THREE.InstancedMesh[];
 }
 
-test('55 spaceport people fit eight batches and 25k triangles in every occupational pose', () => {
+test('55 spaceport people fit eight batches, 45k close triangles and 25k compact triangles in every pose', () => {
   // Homogeneous groups exercise the worst case, not just the expected mixed crowd.
   for (const role of roles) {
     const parent = new THREE.Group();
     const people = buildSpaceportPeople(parent, SPACEPORT, Array.from({ length: 55 }, (_, i) =>
       ({ x: i * .2, z: 0, role, phase: i * .731, to: i % 4 === 0 ? [i * .2 + 3, 0] : undefined })));
     assert.equal(meshes(parent).length, 8);
-    for (const detail of [true, false]) {
+    for (const detail of [true, false, true]) {
       people.setDetail(detail);
       people.setNight(!detail);
       for (let time = 0; time < 24_000; time += 417) {
@@ -40,7 +40,7 @@ test('55 spaceport people fit eight batches and 25k triangles in every occupatio
           const colors = mesh.instanceColor!.array;
           for (let i = 0; i < mesh.count * 3; i++) assert.ok(Number.isFinite(colors[i]), `${role}: finite colors`);
         }
-        assert.ok(triangles < 25_000, `${role}: ${triangles} triangles`);
+        assert.ok(triangles < (detail ? 45_000 : 25_000), `${role} (${detail ? 'close' : 'compact'}): ${triangles} triangles`);
       }
     }
   }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Course } from '../shared/courses.ts';
 import type { RaceSnapshot } from '../shared/protocol.ts';
+import { crewHeadGeometry } from './crew-geometry.ts';
 
 export interface SpaceportPerson {
   x: number;
@@ -91,17 +92,24 @@ export function buildSpaceportPeople(parent: THREE.Group, course: Course, placem
   const screenMaterial = new THREE.MeshBasicMaterial({ color: 0xb8b8b8, toneMapped: false });
   const count = people.length;
   // Capacities include every role's maximum simultaneous pose, including handheld props.
-  const boxes = makeBatch(group, 'People · uniforms and equipment', new THREE.BoxGeometry(1, 1, 1), surface, count * 22);
-  const limbs = makeBatch(group, 'People · articulated sleeves and legs', new THREE.CylinderGeometry(.42, .5, 1, 4), surface, count * 12);
-  const heads = makeBatch(group, 'People · faces', new THREE.SphereGeometry(.5, 6, 4), surface, count);
-  const hands = makeBatch(group, 'People · hands', new THREE.SphereGeometry(.5, 4, 2), surface, count * 2);
-  const torsos = makeBatch(group, 'People · fitted jackets', new THREE.CylinderGeometry(.5, .41, 1, 5), surface, count);
-  const hats = makeBatch(group, 'People · hair and safety helmets', new THREE.SphereGeometry(.5, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2), surface, count);
+  const boxes = makeBatch(group, 'People · uniforms and equipment', new THREE.BoxGeometry(1, 1, 1), surface, count * 42);
+  const limbs = makeBatch(group, 'People · articulated sleeves and legs', new THREE.CylinderGeometry(.42, .5, 1, 6), surface, count * 12);
+  const heads = makeBatch(group, 'People · faces', crewHeadGeometry(), surface, count);
+  const hands = makeBatch(group, 'People · hands', new THREE.SphereGeometry(.5, 6, 3), surface, count * 2);
+  const torsos = makeBatch(group, 'People · fitted jackets', new THREE.CylinderGeometry(.5, .41, 1, 8), surface, count);
+  const hats = makeBatch(group, 'People · hair and safety helmets', new THREE.SphereGeometry(.5, 12, 3, 0, Math.PI * 2, 0, Math.PI / 2), surface, count);
   const screens = makeBatch(group, 'People · tablet screens and camera flashes', new THREE.BoxGeometry(1, 1, 1), screenMaterial, count * 2);
   const shadows = makeBatch(group, 'People · sole contact shadows', new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ color: 0xffffff, map: contactTexture(), transparent: true, opacity: .62,
       depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), count);
   const batches = [boxes, limbs, heads, hands, torsos, hats, screens, shadows];
+  // Detail follows the existing close/compact quality switch. Retain the
+  // original far silhouettes and 25k crowd budget for four small viewports.
+  const detailedGeometry = [limbs, heads, hands, torsos, hats].map(batch => batch.mesh.geometry);
+  const compactGeometry = [new THREE.CylinderGeometry(.42, .5, 1, 4), new THREE.SphereGeometry(.5, 6, 4),
+    new THREE.SphereGeometry(.5, 4, 2), new THREE.CylinderGeometry(.5, .41, 1, 5),
+    new THREE.SphereGeometry(.5, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2)];
+  const lodBatches = [limbs, heads, hands, torsos, hats];
   const root = new THREE.Object3D();
   const part = new THREE.Object3D();
   const matrix = new THREE.Matrix4();
@@ -202,6 +210,17 @@ export function buildSpaceportPeople(parent: THREE.Group, course: Course, placem
       hardhat ? .285 : .248, hardhat ? 0xe3bd53 : cap ? 0x344b5c : person.hair);
     if (hardhat || cap) shape(boxes, 0, headY + .071, .07, hardhat ? .31 : .235, .024, .25,
       hardhat ? 0xf1c95e : 0x344b5c);
+    if (detail) {
+      shape(boxes, 0, headY - .075, .112, .070, .011, .014, 0x8c6252);
+      shape(boxes, 0, chestY + .02, .141, .013, .31, .013, dark);
+      shape(boxes, .074, .826 + settle, .134, .055, .035, .018, 0x9babad);
+      shape(boxes, -.09, chestY + .08, .151, .090, .080, .014, hardhat ? 0x244c5c : 0x738e9a);
+      shape(boxes, -.09, chestY + .10, .162, .064, .022, .006, 0xe1dccc);
+      if (hardhat) {
+        shape(boxes, 0, headY + .183, -.01, .047, .036, .21, 0xf1cb68);
+        shape(boxes, 0, chestY - .06, -.144, .31, .045, .014, 0xe0e5ce);
+      }
+    }
     for (let side = -1; side <= 1; side += 2) {
       const glasses = role === 'scientist' || hardhat;
       shape(boxes, side * .058, headY + .025, .115, glasses ? .079 : .022, glasses ? .042 : .014,
@@ -215,6 +234,11 @@ export function buildSpaceportPeople(parent: THREE.Group, course: Course, placem
       bone(side * .108, .727 + settle, 0, footX, kneeY, kneeZ, .145, trousers);
       bone(footX, kneeY, kneeZ, footX, .105 + footLift, footZ, .108, trousers);
       shape(boxes, footX, .061 + footLift, footZ + .035, .133, .122, .239, dark);
+      if (detail) {
+        shape(boxes, footX, .014 + footLift, footZ + .04, .141, .026, .25, 0x161f22);
+        shape(boxes, footX, .12 + footLift, footZ + .018, .066, .014, .085, 0x627175);
+        shape(boxes, side * .10, 1.248 + settle, .08, .075, .032, .11, shirt, -.12, 0, side * -.25);
+      }
 
       let elbowX = side * .255;
       let elbowY = .991 + settle;
@@ -370,7 +394,14 @@ export function buildSpaceportPeople(parent: THREE.Group, course: Course, placem
         }
       }
     },
-    setDetail(enabled: boolean) { detail = enabled; },
+    setDetail(enabled: boolean) {
+      if (detail === enabled) return;
+      detail = enabled;
+      for (let i = 0; i < lodBatches.length; i++) lodBatches[i].mesh.geometry = (enabled ? detailedGeometry : compactGeometry)[i];
+      // Updating immediately prevents one frame of close accessories on the
+      // compact mesh, and makes re-entering chase deterministic.
+      render(lastRender === undefined || startedAt === undefined ? 0 : Math.max(0, (lastRender - startedAt) / 1000), 0);
+    },
     setNight(night: boolean) { screenMaterial.color.setScalar(night ? .95 : .72); },
   };
 }

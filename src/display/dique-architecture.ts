@@ -4,6 +4,7 @@ import { DIQUE_BUILDING_PAD as slabHeight, diqueBuildingFootprint, diqueBuilding
   type DiqueBuilding } from './dique-architecture-layout';
 import { DIQUE_GROUND, diquePart, diqueRoadClear, diqueSign } from './dique-geometry';
 import { box, canvas2d, standard, texture } from './materials';
+import { buildIndustrialFacade } from './industrial-facades';
 
 const zinc = standard(0x778481, 0.57, 0.48);
 const iron = standard(0x474d48, 0.75, 0.29);
@@ -146,6 +147,11 @@ export function buildDiqueArchitecture(parent: THREE.Group, course: Course, conc
     const shell = new THREE.Group();
     shell.position.y = slabHeight;
     group.add(shell);
+    const facadePaint = concrete.clone(); facadePaint.roughness = .73; facadePaint.metalness = .13;
+    buildIndustrialFacade(shell, site.width, site.depth,
+      site === diqueBuildings.depot ? 4.0 : site === diqueBuildings.workshop ? 3.1 : 2.35,
+      facadePaint, zinc, site === diqueBuildings.workshop, .20);
+    facadePaint.dispose();
     const art = asset?.getObjectByName(site.model);
     if (!art) {
       plaque(group, site);

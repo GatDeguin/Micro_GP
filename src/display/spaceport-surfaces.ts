@@ -61,7 +61,8 @@ export function createSpaceportSurfaces() {
   const steel = material('steel', .82, .003);
   const wood = material('wood', 0, .010), asphalt = material('asphalt', .02, .008);
   const rubber = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .96, metalness: 0 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .17, metalness: .28, envMapIntensity: 1.6 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: .12,
+    metalness: .24, envMapIntensity: 1.9, clearcoat: .75, clearcoatRoughness: .10 });
   const routes = new Map<number, THREE.MeshStandardMaterial>();
   for (const color of [0x858d89, 0xaaa99b, 0x777e78]) routes.set(color, concrete);
   routes.set(0xc4c6bc, plaster);

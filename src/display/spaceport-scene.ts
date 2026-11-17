@@ -477,7 +477,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
     for (let i = 0; i < 3; i++) d.box(x + i * 1.25 - 1.3, .52, z + .7, 1.0, .91, .96, tone.white);
   }
   d.finish();
-  const campus = buildSpaceportCampus(fixed, course, batch, { metal, concrete, roadway });
+  const campus = buildSpaceportCampus(fixed, course, batch, { metal, concrete, roadway, steel: surfaces.steel, paint: surfaces.paint });
   const workplaces = buildSpaceportWorkplaces(animated, course, { ...surfaces, metal: surfaces.steel });
   const people = buildSpaceportPeople(animated, course, [...campus.people, ...workplaces.people]);
   const vehicles = await buildSpaceportVehicles(animated, {

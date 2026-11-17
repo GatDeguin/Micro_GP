@@ -98,7 +98,7 @@ function serviceTruck(group: THREE.Group, paint: THREE.Material, trailer: boolea
     box(cab, glass, 1.00, 1.96, side * 1.079, 1.15, 0.62, 0.049, false);
     box(cab, paint, 1.51, 1.96, side * 1.117, 0.072, 0.64, 0.054, false);
     box(cab, steel, 0.61, 1.58, side * 1.146, 0.22, 0.05, 0.033, false);
-    box(cab, coal, 1.27, 0.58, side * 1.07, 0.71, 0.13, 0.38, false);
+    box(cab, coal, .38, 0.58, side * 1.07, .54, 0.13, 0.38, false);
     box(cab, coal, 1.51, 2.03, side * 1.27, 0.063, 0.055, 0.35, false);
     box(cab, coal, 1.51, 2.02, side * 1.43, 0.10, 0.32, 0.17, false);
     box(cab, steel, 1.45, 2.02, side * 1.43, 0.033, 0.24, 0.124, false);
@@ -107,6 +107,25 @@ function serviceTruck(group: THREE.Group, paint: THREE.Material, trailer: boolea
     box(cab, tail, frameEnd - 0.021, 0.62, side * 0.92, 0.076, 0.13, 0.22, false);
     box(cab, backup, frameEnd - 0.034, 0.62, side * 0.70, 0.070, 0.112, 0.15, false);
     box(cab, steel, -0.42, 0.66, side * 0.85, 0.73, 0.26, 0.37, false);
+    // Door shuts, hinges, wiper arms and rubber window gaskets remain grouped
+    // with the moving cab. All fittings follow the truck, never the world.
+    for (const x of [.32, 1.58]) box(cab, coal, x, 1.33, side * 1.141, .018, .55, .024, false);
+    box(cab, coal, .95, 1.61, side * 1.146, 1.28, .026, .022, false);
+    box(cab, steel, .34, 1.51, side * 1.16, .047, .10, .032, false);
+    box(cab, steel, .34, 1.05, side * 1.16, .047, .10, .032, false);
+    for (const x of [.20, .38, .56]) box(cab, steel, x, .655, side * 1.11, .035, .022, .30, false);
+    for (const x of [-.65, -.18]) box(cab, coal, x, .67, side * 1.046, .035, .27, .025, false);
+    const wiper = box(cab, coal, 1.73, 1.77, side * .46, .028, .035, .47, false);
+    wiper.rotation.x = side * .19;
+    for (let y = 1.11; y < 1.43; y += .075) box(cab, coal, .45, y, side * 1.15, .24, .025, .025, false);
+    box(cab, yellow, 1.38, 1.46, side * 1.16, .16, .068, .018, false);
+    for (const ax of trailer ? [1.22, -3.50, -4.35] : [1.13, -1.92]) {
+      box(cab, rubber, ax - .53, .46, side * 1.03, .055, .43, .39, false);
+      // The arch is open under the fender: no slab crossing the tire.
+      const arch = diquePart(cab, new THREE.TorusGeometry(.50, .055, 4, 12, Math.PI), paint);
+      arch.position.set(ax, .454, side * 1.14);
+      box(cab, steel, ax - .47, .83, side * 1.14, .08, .08, .06, false);
+    }
   }
   box(cab, coal, 0.96, 2.474, 0, 0.35, 0.066, 0.63, false);
   box(cab, top, 0.96, 2.532, 0, 0.22, 0.074, 0.48, false);

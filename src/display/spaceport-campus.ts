@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { Course } from '../shared/courses';
 import type { SpaceportPerson } from './spaceport-people';
 import { canvas2d, random, texture } from './materials';
+import { buildIndustrialFacade } from './industrial-facades';
 import { roundedServicePath, SPACEPORT_BUILDINGS, SPACEPORT_SERVICE_LOOP, SPACEPORT_SERVICE_ROADS } from './spaceport-campus-layout';
 
 interface PropWriter {
@@ -111,7 +112,8 @@ function siteLabels(parent: THREE.Group, labels: { text: string; x: number; y: n
 }
 
 export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch: PartFactory,
-  materials: { metal: THREE.MeshStandardMaterial; concrete: THREE.MeshStandardMaterial; roadway: THREE.MeshStandardMaterial }) {
+  materials: { metal: THREE.MeshStandardMaterial; concrete: THREE.MeshStandardMaterial; roadway: THREE.MeshStandardMaterial;
+    steel?: THREE.MeshStandardMaterial; paint?: THREE.MeshStandardMaterial }) {
   const group = new THREE.Group(); group.name = 'Campus habitado y paisaje del centro espacial'; parent.add(group);
   const d = batch(group, materials.metal, 'Arquitectura y equipamiento del campus', 52, materials.concrete);
   const landscapeMaterial = materials.concrete.clone(); landscapeMaterial.roughness = .96;
@@ -170,6 +172,9 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   for (const site of SPACEPORT_BUILDINGS) {
     const { x, z, width: w, depth: depth, height: h, style } = site;
     const front = z + depth / 2;
+    const service = new THREE.Group(); service.position.set(x, 0, z); group.add(service);
+    buildIndustrialFacade(service, w, depth, h, materials.paint ?? materials.metal, materials.steel ?? materials.metal,
+      site.id === 'avionics' || site.id === 'instrumentation');
     d.box(x, -.065, z, w + 3, .15, depth + 3, palette.concrete);
     const shell = new RoundedBoxGeometry(w, h, depth, 2, .18);
     d.part(shell, x, h / 2, z, 1, 1, 1, style === 'warehouse' ? palette.navy : palette.wall);

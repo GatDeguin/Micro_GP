@@ -8,6 +8,7 @@ import { standard } from './materials';
 import { marshalSignal, nearestCar } from './world-cues';
 import { createDiqueWorkCycle, sampleDiqueWork } from './dique-work-cycle';
 import type { DiqueWorkstation } from './dique-workstations';
+import { crewHeadGeometry } from './crew-geometry';
 
 type Point = readonly [number, number, number];
 type Role = 'mechanic' | 'marshal' | 'gate' | 'dock' | 'clerk' | 'rigger' | 'mooring' | 'dispatcher';
@@ -198,10 +199,11 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course, stations:
   const box = batch(group, 'Uniformes, equipo y pasarela', new THREE.BoxGeometry(1, 1, 1), coated, people * 14 + 100);
   const joint = batch(group, 'Mangas y pantalones', new THREE.CapsuleGeometry(0.5, 0.01, 2, 6), coated, people * 8 + hoseSegments);
   const round = batch(group, 'Caras y guantes', new THREE.SphereGeometry(0.5, 8, 5), coated, people * 4 + 16);
+  const heads = batch(group, 'Rostros con orejas y volumen', crewHeadGeometry(), coated, people);
   const chest = batch(group, 'Torsos de los operarios', new THREE.CylinderGeometry(0.5, 0.39, 1, 7), coated, people);
   const brim = batch(group, 'Viseras de protección', new THREE.CylinderGeometry(0.5, 0.5, 1, 9), coated, people * 2);
   const helmet = batch(group, 'Cascos', new THREE.SphereGeometry(0.5, 9, 5, 0, 2 * Math.PI, 0, Math.PI / 2), coated, people);
-  const detailBox = batch(group, 'Cintas reflectantes y detalle del uniforme', new THREE.BoxGeometry(1, 1, 1), accents, people * 6 + 20);
+  const detailBox = batch(group, 'Cintas reflectantes y detalle del uniforme', new THREE.BoxGeometry(1, 1, 1), accents, people * 26 + 20);
   const hotMetal = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const sparks = batch(group, 'Soldadura y virutas calientes', new THREE.SphereGeometry(.5, 5, 3), hotMetal, 12);
   const flagPlane = new THREE.PlaneGeometry(1, 1);
@@ -212,7 +214,7 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course, stations:
   const shadows = batch(group, 'Contacto de los operarios', new THREE.PlaneGeometry(1, 1),
     new THREE.MeshBasicMaterial({ map: contactMap(), transparent: true, opacity: 0.72, depthWrite: false, polygonOffset: true,
       polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), people);
-  const batches = [box, joint, round, chest, brim, helmet, detailBox, flag, checker, shadows, sparks];
+  const batches = [box, joint, round, heads, chest, brim, helmet, detailBox, flag, checker, shadows, sparks];
   const taskCycle = createDiqueWorkCycle();
   const root = new THREE.Object3D();
   const part = new THREE.Object3D();
@@ -327,10 +329,19 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course, stations:
     shape(box, [0, 0.68 + settle, lean * 0.37], [0.335, 0.16, 0.24], uniform);
     shape(box, [0, 0.746 + settle, lean * 0.56], [0.36, 0.035, 0.246], boot);
     const headZ = lean * 1.75;
-    shape(round, [0, 1.251 + settle, headZ], [0.238, 0.259, 0.225], skin);
+    shape(heads, [0, 1.251 + settle, headZ], [0.238, 0.259, 0.225], skin);
     shape(round, [0, 1.261 + settle, headZ + 0.1], [0.079, 0.068, 0.074], skin);
     shape(brim, [0, 1.339 + settle, headZ + 0.014], [0.277, 0.027, role === 'mechanic' ? 0.29 : 0.276], cap, -0.09);
     shape(helmet, [0, 1.355 + settle, headZ], [0.23, 0.226, 0.232], cap);
+    if (detail) {
+      shape(detailBox, [0, 1.422 + settle, headZ], [.039, .028, .18], cap);
+      shape(detailBox, [0, 1.196 + settle, headZ + .106], [.064, .010, .014], 0x795645);
+      shape(detailBox, [0, .947 + settle, lean + .157], [.015, .31, .014], 0x2d3636, tinkering * .35);
+      shape(detailBox, [-.087, 1.004 + settle, lean + .158], [.088, .078, .016], 0x43575c, tinkering * .35);
+      shape(detailBox, [-.087, 1.022 + settle, lean + .170], [.065, .022, .009], 0xdfd7b9, tinkering * .35);
+      shape(detailBox, [.044, .75 + settle, lean * .56 + .135], [.052, .034, .022], 0x9ba9a6);
+      shape(detailBox, [-.18, .71 + settle, lean * .56], [.092, .14, .12], 0x454943);
+    }
 
     for (const side of [-1, 1]) {
       const x = side * 0.116;
@@ -381,6 +392,10 @@ export function buildDiqueWorkers(parent: THREE.Group, course: Course, stations:
       shape(box, [side * 0.094, 0.936 + settle, lean + 0.119], [0.104, 0.302, 0.058], vest, tinkering * 0.35);
       shape(box, [side * 0.092, 0.941 + settle, lean - 0.116], [0.118, 0.282, 0.052], vest, tinkering * 0.35);
       if (!detail) continue;
+      shape(detailBox, [foot[0], foot[1] - .065, foot[2] + .048], [.14, .025, .23], 0x171e1d);
+      shape(detailBox, [foot[0], foot[1] + .028, foot[2] + .043], [.068, .012, .065], 0x6a7068);
+      shape(detailBox, [side * .09, 1.075 + settle, lean + .08], [.073, .031, .10], uniform, tinkering * .35, 0, side * -.20);
+      shape(detailBox, [side * .05, 1.28 + settle, headZ + .115], [.068, .037, .014], 0x657e7e);
       if (role !== 'mechanic') {
         for (const face of [-1, 1]) shape(detailBox, [side * 0.092, 0.89 + settle, lean + face * 0.15],
           [0.109, 0.044, 0.013], 0xcdd2c2, tinkering * 0.32);

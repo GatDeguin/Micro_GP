@@ -50,6 +50,8 @@ MATS = {'body': mat('Fleet satin enamel / vertex palette', .42, .28),
         'wheel': mat('Fleet rubber and alloy', .68, .08)}
 MATS['body'].node_tree.nodes.get('Principled BSDF').inputs['Coat Weight'].default_value = .25
 MATS['body'].node_tree.nodes.get('Principled BSDF').inputs['Coat Roughness'].default_value = .25
+MATS['glass'].node_tree.nodes.get('Principled BSDF').inputs['Coat Weight'].default_value = .75
+MATS['glass'].node_tree.nodes.get('Principled BSDF').inputs['Coat Roughness'].default_value = .08
 
 class Batch:
     def __init__(self): self.v, self.f, self.c = [], [], []
@@ -122,7 +124,14 @@ class Batch:
         mesh.materials.append(material)
         colors=mesh.color_attributes.new(name='Color',type='FLOAT_COLOR',domain='CORNER')
         for polygon,color in zip(mesh.polygons,self.c):
-            for loop in polygon.loop_indices: colors.data[loop].color=color
+            # Stable crevice/underbody shading; direct light still supplies the
+            # moving highlight. Avoid painting shadows onto glass or lenses.
+            for loop in polygon.loop_indices:
+                factor=1
+                if name.endswith('_body'):
+                    h=mesh.vertices[mesh.loops[loop].vertex_index].co.z
+                    factor=(.80 if polygon.normal.z < -.2 else 1)*(.89+.11*min(1,max(0,h/.8)))
+                colors.data[loop].color=tuple(v*factor for v in color[:3])+(1,)
         # Correct every disconnected primitive using its closed volume where possible.
         obj=bpy.data.objects.new(name,mesh); scene.collection.objects.link(obj)
         return obj
@@ -223,14 +232,58 @@ def build(kind):
     body.box(0,top,mid,width*.57,.06,.15,'dark',.015)
     for x in [-width*.22,width*.22]: beacon.box(x,top+.065,mid,.23,.11,.16,'amber',.025)
     for x in [-width*.22,width*.22]: body.box(x,1.59 if truck else 1.20,cabin_front+.015,.04,.035,.36 if truck else .25,'dark')
+    # Close-camera fittings remain in the same four material batches.
+    for sign in [-1,1]:
+        x=sign*(width/2+.015)
+        for y in ([1.06,1.30] if truck else [.73,.88]):
+            body.box(x,y,cab_rear+.08,.035,.075,.055,'silver')
+        body.box(x,1.50 if truck else 1.12,(cab_rear+cabin_front)/2,.025,.023,cabin_front-cab_rear-.12,'dark')
+        # Recessed footstep with anti-slip bars and an amber side marker.
+        step_y=.65 if truck else .55
+        body.box(x+sign*.05,step_y,cab_rear+.38,.23,.10,.73,'dark',.02)
+        for dz in [-.25,0,.25]: body.box(x+sign*.05,step_y+.058,cab_rear+.38+dz,.20,.018,.036,'silver')
+        beacon.box(x+sign*.01,.96 if truck else .81,cabin_front-.22,.025,.07,.12,'amber')
+        # Rear mudflaps sit behind the rolling tyre and never intersect its envelope.
+        for axle in axles:
+            body.box(sign*(width/2-.05),rw*.77,axle-rw-.11,.34,rw*.85,.055,'rubber')
+        if truck:
+            for y in [1.13,2.97]:
+                for z in [-3.57,-1.08,1.40]: body.box(x+.02*sign,y,z,.023,.035,.035,'dark')
+            body.box(sign*.82,1.02,-3.94,.07,.11,.08,'dark')
+            body.box(sign*.58,.77,-2.25,.13,.18,2.15,'dark')
+            body.box(sign*.62,.70,-2.25,.06,.07,2.15,'silver')
+        else:
+            # Tailgate hinge, latch and tie-down eyes, plus a real tool case lid.
+            body.box(sign*.58,.94,-2.36,.20,.045,.035,'silver')
+            body.box(sign*.86,1.25,-1.80,.055,.055,.14,'dark')
+    body.box(0,1.17 if not truck else 1.85,rear-.11,.30,.055,.035,'dark')
+    # Tow loops and grille badge give the front a recognisable mechanical scale.
+    for x in [-width*.29,width*.29]:
+        body.box(x,.50 if not truck else .52,nose+.09,.12,.07,.06,'silver',.015)
+    body.box(0,grille_y,nose+.044,.17,.095,.025,'navy',.012)
     for category,batch in batches.items(): batch.object(kind+'_'+category,MATS[category])
     return {'kind':kind,'wheelRadius':rw,'wheelWidth':.28 if truck else .22,'wheelX':width/2-.05,'axles':axles}
 
 manifest=[build(kind) for kind in ['truck','pickup','security']]
 wheel=Batch()
-wheel.ring(0,0,0,.61,1,1,'rubber',16)
+# One continuous six-ring rounded shoulder. Internal duplicate ring walls
+# would consume thousands of invisible triangles across the fleet.
+profile=[(-.5,.61),(-.5,.85),(-.36,1),(.36,1),(.5,.85),(.5,.61)]
+for i in range(18):
+    a=math.tau*i/18; b=math.tau*(i+1)/18
+    for j in range(len(profile)):
+        x1,r1=profile[j]; x2,r2=profile[(j+1)%len(profile)]
+        wheel.face([(x1,math.cos(a)*r1,math.sin(a)*r1),(x2,math.cos(a)*r2,math.sin(a)*r2),
+                    (x2,math.cos(b)*r2,math.sin(b)*r2),(x1,math.cos(b)*r1,math.sin(b)*r1)][::-1],'rubber')
 wheel.ring(0,0,0,.20,.64,1.025,'silver',12)
 wheel.ring(0,0,0,.05,.24,1.10,'dark',12)
+# Shallow tread grooves are two radial rows; the tyre silhouette stays round.
+for i in range(20):
+    a=math.tau*i/20; b=a+.038
+    wheel.face([(-.33,math.cos(a)*1.002,math.sin(a)*1.002),
+                (.33,math.cos(a+.055)*1.002,math.sin(a+.055)*1.002),
+                (.33,math.cos(b+.055)*1.002,math.sin(b+.055)*1.002),
+                (-.33,math.cos(b)*1.002,math.sin(b)*1.002)][::-1],'dark')
 for sign in [-1,1]:
     for i in range(6):
         a=math.tau*i/6

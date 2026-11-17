@@ -146,6 +146,32 @@ function forklift(parent: THREE.Group) {
   part(body, chassis, 0, 1.99, 1.10, 0.98, 0.094, 0.17);
   part(forks, chassis, 0, 0.54, 1.26, 1.06, 0.16, 0.109);
   part(forks, chassis, 0, 0.75, 1.26, 1.06, 0.082, 0.087);
+  // Hydraulic lift with piston collars, flexible hoses and a chain guide.
+  for (const x of [-.29, .29]) {
+    const ram = diquePart(body, new THREE.CylinderGeometry(.06, .06, 1.0, 10), chassis);
+    ram.position.set(x, 1.02, 1.15);
+    const piston = diquePart(body, new THREE.CylinderGeometry(.031, .031, .54, 10), steel);
+    piston.position.set(x, 1.73, 1.15);
+    for (let y = .62; y < 1.95; y += .12) part(body, steel, x + .12, y, 1.16, .037, .055, .025);
+    const path = new THREE.CatmullRomCurve3([new THREE.Vector3(x, .63, 1.1),
+      new THREE.Vector3(x, .52, .68), new THREE.Vector3(x + .14, .65, .25), new THREE.Vector3(x + .18, 1.02, .25)]);
+    diquePart(body, new THREE.TubeGeometry(path, 10, .022, 5, false), tire);
+  }
+  for (const x of [-.74, .74]) {
+    for (let z = -.99; z < -.36; z += .12) part(body, chassis, x, .85, z, .018, .15, .032);
+    part(body, steel, x, .66, -.44, .026, .035, .17);
+    part(body, chassis, x, .62, -.04, .20, .07, .48);
+    for (let z = -.2; z < .2; z += .12) part(body, steel, x, .665, z, .17, .017, .025);
+  }
+  // Control levers sit by the driver's hand; harness and cuff read in chase.
+  for (const x of [.12, .23]) {
+    part(body, steel, x, 1.05, .28, .024, .26, .025).rotation.x = -.20;
+    part(body, tire, x, 1.17, .25, .05, .065, .05);
+  }
+  part(driver, steel, -.13, 1.13, -.052, .31, .037, .026);
+  part(driver, workwear, .08, 1.31, .09, .10, .12, .39).rotation.x = .21;
+  part(driver, skin, .08, 1.27, .27, .09, .084, .10);
+  for (const x of [-.18, -.08]) part(driver, chassis, x, 1.68, -.060, .032, .025, .019);
   mergeStatic(body);
   mergeStatic(forks);
 
