@@ -34,11 +34,14 @@ function campusSky(parent: THREE.Group) {
       void main(){vec3 d=normalize(direction);float h=smoothstep(-.06,.80,d.y);
         vec3 day=mix(vec3(.72,.68,.56),vec3(.16,.34,.49),h);
         vec3 dark=mix(vec3(.055,.105,.15),vec3(.009,.022,.055),h);
-        float cloud=sin(d.x*14.+d.z*8.)+sin(d.x*31.-d.z*12.)*.35+sin(d.z*40.)*.16;
-        cloud=smoothstep(.44,1.04,cloud)*smoothstep(.08,.19,d.y)*(1.-smoothstep(.30,.56,d.y));
-        day=mix(day,vec3(.78,.79,.73),cloud*.44);
-        float glow=pow(max(0.,dot(d,normalize(vec3(-110.,115.,160.)))),32.);
-        day+=vec3(.14,.075,.02)*glow;
+        vec2 q=d.xz/(.22+max(0.,d.y));
+        float cloud=sin(q.x*4.3+q.y*2.7)+.51*sin(q.x*8.1-q.y*3.1)+.25*sin(q.x*14.3+q.y*7.1);
+        float cover=smoothstep(.13,.89,cloud)*smoothstep(.025,.16,d.y)*(1.-smoothstep(.62,.90,d.y));
+        vec3 sunDir=normalize(vec3(-145.,88.,168.));
+        float light=max(0.,dot(d,sunDir));
+        day=mix(day,mix(vec3(.61,.67,.71),vec3(1.03,.93,.78),smoothstep(.37,.98,light)),cover*.63);
+        day+=vec3(.22,.11,.035)*pow(light,16.)+vec3(1.0,.62,.29)*pow(light,420.);
+        dark+=cover*vec3(.021,.030,.043);
         gl_FragColor=vec4(mix(day,dark,night),1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

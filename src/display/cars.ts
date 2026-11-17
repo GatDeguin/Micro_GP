@@ -578,9 +578,11 @@ function contactShadow(dimensions: CarDimensions, material: THREE.Material) {
     patches.push(new THREE.PlaneGeometry(0.41, 0.51).rotateX(-Math.PI / 2)
       .translate(WHEEL_SIDE * dimensions.renderScale[0] * side, 0.002, dimensions.axle * end));
   }
+  patches.push(new THREE.PlaneGeometry(dimensions.halfWidth * 2.93, (dimensions.front + dimensions.rear) * 1.26)
+    .rotateX(-Math.PI / 2).translate(0, .003, 0));
   const geometry = mergeGeometries(patches);
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(
-    patches.flatMap((_, i) => Array.from({ length: 4 }, () => [1, 1, 1, i === 0 ? 0.60 : 1]).flat()), 4));
+    patches.flatMap((_, i) => Array.from({ length: 4 }, () => [1, 1, 1, i === 0 ? 0.60 : i === 5 ? 0 : 1]).flat()), 4));
   const shadow = new THREE.Mesh(geometry, material);
   patches.forEach(patch => patch.dispose());
   shadow.position.y = 0.009;
@@ -719,6 +721,9 @@ export function buildCars(parent: THREE.Object3D) {
     headlights.scale.copy(chassis.scale);
     const shadow = contactShadow(dimensions, shadowMaterial);
     const shadowVertices = shadow.geometry.getAttribute('position');
+    const shadowColors = shadow.geometry.getAttribute('color');
+    const projectionCorners = Array.from({ length: 4 }, (_, corner) =>
+      new THREE.Vector2(shadowVertices.getX(20 + corner), shadowVertices.getZ(20 + corner)));
     chassis.add(detail);
     root.add(shadow, chassis, axles, headlights);
     parent.add(root);
@@ -825,6 +830,7 @@ export function buildCars(parent: THREE.Object3D) {
     const roadBasis = new THREE.Matrix4();
     const roadYaw = new THREE.Quaternion();
     const upright = new THREE.Vector3(0, 1, 0);
+    let projectedOpacity = 0;
     return {
       setNight(enabled: boolean) { night = enabled; },
       setProjectedShadow(enabled: boolean) { for (const caster of casters) caster.castShadow = enabled; },
@@ -879,6 +885,24 @@ export function buildCars(parent: THREE.Object3D) {
           && Math.abs(course.heightAt(road.s, road.offset) - view.y) < 0.10;
         const sinYaw = Math.sin(view.yaw);
         const cosYaw = Math.cos(view.yaw);
+        // A soft, directional silhouette extends the close contact shadow on
+        // level outdoor decks. The four tyre contacts keep their own positions.
+        const grounded = !spatial || spatial.ny > .72;
+        const projection = course.id !== 'taller' && !lit && grounded
+          ? .71 * (1 - THREE.MathUtils.smoothstep(view.arcade?.jump ?? 0, .08, 1.20)) : 0;
+        if (projection !== projectedOpacity || projection > 0) {
+          const dx = (.53 * cosYaw + .62 * sinYaw) * projection;
+          const dz = (.53 * sinYaw - .62 * cosYaw) * projection;
+          for (let corner = 0; corner < 4; corner++) {
+            const point = projectionCorners[corner];
+            shadowVertices.setX(20 + corner, point.x + dx);
+            shadowVertices.setZ(20 + corner, point.y + dz);
+            shadowColors.setW(20 + corner, projection);
+          }
+          shadowVertices.needsUpdate = true;
+          if (projection !== projectedOpacity) shadowColors.needsUpdate = true;
+          projectedOpacity = projection;
+        }
         const sinPitch = Math.sin(pitch);
         const cosPitch = Math.cos(pitch);
         const sinBank = Math.sin(bankRoll);

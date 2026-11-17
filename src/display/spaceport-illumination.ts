@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Course } from '../shared/courses.ts';
+import { sceneryLights } from './render-layers.ts';
 
-/** Two local floodlights plus batched, baked pools; one shared sun still owns shadows. */
+/** Local floodlights plus batched pools. One shared sun owns the shadow map. */
 export function buildSpaceportIllumination(parent: THREE.Group, course: Course) {
   const group = new THREE.Group(); group.name = 'Spaceport · iluminación de competición y plataforma'; parent.add(group);
   const size = 64, pixels = new Uint8Array(size * size * 4);
@@ -58,11 +59,20 @@ export function buildSpaceportIllumination(parent: THREE.Group, course: Course) 
 
   const steel = new THREE.MeshStandardMaterial({ color: 0x677c84, roughness: .48, metalness: .65 });
   const emissive = new THREE.MeshBasicMaterial({ color: 0xffe5bb, toneMapped: false });
-  const poles = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), steel, 8);
-  const lenses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), emissive, 12);
+  const stations = [[-7, 15, -212, 26, 22, -184], [61, 16, -147, 29, 19, -184]];
+  const campus = course.chicane.to;
+  for (const [distance, side] of [[campus + 11, -1], [campus + 33, 1]]) {
+    const frame = course.frameAt!(distance);
+    const offset = course.wallHalfAt(distance, side) + 1.45;
+    const target = course.frameAt!(distance + 5);
+    stations.push([frame.x - frame.rx * side * offset, frame.y + 5.2,
+      frame.z - frame.rz * side * offset, target.x, target.y + .05, target.z]);
+  }
+  const poles = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), steel, stations.length * 4);
+  const lenses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), emissive, stations.length * 6);
   const rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
   const floods: THREE.SpotLight[] = [];
-  for (const [i, [x, y, z, tx, ty, tz]] of [[-7, 15, -212, 26, 22, -184], [61, 16, -147, 29, 19, -184]].entries()) {
+  for (const [i, [x, y, z, tx, ty, tz]] of stations.entries()) {
     poles.setMatrixAt(i * 4, matrix.compose(position.set(x, y / 2, z), rotation.identity(), scale.set(.24, y, .24)));
     poles.setMatrixAt(i * 4 + 1, matrix.compose(position.set(x, .07, z), rotation, scale.set(1.7, .3, 1.7)));
     rotation.setFromRotationMatrix(basis.lookAt(new THREE.Vector3(tx, ty, tz), new THREE.Vector3(x, y, z), new THREE.Vector3(0, 1, 0)));
@@ -72,16 +82,18 @@ export function buildSpaceportIllumination(parent: THREE.Group, course: Course) 
       position.set((j % 3 - 1) * .70, (j < 3 ? -.27 : .27), .16).applyQuaternion(rotation).add(new THREE.Vector3(x, y, z));
       lenses.setMatrixAt(i * 6 + j, matrix.compose(position, rotation, scale.set(.59, .43, .05)));
     }
-    const flood = new THREE.SpotLight(i ? 0xc8e7ff : 0xffd7a1, 100, 105, .71, .68, 2);
+    const flood = new THREE.SpotLight(i % 2 ? 0xc8e7ff : 0xffd7a1, i < 2 ? 100 : 0, i < 2 ? 105 : 28, .71, .76, 2);
+    if (i >= 2) flood.layers.set(sceneryLights);
     flood.position.set(x, y, z); flood.target.position.set(tx, ty, tz); flood.name = 'Reflector de plataforma · sin sombra adicional';
     group.add(flood, flood.target); floods.push(flood);
   }
-  poles.name = 'Torres de reflectores'; lenses.name = 'Doce lentes de reflector';
+  poles.name = 'Torres de reflectores'; lenses.name = 'Lentes de reflector';
   poles.castShadow = poles.receiveShadow = true; poles.computeBoundingSphere(); lenses.computeBoundingSphere(); group.add(poles, lenses);
   return {
     setNight(night: boolean) {
-      poolMaterial.opacity = night ? .30 : .025;
+      poolMaterial.opacity = night ? .51 : .025;
       floods[0].intensity = night ? 3400 : 140; floods[1].intensity = night ? 2400 : 110;
+      for (let i = 2; i < floods.length; i++) floods[i].intensity = night ? (i === 2 ? 178 : 130) : 0;
       emissive.color.setHex(night ? 0xffe2ae : 0xe0d4b8).multiplyScalar(night ? 2.2 : .9);
     },
   };

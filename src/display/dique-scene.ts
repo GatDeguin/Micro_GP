@@ -19,6 +19,7 @@ import { buildDiqueTreatment } from './dique-treatment';
 import { buildDiqueWorkers } from './dique-workers';
 import { buildDiqueWorkstations } from './dique-workstations';
 import { buildDiqueYard } from './dique-yard';
+import { applyExteriorOcclusion } from './scene-occlusion';
 
 export async function buildDiqueScene(parent: THREE.Group, course: Course, wood: THREE.Texture, compactEnabled = false) {
   parent.name = 'Gran Premio del Dique';
@@ -72,9 +73,11 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   if (craneActivity) equipment.placeholder.removeFromParent();
   else instanceStatic(equipment.placeholder);
   const ship = await shipLoading;
+  applyExteriorOcclusion(parent);
 
   return {
     backWall: harbor.backWall,
+    captureReflections: harbor.captureReflections,
     setNight(night: boolean) {
       harbor.setNight(night);
       track.setNight(night);

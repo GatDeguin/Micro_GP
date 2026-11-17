@@ -8,6 +8,7 @@ import { buildSpaceportPeople } from './spaceport-people';
 import { buildSpaceportVehicles } from './spaceport-vehicles';
 import { buildSpaceportActivity } from './spaceport-activity';
 import { createSpaceportSurfaces } from './spaceport-surfaces';
+import { applyExteriorOcclusion } from './scene-occlusion';
 import { buildSpaceportWorkplaces } from './spaceport-workplaces';
 import { buildSpaceportLaunch } from './spaceport-launch';
 import { buildSpaceportIllumination } from './spaceport-illumination';
@@ -128,16 +129,19 @@ function track(parent: THREE.Group, course: Course, material: THREE.MeshStandard
   let positions: number[] = [], colors: number[] = [], indices: number[] = [], uv: number[] = [];
   let distance = 0;
   const color = new THREE.Color();
-  function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, tint: number, reverse = false) {
+  function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, tint: number, reverse = false, edgeShade = 0) {
     const at = positions.length / 3; color.setHex(tint);
-    for (const v of [a, b, c, d]) { positions.push(v.x, v.y, v.z); colors.push(color.r, color.g, color.b); }
+    for (const [i, v] of [a, b, c, d].entries()) {
+      const shade = edgeShade && i % 2 === (edgeShade > 0 ? 1 : 0) ? .76 : 1;
+      positions.push(v.x, v.y, v.z); colors.push(color.r * shade, color.g * shade, color.b * shade);
+    }
     uv.push(0, distance, a.distanceTo(b), distance, 0, distance + spacing, c.distanceTo(d), distance + spacing);
     if (reverse) indices.push(at, at + 2, at + 1, at + 2, at + 3, at + 1);
     else indices.push(at, at + 1, at + 2, at + 2, at + 1, at + 3);
   }
   function ribbon(a: CourseFrame, b: CourseFrame, lowA: number, highA: number, lowB: number, highB: number,
-    lift: number, tint: number, reverse = false) {
-    quad(point(a, lowA, lift), point(a, highA, lift), point(b, lowB, lift), point(b, highB, lift), tint, reverse);
+    lift: number, tint: number, reverse = false, edgeShade = 0) {
+    quad(point(a, lowA, lift), point(a, highA, lift), point(b, lowB, lift), point(b, highB, lift), tint, reverse, edgeShade);
   }
   function flush() {
     const geometry = new THREE.BufferGeometry();
@@ -157,11 +161,11 @@ function track(parent: THREE.Group, course: Course, material: THREE.MeshStandard
     const leftA = course.roadHalfAt(s), rightA = course.pitRoadHalfAt(s);
     const leftB = course.roadHalfAt(t), rightB = course.pitRoadHalfAt(t);
     const asphalt = i % 7 ? 0x3b454c : 0x3d474e;
-    ribbon(a, b, -rightA, -1.42, -rightB, -1.42, 0, asphalt);
+    ribbon(a, b, -rightA, -1.42, -rightB, -1.42, 0, asphalt, false, -1);
     ribbon(a, b, -1.42, -.85, -1.42, -.85, 0, 0x3e484e);
     ribbon(a, b, -.85, .85, -.85, .85, 0, asphalt);
     ribbon(a, b, .85, 1.42, .85, 1.42, 0, 0x3e484e);
-    ribbon(a, b, 1.42, leftA, 1.42, leftB, 0, asphalt);
+    ribbon(a, b, 1.42, leftA, 1.42, leftB, 0, asphalt, false, 1);
     ribbon(a, b, -rightA - .65, leftA + .65, -rightB - .65, leftB + .65, -.42, tone.steel, true);
     for (const side of [-1, 1]) {
       const asphaltA = side < 0 ? rightA : leftA, asphaltB = side < 0 ? rightB : leftB;
@@ -517,6 +521,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   for (const side of [-1, 1]) arm.pipe(p(side * .14, 1.5, 1.8), p(side * .10, 1.25, 1.8), .033, tone.silver);
   arm.finish();
   const backWall = new THREE.Group(); backWall.name = 'Límite de la plataforma espacial'; parent.add(backWall);
+  applyExteriorOcclusion(parent);
   let night = false, detail = true;
   return {
     backWall,

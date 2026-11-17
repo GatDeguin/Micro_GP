@@ -175,7 +175,7 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
       const q = diqueEdge(course, p, offset);
       const streak = 0.94 + 0.040 * Math.cos(p.s * 0.092) + 0.025 * Math.sin(p.s * 0.29 + fraction * 1.6);
       const wheelLine = 1 - Math.min(1, Math.abs(Math.abs(fraction) - 0.43 + 0.05 * Math.sin(p.s * 0.23)) * 6.8);
-      const wear = streak * (1 - 0.16 * wheelLine + 0.072 * Math.abs(fraction) ** 3);
+      const wear = streak * (1 - 0.16 * wheelLine - 0.17 * Math.abs(fraction) ** 5);
       const wet = course.wetAt(p.s, offset);
       positions.push(q.x, q.y, q.z);
       uv.push(p.s * repeats, offset * 0.24);

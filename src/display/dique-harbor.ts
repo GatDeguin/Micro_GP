@@ -5,6 +5,7 @@ import { box, canvas2d, random, standard, texture } from './materials';
 import { instanceStatic, mergeStatic } from './batches';
 import { DIQUE_GROUND, DIQUE_WATER, diqueBeam, diqueEdge, diquePart, diquePlane, diqueSign, diqueSpan, diqueStrip } from './dique-geometry';
 import { buildDiqueGorge, diqueGorgeOutline } from './dique-gorge';
+import { cameraLights } from './render-layers';
 
 export const DIQUE_FRONT = 15.4;
 const left = diquePlanPoint(6.5, 0).x;
@@ -138,8 +139,8 @@ function waterMaterial() {
   const time = { value: 0 };
   const night = { value: 0 };
   const pilingPositions = { value: new Float32Array(quaysideLights) };
-  const water = new THREE.MeshPhysicalMaterial({ color: 0x0e3543, roughness: 0.23, metalness: 0.15,
-    clearcoat: 0.85, clearcoatRoughness: 0.145, ior: 1.333, envMapIntensity: 0.92 });
+  const water = new THREE.MeshPhysicalMaterial({ color: 0x0c2c36, roughness: 0.20, metalness: 0.12,
+    clearcoat: 0.95, clearcoatRoughness: 0.095, ior: 1.333, envMapIntensity: 1.15 });
   water.onBeforeCompile = shader => {
     shader.uniforms.harborTime = time;
     shader.uniforms.harborNight = night;
@@ -157,10 +158,10 @@ function waterMaterial() {
         vec2 second = vec2(-1.92, 0.62);
         vec2 third = vec2(0.36, 3.42);
         float drift = sin(dot(p, vec2(0.23, 0.31)) - t * 0.63);
-        return first * 0.102 * cos(dot(p, first) - (1.55 + current) * t + drift)
-          + second * 0.060 * cos(dot(p, second) + 1.6 * t + 0.62 * drift)
-          + third * 0.035 * cos(dot(p, third) - (2.1 + 3.7 * current) * t)
-          + vec2(0.057, -0.042) * sin(dot(p, vec2(4.31, -5.4)) + t * 2.21);
+        return first * mix(0.058, 0.102, current) * cos(dot(p, first) - (1.55 + current) * t + drift)
+          + second * 0.045 * cos(dot(p, second) + 1.6 * t + 0.62 * drift)
+          + third * 0.024 * cos(dot(p, third) - (2.1 + 3.7 * current) * t)
+          + vec2(0.038, -0.032) * sin(dot(p, vec2(4.31, -5.4)) + t * 2.21);
       }
     ` + shader.fragmentShader
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -189,7 +190,7 @@ function waterMaterial() {
           reflections += 1.0 - smoothstep(0.13, 2.16, alignment);
           darkPiling += 1.0 - smoothstep(0.08, 0.66, abs(quayPilings[i] - q.x - 0.33 * bands));
         }
-        float gold = reflections * quay * (0.045 + 0.74 * sparkle * detail) * (0.38 + 0.84 * harborNight);
+        float gold = reflections * quay * (0.032 + 0.58 * sparkle * detail) * (0.27 + 1.05 * harborNight);
         float shadow = darkPiling * (1.0 - smoothstep(16.0, 19.73, q.y)) * smoothstep(15.5, 16.2, q.y);
         float riverShade = smoothstep(-4.7, -2.75, diqueWorld.y);
         float ridge = smoothstep(0.19, 0.93, breakup * crossing + 0.54 * breakup);
@@ -364,15 +365,50 @@ export function buildDiqueHarbor(parent: THREE.Group, course: Course, wood: THRE
     concrete, false, 'Plataforma de hormigón del dique');
   land.position.y = DIQUE_GROUND;
   const { water, time, night } = waterMaterial();
-  const basin = diquePart(parent, diquePlane(moorings), water);
+  // The basin gets a separate material before static batching so its local
+  // reflection can be refreshed independently of the moving river.
+  const basinMaterial = water.clone();
+  basinMaterial.onBeforeCompile = water.onBeforeCompile;
+  basinMaterial.customProgramCacheKey = water.customProgramCacheKey;
+  const basin = diquePart(parent, diquePlane(moorings), basinMaterial);
   basin.name = 'Agua del muelle';
   basin.position.y = DIQUE_WATER;
   buildDiqueGorge(parent, course, river, concrete, water, time, night);
   buildQuay(parent, concrete, wood, facade, pier);
+  let reflection: THREE.WebGLRenderTarget | undefined;
+  let capturedAtNight = false;
+  function captureReflections(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
+    const target = new THREE.WebGLCubeRenderTarget(128, {
+      type: renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    });
+    const camera = new THREE.CubeCamera(.18, 74, target);
+    cameraLights(camera, false);
+    camera.position.set((left + right) * .5 + 28, DIQUE_WATER + .32, DIQUE_FRONT + 9.2);
+    const generator = new THREE.PMREMGenerator(renderer);
+    try {
+      basin.visible = false;
+      renderer.shadowMap.needsUpdate = true;
+      camera.update(renderer, scene);
+      const next = generator.fromCubemap(target.texture);
+      reflection?.dispose(); reflection = next;
+      basinMaterial.envMap = next.texture;
+      capturedAtNight = !!night.value;
+      applyReflectionIntensity();
+    } finally {
+      basin.visible = true;
+      generator.dispose(); target.dispose();
+    }
+  }
+  function applyReflectionIntensity() {
+    if (reflection) {
+      basinMaterial.envMapIntensity = night.value ? (capturedAtNight ? 1.25 : .45) : (capturedAtNight ? .85 : 1.30);
+    }
+  }
   return {
     backWall,
+    captureReflections,
     update(now: number) { time.value = (now % 900_000) / 1000; },
-    setNight(enabled: boolean) { night.value = Number(enabled); },
+    setNight(enabled: boolean) { night.value = Number(enabled); applyReflectionIntensity(); },
   };
 }
 

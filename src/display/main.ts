@@ -306,6 +306,7 @@ async function bootstrap() {
         await renderer.compileAsync(scene, camera);
         if (desiredCourse !== course || lostContext) return;
         renderer.render(scene, camera);
+        next.captureReflections?.(renderer, scene);
         await warmCloseView(next);
         if (desiredCourse !== course || lostContext) return;
         if (!pages) {

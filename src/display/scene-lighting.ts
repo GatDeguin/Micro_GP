@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TALLER, type Course } from '../shared/courses';
 import { BENCH_SURFACE } from './materials';
 import { sceneryLights } from './render-layers';
-import { spaceportEnvironment } from './spaceport-surfaces';
+import { exteriorEnvironment } from './spaceport-surfaces';
 import { SPACEPORT_BUILDINGS } from './spaceport-campus-layout';
 
 function panelFalloff() {
@@ -114,20 +114,30 @@ function fitShadow(key: THREE.DirectionalLight, points: readonly THREE.Vector3[]
 
 export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRenderer, lowQuality: boolean) {
   let environment: THREE.WebGLRenderTarget | undefined;
-  let outdoorEnvironment: THREE.WebGLRenderTarget | undefined;
+  const outdoorEnvironments = new Map<string, THREE.WebGLRenderTarget>();
+  let exterior = false;
   let spaceport = false;
+  let night = false;
   function restoreReflections() {
     if (lowQuality) return;
     const next = prefilterWorkshop(renderer);
     environment?.dispose();
     environment = next;
-    outdoorEnvironment?.dispose(); outdoorEnvironment = undefined;
+    for (const probe of outdoorEnvironments.values()) probe.dispose();
+    outdoorEnvironments.clear();
     selectReflections();
   }
   function selectReflections() {
     if (lowQuality) return;
-    if (spaceport) outdoorEnvironment ??= spaceportEnvironment(renderer);
-    scene.environment = (spaceport ? outdoorEnvironment : environment)?.texture ?? null;
+    if (!exterior) { scene.environment = environment?.texture ?? null; return; }
+    const course = spaceport ? 'spaceport' : 'dique';
+    // Both moods are ready on course entry so a race restart doesn't filter
+    // an HDR probe while rendering the first frame of the selected mood.
+    for (const dark of [false, true]) {
+      const id = `${course}:${dark}`;
+      if (!outdoorEnvironments.has(id)) outdoorEnvironments.set(id, exteriorEnvironment(renderer, !spaceport, dark));
+    }
+    scene.environment = outdoorEnvironments.get(`${course}:${night}`)!.texture;
   }
   restoreReflections();
 
@@ -148,7 +158,6 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   scene.add(key, key.target, fill, fill.target, bounce, benchLight, benchLight.target, toolLight, toolLight.target);
   let points = shadowPoints(TALLER);
   const lightCenter = new THREE.Vector3();
-  let dique = false;
   const trackLamps: { light: THREE.SpotLight; day: number }[] = [];
   const diffusers = new Set<THREE.MeshStandardMaterial>();
   const halos = new Set<THREE.SpriteMaterial>();
@@ -170,65 +179,79 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
   const nightBackground = new THREE.Color(0x101521);
   const harborSky = new THREE.Color(0x3c5061);
   const harborNight = new THREE.Color(0x122235);
+  const distanceHaze = new THREE.FogExp2(0xb3b6a5, .0027);
   let close = false;
-  let night = false;
 
   function applyLighting() {
     // A single shadow-casting key is shared by all views of a given frame.
     if (night) key.position.set(-12.0, 24.0, -17.0);
     else key.position.set(close ? -19.1 : -17.7, close ? 16.7 : 24.8, close ? 13.0 : -8.2);
-    if (dique) key.position.set(night ? -28 : -31, close ? 24 : 29, close ? 23 : 29).multiplyScalar(5.2);
-    if (spaceport) key.position.set(night ? -95 : -110, night ? 190 : 115, night ? -130 : 160);
+    if (exterior) key.position.set(night ? -108 : -143, night ? 145 : 96, night ? -86 : 172);
+    if (spaceport) key.position.set(night ? -95 : -145, night ? 190 : 88, night ? -130 : 168).multiplyScalar(2);
     key.position.add(lightCenter);
     key.target.position.copy(lightCenter);
-    key.color.setHex(dique ? (night ? 0xb7d0f2 : 0xffe0c3) : (night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9));
-    key.intensity = dique ? (night ? 1.48 : close ? 2.52 : 2.34) : (night ? 0.78 : close ? 3.10 : 2.94);
+    key.color.setHex(exterior ? (night ? 0xaac6ec : 0xffd2a6) : (night ? 0x9bb7e9 : close ? 0xffd1a4 : 0xffd8b9));
+    key.intensity = exterior ? (night ? .83 : 3.15) : (night ? 0.78 : close ? 3.10 : 2.94);
     fill.position.set(20.8, 11.5, close ? -7.2 : 13.7).add(lightCenter);
     fill.target.position.copy(lightCenter);
-    fill.color.setHex(dique ? (night ? 0x93b8ee : 0xb6d4f9) : (night ? 0x819ed4 : 0xe1eaff));
-    fill.intensity = dique ? (night ? 0.45 : 0.67) : (night ? 0.28 : close ? 0.49 : 0.66);
-    bounce.color.setHex(dique ? (night ? 0xb3cfed : 0xc5d9ed) : night ? 0x94acd3 : 0xffe9d7);
-    bounce.groundColor.setHex(dique ? (night ? 0x536272 : 0x8a7768) : (night ? 0x5a4045 : 0x4d4d54));
-    bounce.intensity = dique ? (night ? 0.56 : 0.52) : (night ? 0.24 : close ? 0.23 : 0.42);
+    fill.color.setHex(exterior ? (night ? 0x93b8ee : 0xb6d4f9) : (night ? 0x819ed4 : 0xe1eaff));
+    fill.intensity = exterior ? (night ? 0.23 : 0.37) : (night ? 0.28 : close ? 0.49 : 0.66);
+    bounce.color.setHex(exterior ? (night ? 0xb3cfed : 0xc5d9ed) : night ? 0x94acd3 : 0xffe9d7);
+    bounce.groundColor.setHex(exterior ? (night ? 0x536272 : 0x8a7768) : (night ? 0x5a4045 : 0x4d4d54));
+    bounce.intensity = exterior ? (night ? 0.36 : 0.46) : (night ? 0.24 : close ? 0.23 : 0.42);
     benchLight.intensity = night ? 187 : 277;
     toolLight.intensity = night ? 164 : 254;
     for (const { light, day } of trackLamps) light.intensity = day * (night ? 3.8 : 1);
     if (finish && night) finish.intensity *= 1.30;
     for (const material of diffusers) material.emissiveIntensity = night ? 3.65 : 2.18;
     for (const material of halos) material.opacity = night ? 0.95 : 0.59;
-    scene.environmentRotation.y = dique ? 0.54 : 0;
-    scene.environmentIntensity = dique ? (night ? 0.45 : 0.49) : (night ? 0.19 : close ? 0.42 : 0.38);
-    renderer.toneMappingExposure = dique ? (night ? 1.12 : 1.06) : (night ? 1.01 : close ? 1.015 : 1.075);
-    scene.background = dique ? (night ? harborNight : harborSky) : (night ? nightBackground : dayBackground);
+    scene.environmentRotation.y = 0;
+    scene.environmentIntensity = exterior ? (night ? 0.66 : 0.61) : (night ? 0.19 : close ? 0.42 : 0.38);
+    renderer.toneMappingExposure = exterior ? (night ? 1.12 : 1.06) : (night ? 1.01 : close ? 1.015 : 1.075);
+    scene.background = exterior ? (night ? harborNight : harborSky) : (night ? nightBackground : dayBackground);
+    scene.fog = spaceport ? distanceHaze : null;
     if (spaceport) {
-      key.color.setHex(night ? 0xb8d1ec : 0xffd8aa);
-      key.intensity = night ? .78 : 3.15;
+      key.color.setHex(night ? 0xb8d1ec : 0xffd6a5);
+      key.intensity = night ? .66 : 3.65;
       fill.position.set(110, 65, -90).add(lightCenter);
-      fill.color.setHex(0xb6d4ff); fill.intensity = night ? .22 : .36;
+      fill.color.setHex(0xb6d4ff); fill.intensity = night ? .17 : .43;
       bounce.color.setHex(0xc3dafe); bounce.groundColor.setHex(night ? 0x39434f : 0x83705a);
-      bounce.intensity = night ? .40 : .46;
-      scene.environmentIntensity = night ? .30 : .78;
+      bounce.intensity = night ? .34 : .39;
+      scene.environmentIntensity = night ? .76 : .72;
       renderer.toneMappingExposure = night ? 1.13 : 1.03;
       scene.environmentRotation.y = 0;
       scene.background = night ? harborNight : harborSky;
+      distanceHaze.color.setHex(night ? 0x28384a : 0xc2c6b7);
+      distanceHaze.density = night ? .0038 : .0028;
     }
     scene.backgroundIntensity = dayBackgroundIntensity * (night ? 0.64 : 1);
     if (!lowQuality) {
       fitShadow(key, points, close);
-      if (night) key.shadow.intensity = dique ? 0.74 : 0.62;
+      if (exterior) {
+        key.shadow.radius = spaceport ? 2.8 : 2.6;
+        key.shadow.normalBias = spaceport ? .068 : .040;
+        key.shadow.bias = spaceport ? -.00022 : -.00013;
+        key.shadow.intensity = night ? .81 : .96;
+      } else if (night) key.shadow.intensity = .62;
     }
   }
   applyLighting();
   return {
     restoreReflections,
     setCourse(course: Course) {
-      dique = course.id !== 'taller';
+      exterior = course.id !== 'taller';
       spaceport = course.id === 'spaceport';
       selectReflections();
+      const size = exterior ? Math.min(4096, renderer.capabilities.maxTextureSize) : 2048;
+      if (key.shadow.mapSize.x !== size) {
+        key.shadow.map?.dispose(); key.shadow.map = null;
+        key.shadow.mapSize.set(size, size);
+        renderer.shadowMap.needsUpdate = true;
+      }
       points = shadowPoints(course);
       lightCenter.set(0, 0, 0);
-      if (dique) new THREE.Box3().setFromPoints(points).getCenter(lightCenter);
-      benchLight.visible = toolLight.visible = !dique;
+      if (exterior) new THREE.Box3().setFromPoints(points).getCenter(lightCenter);
+      benchLight.visible = toolLight.visible = !exterior;
       applyLighting();
     },
     lightShot(next: boolean) {
@@ -239,6 +262,7 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
     setNight(enabled: boolean) {
       if (night === enabled) return;
       night = enabled;
+      selectReflections();
       applyLighting();
     },
   };

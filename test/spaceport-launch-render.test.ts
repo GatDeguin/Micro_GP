@@ -5,6 +5,7 @@ import { SPACEPORT } from '../src/shared/courses.ts';
 import type { RaceSnapshot } from '../src/shared/protocol.ts';
 import { buildSpaceportLaunch } from '../src/display/spaceport-launch.ts';
 import { buildSpaceportIllumination } from '../src/display/spaceport-illumination.ts';
+import { cameraLights } from '../src/display/render-layers.ts';
 
 test('liftoff reuses bounded buffers, follows altitude, clears and rearms at both detail levels', () => {
   const root = new THREE.Group(), rocket = new THREE.Group(), arms = [new THREE.Group(), new THREE.Group()];
@@ -40,13 +41,20 @@ test('liftoff reuses bounded buffers, follows altitude, clears and rearms at bot
   assert.equal(rocket.position.x, 26); assert.equal(rocket.rotation.z, 0); assert.equal(lights[0].intensity, 0);
 });
 
-test('competition lighting uses two shadowless floods and bounded pools aligned to the 3D road', () => {
+test('competition lighting keeps the extra campus floods out of compact views and pools aligned to the 3D road', () => {
   const root = new THREE.Group(), lighting = buildSpaceportIllumination(root, SPACEPORT);
   const lights: THREE.SpotLight[] = [];
   root.traverse(object => { if (object instanceof THREE.SpotLight) lights.push(object); });
-  assert.equal(lights.length, 2); assert.ok(lights.every(light => !light.castShadow));
-  lighting.setNight(true); assert.ok(lights.every(light => light.intensity >= 2000));
+  assert.equal(lights.length, 4); assert.ok(lights.every(light => !light.castShadow));
+  const compact = new THREE.PerspectiveCamera(); cameraLights(compact, true, 0);
+  const launch = lights.filter(light => light.layers.test(compact.layers));
+  const campus = lights.filter(light => !light.layers.test(compact.layers));
+  assert.equal(launch.length, 2); assert.equal(campus.length, 2);
+  lighting.setNight(true);
+  assert.ok(launch.every(light => light.intensity >= 2000));
+  assert.ok(campus.every(light => light.intensity > 100 && light.intensity < 200));
   lighting.setNight(false); assert.ok(lights.every(light => light.intensity < 200));
+  assert.ok(campus.every(light => light.intensity === 0));
   const pools = root.getObjectByName('Manchas de luz sobre pista, boxes y edificios') as THREE.Mesh;
   const vertices = pools.geometry.getAttribute('position'), point = new THREE.Vector3();
   assert.ok(pools.geometry.index!.count < 4000);

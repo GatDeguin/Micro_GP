@@ -74,24 +74,41 @@ export function createSpaceportSurfaces() {
   return { concrete, plaster, paint, steel, wood, rubber, glass, asphalt, routes };
 }
 
-/** Static outdoor reflection probe; generated/filtered only when first needed. */
-export function spaceportEnvironment(renderer: THREE.WebGLRenderer) {
+/** Outdoor reflection probes in linear HDR. Wide cloud and roof shapes remain
+ * legible on curved paint after prefiltering. Night has its own luminaires. */
+export function exteriorEnvironment(renderer: THREE.WebGLRenderer, port: boolean, night: boolean) {
   const width = 256, height = 128, pixels = new Float32Array(width * height * 4);
-  const sun = new THREE.Vector3(-110, 115, 160).normalize();
+  const sun = new THREE.Vector3(port ? -143 : -145, port ? 96 : 88, port ? 172 : 168).normalize();
+  const smooth = THREE.MathUtils.smoothstep;
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const phi = x / width * Math.PI * 2, theta = y / height * Math.PI;
     // Equirect UV.y is asin(direction.y) / PI + .5. DataTexture row 0
     // is the southern hemisphere (flipY=false), not the sky.
     const dx = -Math.sin(theta) * Math.cos(phi), dy = -Math.cos(theta), dz = -Math.sin(theta) * Math.sin(phi);
-    const horizon = Math.exp(-Math.abs(dy) * 5), sky = Math.max(0, dy);
-    const sunspot = Math.pow(Math.max(0, dx * sun.x + dy * sun.y + dz * sun.z), 180) * 3.4;
-    const cloud = Math.max(0, Math.sin(phi * 3 + dy * 7)) * sky * .16;
-    const buildings = dy < .08 && dy > -.28 && (Math.sin(phi * 9) > .25) ? .18 : 0;
+    const horizon = Math.exp(-Math.abs(dy) * 5), sky = smooth(dy, -.12, .1);
+    const towardSun = Math.max(0, dx * sun.x + dy * sun.y + dz * sun.z);
+    const sunspot = Math.pow(towardSun, 215) * 9 + Math.pow(towardSun, 22) * .55;
+    const cloud = smooth(Math.sin(phi * 3 + dy * 7) + .24 * Math.sin(phi * 11 - dy * 18), .20, .84)
+      * smooth(dy, .06, .24) * (1 - smooth(dy, .42, .62));
+    const roofs = (1 - smooth(dy, .055 + .045 * Math.sin(phi * 5), .12 + .045 * Math.sin(phi * 5)))
+      * smooth(dy, -.31, -.09) * smooth(Math.sin(phi * 6) + .29 * Math.cos(phi * 13), -.24, .18);
+    const lightRow = smooth(Math.cos(phi * 4 + .77), .91, .99)
+      * smooth(dy, .035, .095) * (1 - smooth(dy, .135, .21));
+    const highLights = Math.pow(Math.max(0, Math.cos(phi * 3 + .56)), 24)
+      * Math.exp(-((dy - .38) ** 2) * 350);
     const i = (y * width + x) * 4;
-    pixels[i] = Math.max(.04, (dy > 0 ? .42 + horizon * .18 + cloud : .13 + horizon * .14) + sunspot - buildings);
-    pixels[i + 1] = Math.max(.05, (dy > 0 ? .57 + horizon * .15 + cloud : .14 + horizon * .17) + sunspot * .91 - buildings);
-    pixels[i + 2] = Math.max(.06, (dy > 0 ? .76 + horizon * .07 + cloud : .15 + horizon * .18) + sunspot * .72 - buildings);
-    pixels[i + 3] = 1;
+    if (night) {
+      const warm = (port ? 4 : 2.5) * (lightRow + .65 * highLights);
+      const cool = 1.8 * Math.pow(Math.max(0, Math.cos(phi * 3 - 1)), 26) * Math.exp(-((dy - .19) ** 2) * 320);
+      pixels.set([.026 + .030 * horizon + warm + cool * .52, .045 + .047 * horizon + warm * .59 + cool * .78,
+        .088 + .062 * horizon + warm * .27 + cool, 1], i);
+    } else {
+      const open = 1 - .80 * roofs;
+      const whiteLight = .96 * cloud + .42 * lightRow;
+      pixels.set([open * (.14 + .19 * horizon + .28 * sky + whiteLight) + sunspot,
+        open * (.12 + .20 * horizon + .48 * sky + .94 * whiteLight) + sunspot * .83,
+        open * (.105 + .16 * horizon + .75 * sky + .86 * whiteLight) + sunspot * .62, 1], i);
+    }
   }
   const source = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat, THREE.FloatType);
   source.mapping = THREE.EquirectangularReflectionMapping; source.needsUpdate = true;

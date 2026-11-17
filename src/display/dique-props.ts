@@ -697,8 +697,8 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   return {
     ...crane,
     setNight(enabled: boolean) {
-      for (const light of poles) light.intensity = enabled ? 221 : 63;
-      glow.opacity = enabled ? 0.84 : 0.43;
+      for (const light of poles) light.intensity = enabled ? 326 : 47;
+      glow.opacity = enabled ? 0.92 : 0.31;
       garageGlow.opacity = enabled ? 0.95 : 0.75;
       wallBounce.opacity = enabled ? 0.57 : 0.33;
       halo.opacity = enabled ? 0.44 : 0.21;
