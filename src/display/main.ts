@@ -11,6 +11,7 @@ import { buildCircuit } from './circuit';
 import { buildCollectorBackdrop, disposeCollectorBackdrop } from './collector-backdrop';
 import { buildCompactScenery } from './compact-scenery';
 import { frameBudget } from './frame-budget';
+import type { LocalReflector } from './local-reflections';
 import { buildGrandstands } from './grandstands';
 import { buildImpactSparks } from './impact-sparks';
 import { buildArcadeScene } from './arcade-scene';
@@ -49,7 +50,9 @@ type CourseStage = {
   setNight(night: boolean): void;
   setDetail?(detail: boolean): void;
   captureReflections?(renderer: THREE.WebGLRenderer, scene: THREE.Scene): void;
+  reflectors?: readonly LocalReflector[];
 };
+const noLocalReflectors: readonly LocalReflector[] = [];
 
 const canvas = document.querySelector<HTMLCanvasElement>('#track')!;
 const homeLogo = document.querySelector<HTMLImageElement>('#home-logo')!;
@@ -561,6 +564,9 @@ async function bootstrap() {
       const closeView = mode !== 'general' && slots.length <= 2 && slots.includes(i);
       cars[i].setDetail(!lowQuality && (closeView
         || (subject !== undefined && Math.hypot(car.x - subject.x, car.z - subject.z) < 7.0)));
+      const reflectors = !lowQuality && closeView && car.active !== false ? stage.reflectors : undefined;
+      cars[i].setReflections(reflectors ?? noLocalReflectors, view,
+        reflectors ? approachingCover(road.s, 6, course) : 0);
       cars[i].update(view, dt, slope, now, approachingCover(road.s, 4, course) > 0.24, bankRoll, course);
       if (moment?.slot === i) focus = view;
       if (partnerSlot === i) partner = view;

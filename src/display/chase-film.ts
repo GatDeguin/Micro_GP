@@ -22,6 +22,7 @@ const effects = /* glsl */`
   uniform sampler2D sceneColor;
   uniform vec2 pixel;
   uniform vec4 unproject;
+  uniform float night;
   layout(location = 0) out vec4 opticalResult;
   layout(location = 1) out vec4 lensResult;
   ${depthFunctions}
@@ -32,7 +33,7 @@ const effects = /* glsl */`
   vec3 highlight(vec3 color) {
     float peak = max(color.r, max(color.g, color.b));
     // The soft threshold retains the warm color of lamps and rolls off rockets.
-    return min(color, vec3(12.0)) * smoothstep(.86, 2.15, peak);
+    return min(color, vec3(12.0)) * smoothstep(mix(1.48, .91, night), mix(3.12, 2.18, night), peak);
   }
   void gather(vec2 shift, float weight, vec3 center, float depth, inout vec3 glow, inout vec3 lensColor) {
     vec2 uv = vFilmUv + shift;
@@ -99,32 +100,59 @@ const composite = /* glsl */`
   #include <tonemapping_pars_fragment>
   #include <dithering_pars_fragment>
 
+  float filmLuma(vec3 color) {
+    return sqrt(max(dot(color, vec3(.2126, .7152, .0722)), 0.0));
+  }
+
   vec3 softenEdge(vec3 center) {
-    const vec3 weights = vec3(.2126, .7152, .0722);
-    // Luma derivatives locate edges before taking extra color samples.
-    float luminance = sqrt(max(dot(center, weights), 0.0));
-    vec2 gradient = vec2(dFdx(luminance), dFdy(luminance));
-    float contrast = max(abs(gradient.x), abs(gradient.y));
-    if (contrast < max(.031, luminance * .13)) return center;
-    vec2 normal = gradient / contrast;
-    vec2 shift = normal * pixel * .64;
-    vec3 nearby = texture2D(sceneColor, vFilmUv + shift).rgb + texture2D(sceneColor, vFilmUv - shift).rgb;
-    return mix(center, nearby * .5, .29);
+    float middle = filmLuma(center);
+    float a = filmLuma(texture2D(sceneColor, vFilmUv + pixel * vec2(-1.0, -1.0)).rgb);
+    float b = filmLuma(texture2D(sceneColor, vFilmUv + pixel * vec2( 1.0, -1.0)).rgb);
+    float c = filmLuma(texture2D(sceneColor, vFilmUv + pixel * vec2(-1.0,  1.0)).rgb);
+    float d = filmLuma(texture2D(sceneColor, vFilmUv + pixel * vec2( 1.0,  1.0)).rgb);
+    float darkest = min(middle, min(min(a, b), min(c, d)));
+    float brightest = max(middle, max(max(a, b), max(c, d)));
+    float contrast = brightest - darkest;
+    if (contrast < max(.023, brightest * .088)) return center;
+
+    // Follow the edge to smooth stair steps without softening the road as a whole.
+    vec2 tangent = vec2(a + b - c - d, c + a - d - b);
+    float minimumStep = max(.018, (a + b + c + d) * .027);
+    vec2 stepSize = clamp(tangent / (min(abs(tangent.x), abs(tangent.y)) + minimumStep), -4.0, 4.0) * pixel;
+    vec3 interior = (texture2D(sceneColor, vFilmUv - stepSize / 6.0).rgb
+      + texture2D(sceneColor, vFilmUv + stepSize / 6.0).rgb) * .5;
+    vec3 exterior = (texture2D(sceneColor, vFilmUv - stepSize * .5).rgb
+      + texture2D(sceneColor, vFilmUv + stepSize * .5).rgb) * .25 + interior * .5;
+    float outside = filmLuma(exterior);
+    vec3 filtered = outside < darkest || outside > brightest ? interior : exterior;
+
+    // Isolated subpixel details can cancel the directional gradient.
+    float mean = (a + b + c + d) * .25;
+    float isolated = clamp(abs(mean - middle) / contrast, 0.0, 1.0);
+    float strength = smoothstep(contrast * .045, contrast * .32, max(abs(tangent.x), abs(tangent.y)));
+    if (strength < .85 && isolated > .18) {
+      vec3 crossColor = (texture2D(sceneColor, vFilmUv + pixel * vec2(.5, 0.0)).rgb
+        + texture2D(sceneColor, vFilmUv - pixel * vec2(.5, 0.0)).rgb
+        + texture2D(sceneColor, vFilmUv + pixel * vec2(0.0, .5)).rgb
+        + texture2D(sceneColor, vFilmUv - pixel * vec2(0.0, .5)).rgb) * .25;
+      filtered = mix(mix(center, crossColor, isolated * .83), filtered, strength);
+    }
+    return mix(center, filtered, .86);
   }
 
   void main() {
     vec3 color = softenEdge(texture2D(sceneColor, vFilmUv).rgb);
     float depth = eyeDepth(vFilmUv);
-    float blur = softLens * smoothstep(focusDepth + 7.0, focusDepth + 37.0, depth);
+    float blur = .84 * softLens * smoothstep(focusDepth + 9.0, focusDepth + 49.0, depth);
     if (blur > .025) {
       vec4 distant = texture2D(lensImage, vFilmUv);
-      color = mix(color, distant.rgb, blur * smoothstep(.72, .94, distant.a / depth));
+      color = mix(color, distant.rgb, blur * smoothstep(.83, .975, distant.a / depth));
     }
     vec4 optical = texture2D(effectsImage, vFilmUv);
     // Reject blurred occlusion from another depth layer along hard silhouettes.
     float edge = clamp(length(vec2(dFdx(depth), dFdy(depth))) / max(.35, depth * .10), 0.0, 1.0);
     color *= 1.0 - optical.a * (1.0 - edge * .80);
-    color += optical.rgb * mix(.11, .21, night);
+    color += optical.rgb * mix(.068, .19, night);
 
     vec2 field = vFilmUv * 2.0 - 1.0;
     color *= 1.0 - .135 * smoothstep(.35, 1.8, dot(field, field));
@@ -156,13 +184,14 @@ export function buildChaseFilm(renderer: THREE.WebGLRenderer) {
 
   const pixel = { value: new THREE.Vector2(1, 1) };
   const clipPlanes = { value: new THREE.Vector2() };
+  const night = { value: 0 };
   const unproject = { value: new THREE.Vector4() };
-  const shared = { sceneColor: { value: image.texture }, sceneDepth: { value: depth }, pixel, clipPlanes };
+  const shared = { sceneColor: { value: image.texture }, sceneDepth: { value: depth }, pixel, clipPlanes, night };
   const effectsMaterial = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: effects,
     uniforms: { ...shared, unproject }, glslVersion: THREE.GLSL3, toneMapped: false, depthWrite: false, depthTest: false });
   const outputMaterial = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: composite,
     uniforms: { ...shared, effectsImage: { value: optical.texture }, lensImage: { value: optical.textures[1] }, focusDepth: { value: 6 },
-      softLens: { value: 1 }, night: { value: 0 }, toneMappingExposure: { value: 1 } },
+      softLens: { value: 1 }, toneMappingExposure: { value: 1 } },
     dithering: true, toneMapped: false, depthWrite: false, depthTest: false });
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
@@ -185,7 +214,7 @@ export function buildChaseFilm(renderer: THREE.WebGLRenderer) {
     const projection = camera.projectionMatrix.elements;
     unproject.value.set(1 / projection[0], 1 / projection[5], projection[8], projection[9]);
     outputMaterial.uniforms.focusDepth.value = focus;
-    outputMaterial.uniforms.night.value = Number(nightView);
+    night.value = Number(nightView);
     outputMaterial.uniforms.softLens.value = Number(blur);
     outputMaterial.uniforms.toneMappingExposure.value = renderer.toneMappingExposure;
 

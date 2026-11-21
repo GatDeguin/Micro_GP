@@ -8,6 +8,7 @@ import { mergeStatic } from './batches';
 import { ARCH_RADIUS, archFloor, crownHeight, sectionAt, shellGeometry, shellSections, sidePoint, type Section } from './car-shell';
 import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
 import { headlightLayer } from './render-layers';
+import { buildLocalReflections, type LocalReflector } from './local-reflections';
 
 const compact: Section[] = [
   [-0.88, 0.414, 0.142, 0.408], [-0.77, 0.465, 0.134, 0.451], [-0.56, 0.537, 0.133, 0.490],
@@ -264,6 +265,19 @@ function enamelRelief() {
   for (let i = 0; i < 2200; i++) {
     context.fillStyle = i % 5 === 0 ? 'rgba(255,255,255,.24)' : 'rgba(156,156,156,.13)';
     context.fillRect(rng() * canvas.width, rng() * canvas.height, 0.55 + rng() * 1.35, 0.45 + rng() * 0.85);
+  }
+  // The lower panels and handled edges have lost more gloss than the roof.
+  const abrasion = context.createLinearGradient(0, 0, 0, canvas.height);
+  abrasion.addColorStop(0, 'rgba(255,255,255,.43)');
+  abrasion.addColorStop(.21, 'rgba(255,255,255,.02)');
+  abrasion.addColorStop(.76, 'rgba(75,75,75,.22)');
+  abrasion.addColorStop(1, 'rgba(255,255,255,.18)');
+  context.fillStyle = abrasion;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < 32; i++) {
+    context.fillStyle = 'rgba(255,255,255,.32)';
+    const edge = i % 2 ? rng() * 18 : canvas.height - rng() * 24;
+    context.fillRect(rng() * canvas.width, edge, 1 + rng() ** 2 * 13, .7);
   }
   const relief = texture(canvas);
   relief.colorSpace = THREE.NoColorSpace;
@@ -731,8 +745,12 @@ export function buildCars(parent: THREE.Object3D) {
     const paint = new THREE.MeshPhysicalMaterial({
       color: enamelColors[i], roughness: i === 0 ? 0.255 : 0.285, metalness: 0.22,
       clearcoat: 0.96, clearcoatRoughness: i === 3 ? 0.191 : 0.161, envMapIntensity: 1.13,
-      clearcoatRoughnessMap: enamel, bumpMap: enamel, bumpScale: 0.00075,
+      roughnessMap: enamel, clearcoatRoughnessMap: enamel, bumpMap: enamel, bumpScale: 0.00067,
     });
+    const localReflection = buildLocalReflections();
+    const reflectiveGlass = closeGlass.clone();
+    localReflection.attach(paint);
+    localReflection.attach(reflectiveGlass);
     loft(chassis, model.body, paint, model.wheelbase);
     box(chassis, splitter, 0, 0.148, 0, 0.56, 0.065, model.wheelbase * 2 + 0.44);
     const glazing = loft(chassis, model.glass, glass);
@@ -833,11 +851,14 @@ export function buildCars(parent: THREE.Object3D) {
     let projectedOpacity = 0;
     return {
       setNight(enabled: boolean) { night = enabled; },
+      setReflections(reflectors: readonly LocalReflector[], view: CarView, cover: number) {
+        localReflection.update(reflectors, view.x, view.y + .45, view.z, cover, night);
+      },
       setProjectedShadow(enabled: boolean) { for (const caster of casters) caster.castShadow = enabled; },
       setDetail(close: boolean) {
         if (detail.visible === close) return;
         detail.visible = close;
-        glazing.material = close ? closeGlass : glass;
+        glazing.material = close ? reflectiveGlass : glass;
       },
       update(view: CarView, delta: number, slope: number, now: number, covered = false, bankRoll = 0, course: Course = TALLER) {
         const active = view.active !== false;

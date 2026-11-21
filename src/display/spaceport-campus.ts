@@ -23,6 +23,9 @@ const p = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const up = new THREE.Vector3(0, 1, 0);
 const circle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+const frameEdge = new RoundedBoxGeometry(1, 1, 1, 1, .085);
+const socket = new THREE.CylinderGeometry(1, 1, 1, 6);
+const wallSocket = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
 const sphere = new THREE.SphereGeometry(1, 8, 5);
 
 function campusSky(parent: THREE.Group) {
@@ -272,9 +275,13 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
       // entrances use the protected west promenade, away from the racing lane.
       const q = new THREE.Quaternion().setFromAxisAngle(up, Math.PI / 2);
       for (let zz = z - depth / 2 + 3.2; zz < front - 1.5; zz += 4.1) {
-        d.box(x + w / 2 + .12, 2.7, zz, 3.4, 2.1, .20, palette.trim, q);
+        d.part(frameEdge, x + w / 2 + .12, 2.7, zz, 3.48, 2.17, .21, palette.trim, q);
+        d.box(x + w / 2 + .221, 2.7, zz, 3.22, 1.94, .027, palette.black, q);
         d.box(x + w / 2 + .24, 2.7, zz, 3.05, 1.77, .045, palette.glass, q);
         d.box(x + w / 2 + .29, 2.7, zz, .07, 1.8, .04, palette.white, q);
+        d.part(frameEdge, x + w / 2 + .23, 1.61, zz, 3.55, .087, .37, palette.trim, q);
+        for (const dz of [-1.66, 1.66]) for (const y of [1.73, 3.67])
+          d.part(socket, x + w / 2 + .235, y, zz + dz, .030, .034, .030, palette.white, wallSocket);
         windows.push({ x: x + w / 2 + .28, y: 3.2, z: zz, w: 2.8, h: .045, yaw: Math.PI / 2 });
       }
       labels.push({ text: site.label, x: x + w / 2 + .30, y: h - .85, z, width: depth - 2.5, yaw: Math.PI / 2 });
@@ -283,14 +290,29 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
       const q = new THREE.Quaternion().setFromAxisAngle(up, -Math.PI / 2);
       for (let zz = z - depth / 2 + 3; zz < front - 1; zz += 4.3) {
         for (let yy = 2.7; yy < h - 1.4; yy += 3.4) {
-          d.box(x - w / 2 - .10, yy, zz, 3.2, 2.05, .20, palette.trim, q);
+          d.part(frameEdge, x - w / 2 - .10, yy, zz, 3.23, 2.07, .23, palette.trim, q);
+          d.box(x - w / 2 - .209, yy, zz, 3.03, 1.90, .025, palette.black, q);
           d.box(x - w / 2 - .23, yy, zz, 2.9, 1.74, .04, palette.glass, q);
           d.box(x - w / 2 - .28, yy, zz, .07, 1.78, .04, palette.white, q);
+          d.part(frameEdge, x - w / 2 - .25, yy - 1.05, zz, 3.3, .09, .42, palette.trim, q);
           windows.push({ x: x - w / 2 - .27, y: yy + .48, z: zz, w: 2.65, h: .045, yaw: -Math.PI / 2 });
         }
       }
       d.pipe(p(x - w / 2 - .20, .2, z - depth / 2 + .35),
         p(x - w / 2 - .20, h - .3, z - depth / 2 + .35), .065, palette.trim);
+    }
+    if (x < -140 || site.id === 'laboratory' || site.id === 'reception' || site.id === 'mission') {
+      const side = x < -140 ? 1 : -1;
+      // Drain route and removable utility covers follow the building footing.
+      const walk = x + side * (w / 2 + 1.0);
+      for (let zz = z - depth / 2 + 1; zz < front - .8; zz += 2.65) {
+        d.box(walk, .014, zz, .83, .013, .027, palette.trim);
+      }
+      for (const dz of [-depth * .32, depth * .29]) {
+        d.part(frameEdge, walk, .023, z + dz, .65, .032, .91, palette.black);
+        for (let slat = -4; slat <= 4; slat++) d.box(walk, .043, z + dz + slat * .092, .54, .013, .031, palette.trim);
+        d.box(walk, .041, z + dz + .43, .64, .016, .035, palette.trim);
+      }
     }
     for (let i = 0; i < (w > 25 ? 3 : 2); i++) {
       const xx = x - w * .28 + i * w * .24;
@@ -622,6 +644,9 @@ export function buildSpaceportCampus(parent: THREE.Group, course: Course, batch:
   };
   return {
     people, fleet,
+    reflectors: SPACEPORT_BUILDINGS.map(site => ({ x: site.x, y: site.height / 2, z: site.z,
+      width: site.width, height: site.height, depth: site.depth, yaw: 0, glazed: true,
+      color: new THREE.Color(site.style === 'warehouse' ? palette.navy : 0x89999c) })),
     setNight(value: boolean) {
       sky.uniforms.night.value = value ? 1 : 0; glow.emissiveIntensity = value ? 2.2 : .22;
       coastMaterial.color.setHex(value ? 0x1c3748 : 0x608d91);

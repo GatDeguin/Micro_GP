@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { diqueRoadDistance, type Course } from '../shared/courses';
 import { GRID_LANE_OFFSET } from '../shared/car-dimensions';
@@ -103,10 +104,26 @@ function castConcrete(retaining: boolean) {
     map.repeat.set(0.81, 0.68);
     details.repeat.copy(map.repeat);
   }
-  return new THREE.MeshStandardMaterial({
+  const surface = new THREE.MeshStandardMaterial({
     color: retaining ? 0xc6bbac : 0xbfb8ad, map, bumpMap: details,
     bumpScale: 0.042, roughnessMap: details, roughness: 0.96,
   });
+  if (retaining) {
+    surface.customProgramCacheKey = () => 'dique-damp-wall-v1';
+    surface.onBeforeCompile = shader => {
+      shader.vertexShader = 'varying vec3 masonryWorld;\n' + shader.vertexShader.replace('#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nmasonryWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = 'varying vec3 masonryWorld;\n' + shader.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float streak = .54 + .24 * sin(masonryWorld.x * 1.62 + masonryWorld.z * 2.09)
+            + .18 * sin(masonryWorld.x * 5.18 - masonryWorld.z * 3.14);
+          float damp = (1.0 - smoothstep(-.93, -.21 + .31 * streak, masonryWorld.y)) * (.46 + .51 * streak);
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(.62, .72, .67), damp);
+        `)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor *= 1.0 - .30 * damp;');
+    };
+  }
+  return surface;
 }
 
 export function diqueConcrete() {
@@ -149,8 +166,20 @@ function asphalt() {
   map.wrapS = map.wrapT = aggregate.wrapS = aggregate.wrapT = THREE.RepeatWrapping;
   // Texture data is linear. Red carries surface relief, green controls the gloss of the exposed aggregate.
   aggregate.anisotropy = map.anisotropy;
-  return new THREE.MeshStandardMaterial({ color: TINT.asphalt, map, bumpMap: aggregate, bumpScale: 0.021,
+  const material = new THREE.MeshStandardMaterial({ color: TINT.asphalt, map, bumpMap: aggregate, bumpScale: 0.021,
     name: 'Asfalto de árido expuesto', vertexColors: true, roughnessMap: aggregate, roughness: 0.95 });
+  material.customProgramCacheKey = () => 'dique-damp-asphalt-v1';
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = 'attribute float roadDamp; varying float vRoadDamp;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoadDamp = roadDamp;');
+    shader.fragmentShader = 'varying float vRoadDamp;\n' + shader.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float wet = vRoadDamp * (.65 + .35 * sin(vMapUv.x * 8.4 + .85 * sin(vMapUv.y * 9.0)));
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(.66, .74, .82), wet);
+      `)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor *= 1.0 - .47 * wet;');
+  };
+  return material;
 }
 
 function insideDetour(detour: Course['detour'], distance: number, transition: number) {
@@ -164,12 +193,15 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
   const positions = [];
   const colors = [];
   const uv = [];
+  const damp = [];
   const indices = [];
   const repeats = Math.round(course.length * 0.24) / course.length;
   for (const [i, p] of samples.entries()) {
     const half = course.roadHalfAt(p.s);
     const port = insideDetour(course.detour, p.s, 6);
     const plant = insideDetour(course.treatmentDetour, p.s, 6);
+    const drainage = course.treatmentDetour
+      ? 1 - THREE.MathUtils.smoothstep(Math.abs(p.s - course.treatmentDetour.from - 46), 7, 26) : 0;
     for (const [line, fraction] of bands.entries()) {
       const offset = fraction * half;
       const q = diqueEdge(course, p, offset);
@@ -177,8 +209,10 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
       const wheelLine = 1 - Math.min(1, Math.abs(Math.abs(fraction) - 0.43 + 0.05 * Math.sin(p.s * 0.23)) * 6.8);
       const wear = streak * (1 - 0.16 * wheelLine - 0.17 * Math.abs(fraction) ** 5);
       const wet = course.wetAt(p.s, offset);
+      const surfaceMoisture = Math.max(wet, drainage * THREE.MathUtils.smoothstep(Math.abs(fraction), .54, .96) * .87);
       positions.push(q.x, q.y, q.z);
       uv.push(p.s * repeats, offset * 0.24);
+      damp.push(surfaceMoisture);
       colors.push(wear * (1 - 0.49 * wet + 0.21 * port + 0.06 * plant),
         wear * (1 - 0.43 * wet + 0.28 * port + 0.13 * plant),
         wear * (1 - 0.37 * wet + 0.30 * port + 0.17 * plant));
@@ -191,6 +225,7 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setAttribute('roadDamp', new THREE.Float32BufferAttribute(damp, 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -382,6 +417,8 @@ function rails(parent: THREE.Group, course: Course) {
   const post = standard(0x818b8e, 0.46, 0.58);
   const rail = standard(0xa8b3b0, 0.39, 0.59);
   const base = standard(0x66615a, 0.72, 0.30);
+  const bevel = new RoundedBoxGeometry(1, 1, 1, 1, .11);
+  const hex = new THREE.CylinderGeometry(.020, .024, .021, 6);
   const repairRail = [standard(0xc77b38, 0.75, 0.17), standard(0xe0cba0, 0.83)];
   const count = Math.round(course.length / 2.30);
   const spacing = course.length / count;
@@ -399,9 +436,20 @@ function rails(parent: THREE.Group, course: Course) {
       const nextLateral = side * course.wallHalfAt(q.s, side);
       const foot = diqueEdge(course, p, lateral);
       const yaw = Math.atan2(p.dx, p.dz);
+      const closeHardware = insideDetour(course.detour, s, 2) > 0 || insideDetour(course.treatmentDetour, s, 2) > 0;
       if (!skip(s, side)) {
-        box(parent, base, foot.x, foot.y + 0.018, foot.z, 0.185, 0.067, 0.264, false).rotation.y = yaw;
-        box(parent, post, foot.x, foot.y + 0.391, foot.z, 0.077, 0.795, 0.091, false).rotation.y = yaw;
+        const shoe = box(parent, base, foot.x, foot.y + .017, foot.z, .185, .067, .264, false);
+        const upright = box(parent, post, foot.x, foot.y + .391, foot.z, .077, .795, .091, false);
+        shoe.rotation.y = upright.rotation.y = yaw;
+        if (closeHardware) {
+          shoe.geometry = upright.geometry = bevel;
+          const join = box(parent, post, foot.x, foot.y + .432, foot.z, .094, .096, .116, false);
+          join.geometry = bevel; join.rotation.y = yaw;
+          for (const direction of [-1, 1]) {
+            const bolt = diquePart(parent, hex, rail);
+            bolt.position.set(foot.x + p.dx * direction * .088, foot.y + .060, foot.z + p.dz * direction * .088);
+          }
+        }
       }
       if (skip((s + next) / 2, side)) continue;
       // The inside guardrail crosses the former road and is also the first work-zone barrier.
@@ -415,7 +463,8 @@ function rails(parent: THREE.Group, course: Course) {
         continue;
       }
       for (const [height, gauge] of [[0.18, 0.056], [0.43, 0.063], [0.76, 0.068]]) {
-        diqueBeam(parent, rail, diqueEdge(course, p, lateral, height), diqueEdge(course, q, nextLateral, height), gauge, gauge * 0.72, false);
+        const beam = diqueBeam(parent, rail, diqueEdge(course, p, lateral, height), diqueEdge(course, q, nextLateral, height), gauge, gauge * .72, false);
+        if (closeHardware) beam.geometry = bevel;
       }
     }
   }

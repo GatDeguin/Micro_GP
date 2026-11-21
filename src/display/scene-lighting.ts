@@ -214,9 +214,9 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
       key.color.setHex(night ? 0xb8d1ec : 0xffd6a5);
       key.intensity = night ? .66 : 3.65;
       fill.position.set(110, 65, -90).add(lightCenter);
-      fill.color.setHex(0xb6d4ff); fill.intensity = night ? .17 : .43;
-      bounce.color.setHex(0xc3dafe); bounce.groundColor.setHex(night ? 0x39434f : 0x83705a);
-      bounce.intensity = night ? .34 : .39;
+      fill.color.setHex(night ? 0xdcc9af : 0xd5dfec); fill.intensity = night ? .25 : .45;
+      bounce.color.setHex(0xcbd9ed); bounce.groundColor.setHex(night ? 0x736350 : 0x99836a);
+      bounce.intensity = night ? .37 : .43;
       scene.environmentIntensity = night ? .76 : .72;
       renderer.toneMappingExposure = night ? 1.13 : 1.03;
       scene.environmentRotation.y = 0;

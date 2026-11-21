@@ -77,6 +77,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
 
   return {
     backWall: harbor.backWall,
+    reflectors: equipment.reflectors,
     captureReflections: harbor.captureReflections,
     setNight(night: boolean) {
       harbor.setNight(night);

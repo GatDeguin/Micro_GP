@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses';
 import { box, canvas2d, horizontalShadow, noiseField, random, standard, texture } from './materials';
 import { instanceStatic } from './batches';
 import { sceneryLights } from './render-layers';
+import type { LocalReflector } from './local-reflections';
 import { DIQUE_GROUND, diqueBeam, diqueEdge, diquePart, diqueRoadClear, diqueSign, diqueSpan, diqueStrip } from './dique-geometry';
 
 const galvanized = standard(0x747b7c, 0.49, 0.58);
@@ -317,17 +319,38 @@ function corrugatedSteel() {
 }
 
 const cargoPanels = corrugatedSteel();
+const cargoEdge = new RoundedBoxGeometry(1, 1, 1, 1, .092);
 
 export function containerShell(paint: THREE.MeshStandardMaterial) {
   const cargo = new THREE.Group();
   const material = wornCargoPaint(paint);
   box(cargo, material, 0, cargoHeight / 2, 0, cargoWidth, cargoHeight, cargoDepth);
   diquePart(cargo, cargoPanels, material, false);
-  for (const side of [-1, 1]) {
-    box(cargo, iron, 0, 0.083, side * 1.52, cargoWidth + 0.04, 0.11, 0.14, false);
-    box(cargo, paint, 0, cargoHeight - 0.068, side * 1.53, cargoWidth + 0.04, 0.13, 0.127, false);
-    for (const z of [-1.43, 1.43]) box(cargo, zinc, side * 4.014, cargoHeight / 2, z, 0.116, cargoHeight, 0.092, false);
+  function fitting(surface: THREE.Material, x: number, y: number, z: number, w: number, h: number, d: number) {
+    const mesh = diquePart(cargo, cargoEdge, surface);
+    mesh.position.set(x, y, z); mesh.scale.set(w, h, d);
   }
+  for (const side of [-1, 1]) {
+    fitting(iron, 0, 0.083, side * 1.53, cargoWidth + .04, .13, .17);
+    fitting(paint, 0, cargoHeight - .068, side * 1.54, cargoWidth + .04, .14, .16);
+    for (const z of [-1.44, 1.44]) {
+      fitting(zinc, side * 4.013, cargoHeight / 2, z, .12, cargoHeight, .13);
+      for (const y of [.105, cargoHeight - .085]) {
+        fitting(paint, side * 3.938, y, z, .23, .20, .23);
+        box(cargo, iron, side * 3.936, y, Math.sign(z) * 1.558, .108, .075, .013, false);
+      }
+    }
+  }
+  // The door has two pressed panels, a dark gasket at the centre and
+  // separate lock bars with hinges and keeper plates.
+  for (const side of [-1, 1]) {
+    fitting(material, 4.015, 1.34, side * .69, .08, 2.32, 1.33);
+    for (const y of [.46, 2.13]) {
+      fitting(zinc, 4.075, y, side * 1.18, .092, .15, .24);
+      box(cargo, iron, 4.124, y, side * 1.18, .014, .059, .19, false);
+    }
+  }
+  box(cargo, iron, 4.056, 1.34, 0, .019, 2.32, .037, false);
   for (const z of [-0.84, -0.26, 0.26, 0.84]) {
     box(cargo, zinc, 4.055, cargoHeight / 2, z, 0.076, cargoHeight - 0.23, 0.038, false);
     box(cargo, iron, 4.083, 1.02, z + 0.098, 0.035, 0.052, 0.26, false);
@@ -340,9 +363,12 @@ function shippingContainer(parent: THREE.Group, x: number, z: number, yaw: numbe
   cargo.position.set(x, DIQUE_GROUND + (stacked ? 2.67 : 0), z);
   cargo.rotation.y = yaw;
   parent.add(cargo);
+  return { x, y: cargo.position.y + cargoHeight / 2, z, yaw, color: material.color,
+    width: cargoWidth, height: cargoHeight, depth: cargoDepth } satisfies LocalReflector;
 }
 
 function containers(parent: THREE.Group, course: Course) {
+  const reflectors: LocalReflector[] = [];
   const rng = random(74149);
   const stacks = [[173, 88, -0.19, blue], [155, 133, -0.04, oxide], [194, 123, 0.11, blue],
     [201.5, 132.6, -0.06, oxide], [125.2, 130.0, -0.19, blue], [52.6, 68.7, 0, blue],
@@ -362,9 +388,9 @@ function containers(parent: THREE.Group, course: Course) {
       return diqueRoadClear(course, corner.x, corner.z, 0.42);
     }));
     if (!fits) continue;
-    shippingContainer(parent, anchor.x, anchor.z, yaw, color);
+    reflectors.push(shippingContainer(parent, anchor.x, anchor.z, yaw, color));
     if ([4, 7, 12, 13, 14].includes(i)) {
-      shippingContainer(parent, anchor.x + 0.15, anchor.z + 0.038, yaw + 0.018, i % 3 === 0 ? amber : blue, true);
+      reflectors.push(shippingContainer(parent, anchor.x + 0.15, anchor.z + 0.038, yaw + 0.018, i % 3 === 0 ? amber : blue, true));
     }
     for (let j = 0; j < 4; j++) {
       const { x, z } = point((j - 2) * 0.67 + (i % 2 ? 5.21 : -4.31), 1.91 + rng() * 0.54);
@@ -373,6 +399,7 @@ function containers(parent: THREE.Group, course: Course) {
     const load = point(-4.97, -1.51);
     if (diqueRoadClear(course, load.x, load.z, 0.88)) pallet(parent, load.x, DIQUE_GROUND, load.z);
   }
+  return reflectors;
 }
 
 function serviceYards(parent: THREE.Group, course: Course, concrete: THREE.Material) {
@@ -512,7 +539,7 @@ function craneSite(parent: THREE.Group, course: Course, concrete: THREE.Material
   return { crane, placeholder };
 }
 
-function pumpingStation(parent: THREE.Group, concrete: THREE.Material, glass: THREE.Material, pool: THREE.Material) {
+function pumpingStation(parent: THREE.Group, concrete: THREE.Material, glass: THREE.Material, pool: THREE.Material, wallLight: THREE.Material) {
   const { x, z } = diquePlanPoint(225, 27.5);
   const house = new THREE.Group();
   house.position.set(x, DIQUE_GROUND, z);
@@ -570,8 +597,8 @@ function pumpingStation(parent: THREE.Group, concrete: THREE.Material, glass: TH
   pallet(house, -0.25, 4.54, 4.29);
   const upperGlow = diquePart(house, new THREE.PlaneGeometry(12.0, 7.4).rotateX(-Math.PI / 2), pool);
   upperGlow.position.set(-4.23, 4.535, 3.18);
-  const wallGlow = diquePart(house, new THREE.PlaneGeometry(15.4, 4.08), pool);
-  wallGlow.position.set(-5.5, 2.13, 7.124);
+  const wallGlow = diquePart(house, new THREE.PlaneGeometry(15.4, 4.08), wallLight);
+  wallGlow.position.set(-5.5, 2.13, 6.862);
 }
 
 function brakingBoard(parent: THREE.Group, course: Course, distance: number, side: number, text: string, note: string) {
@@ -595,6 +622,7 @@ function lights(parent: THREE.Group, course: Course) {
   const halo = new THREE.SpriteMaterial({ color: 0xffc08c, map: poolMaterial().map, blending: THREE.AdditiveBlending,
     transparent: true, opacity: 0.28, depthWrite: false });
   const poles: THREE.SpotLight[] = [];
+  const bounces: THREE.SpotLight[] = [];
   const stations = ([[4, 1], [44, 1], [92, 1], [136, -1], [171, 1], [238, 1], [279, -1],
     [325, -1], [395, 1], [445, 1], [494, -1], [555, -1], [644, -1], [692, 1], [735, -1]] as const)
     .map(([at, side], i) => ({ s: diqueRoadDistance(at), side, tall: [3, 4, 7, 8, 10, 12].includes(i),
@@ -660,24 +688,34 @@ function lights(parent: THREE.Group, course: Course) {
       haze.position.set(0, 0.01, 0.29);
       haze.scale.set(2.25, 0.95, 1);
       head.add(haze);
-      const actual = new THREE.SpotLight(0xffb571, 21, 15.6, 0.63, 0.79, 2);
+      const actual = new THREE.SpotLight(0xffc087, 21, 17.8, 0.69, 0.87, 2);
       actual.position.set(q.x, postTop, q.z);
       actual.target.position.copy(aim);
       actual.layers.set(sceneryLights);
       parent.add(actual, actual.target);
       poles.push(actual);
+      if (course.detour && s >= course.detour.from && s <= course.detour.to) {
+        // A wide low return carries the color of the lit pavement onto the
+        // rail and container at this bend. Its reach ends in the same yard.
+        const reflected = new THREE.SpotLight(0xffbb78, 0, 15.6, 1.04, .9, 2);
+        reflected.position.copy(aim).add(new THREE.Vector3(0, .34, 0));
+        reflected.target.position.copy(diqueEdge(course, p, margin * 1.52, 1.72));
+        reflected.layers.set(sceneryLights); reflected.name = 'Rebote cálido del patio portuario';
+        parent.add(reflected, reflected.target); bounces.push(reflected);
+      }
     }
   }
-  return { poles, glow, halo, bulb: glass };
+  return { poles, bounces, glow, halo, bulb: glass };
 }
 
 export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: THREE.Material, garageModel?: THREE.Object3D) {
   const lamp = new THREE.MeshStandardMaterial({ color: 0xffd59b, emissive: 0xf99335, emissiveIntensity: 1.25, roughness: 0.52 });
-  const { poles, glow, halo, bulb } = lights(parent, course);
+  const { poles, bounces, glow, halo, bulb } = lights(parent, course);
   const garageGlow = poolMaterial();
   const wallBounce = garageGlow.clone();
   wallBounce.color.setHex(0xe9d0b2);
   wallBounce.opacity = 0.40;
+  const stationBounce = wallBounce.clone();
   const shadow = horizontalShadow();
   const floorFinish = garageFloor();
   const service = new THREE.Group();
@@ -686,9 +724,9 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   boxServiceFence(service, course, grateMaterial());
   if (garageModel) instanceStatic(service);
   const crane = craneSite(parent, course, concrete, lamp, garageGlow);
-  containers(parent, course);
+  const reflectors = containers(parent, course);
   serviceYards(parent, course, concrete);
-  pumpingStation(parent, concrete, lamp, garageGlow);
+  pumpingStation(parent, concrete, lamp, garageGlow, stationBounce);
   for (const [s, side, text, note] of [[125, 1, '100', 'GRÚA'], [141, 1, '50', 'GRÚA'],
     [279, 1, 'CHICANA', 'REGRESO A PISTA'], [335, -1, 'PUENTE', 'NIVEL ALTO'], [476, 1, 'FRENÁ', 'VERTEDERO'],
     [574, -1, 'TÚNEL', 'CARRIL BAJO'], [640, 1, 'MALECÓN', 'DOS CURVAS'], [20, -1, 'BOXES', 'DESPACIO']] as const) {
@@ -696,11 +734,14 @@ export function buildDiqueProps(parent: THREE.Group, course: Course, concrete: T
   }
   return {
     ...crane,
+    reflectors,
     setNight(enabled: boolean) {
-      for (const light of poles) light.intensity = enabled ? 326 : 47;
-      glow.opacity = enabled ? 0.92 : 0.31;
+      for (const light of poles) light.intensity = enabled ? 292 : 47;
+      for (const light of bounces) light.intensity = enabled ? 54 : 12;
+      glow.opacity = enabled ? 0.60 : 0.25;
       garageGlow.opacity = enabled ? 0.95 : 0.75;
       wallBounce.opacity = enabled ? 0.57 : 0.33;
+      stationBounce.opacity = enabled ? 0.28 : 0.09;
       halo.opacity = enabled ? 0.44 : 0.21;
       bulb.emissiveIntensity = enabled ? 3.60 : 2.35;
       lamp.emissiveIntensity = enabled ? 3.35 : 2.26;

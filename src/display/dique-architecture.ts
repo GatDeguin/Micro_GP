@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { Course } from '../shared/courses';
 import { DIQUE_BUILDING_PAD as slabHeight, diqueBuildingFootprint, diqueBuildingPoint, diqueBuildings,
   type DiqueBuilding } from './dique-architecture-layout';
@@ -13,6 +14,7 @@ const asphalt = standard(0x565953, 0.89);
 const ironPipe = standard(0x586964, 0.63, 0.55);
 const pipeGeometry = new THREE.CylinderGeometry(1, 1, 1, 12);
 const horizontal = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+const sillEdge = new RoundedBoxGeometry(1, 1, 1, 1, .09);
 
 function workGlow() {
   const { canvas, context } = canvas2d(64, 64);
@@ -53,6 +55,16 @@ function apron(parent: THREE.Group, site: DiqueBuilding, paving: THREE.Material,
     const ramp = box(parent, paving, depot ? 3.73 : -1.55, slabHeight + 0.088, depth / 2 + 0.37,
       depot ? 4.10 : 4.38, 0.064, 1.08, false);
     ramp.rotation.x = 0.16;
+    const step = diquePart(parent, sillEdge, zinc);
+    step.position.set(depot ? 3.73 : -1.55, slabHeight + .122, depth / 2 - .02);
+    step.scale.set(depot ? 4.10 : 4.38, .037, .19);
+    for (const end of [-1, 1]) {
+      const x = (depot ? 3.73 : -1.55) + end * (depot ? 2.08 : 2.21);
+      const jamb = diquePart(parent, sillEdge, iron);
+      jamb.position.set(x, slabHeight + 1.08, depth / 2 - .031);
+      jamb.scale.set(.063, 1.93, .090);
+      for (const y of [.26, 1.09, 1.97]) box(parent, zinc, x, slabHeight + y, depth / 2 + .025, .045, .04, .025, false);
+    }
   }
 }
 

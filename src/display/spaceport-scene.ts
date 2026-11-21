@@ -131,22 +131,39 @@ function track(parent: THREE.Group, course: Course, source: THREE.MeshStandardMa
   material.metalness = .58;
   material.customProgramCacheKey = () => 'spaceport-track-finishes-v1';
   material.onBeforeCompile = shader => {
-    shader.vertexShader = 'attribute float finish; varying float vFinish;\n' + shader.vertexShader
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinish = finish;');
-    shader.fragmentShader = 'varying float vFinish;\n' + shader.fragmentShader
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, .35, vFinish);')
+    shader.vertexShader = 'attribute float finish; attribute vec4 roadWear; varying float vFinish; varying vec4 vRoadWear;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinish = finish; vRoadWear = roadWear;');
+    shader.fragmentShader = 'varying float vFinish; varying vec4 vRoadWear;\n' + shader.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float span = abs(vRoadWear.x) / max(.01, vRoadWear.y);
+        float rubber = 1.0 - smoothstep(.16, .64,
+          abs(abs(vRoadWear.x - .29 * sin(vRoadWear.w * .061)) - 1.05));
+        float outwash = .54 + .29 * sin(vRoadWear.w * .44) + .16 * sin(vRoadWear.w * .13);
+        float dryEdge = smoothstep(.68, .98, span) * outwash;
+        float burnish = rubber * (.24 + .68 * vRoadWear.z) * step(.1, vRoadWear.y);
+        diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - .29 * burnish),
+          diffuseColor.rgb * vec3(1.37, 1.22, 1.07), dryEdge * step(.1, vRoadWear.y));
+      `)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, .35, vFinish);
+        roughnessFactor = clamp(roughnessFactor - .28 * burnish + .12 * dryEdge, .25, 1.0);
+      `)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor *= vFinish;');
   };
   const count = Math.ceil(course.length / .78), spacing = course.length / count;
   let positions: number[] = [], colors: number[] = [], indices: number[] = [], uv: number[] = [], finishes: number[] = [];
+  let wear: number[] = [];
   let distance = 0;
+  let brake = 0;
   const color = new THREE.Color();
-  function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, tint: number, reverse = false, edgeShade = 0) {
+  function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, tint: number,
+    reverse = false, edgeShade = 0, asphalt?: readonly number[]) {
     const at = positions.length / 3; color.setHex(tint);
     for (const [i, v] of [a, b, c, d].entries()) {
       const shade = edgeShade && i % 2 === (edgeShade > 0 ? 1 : 0) ? .76 : 1;
       positions.push(v.x, v.y, v.z); colors.push(color.r * shade, color.g * shade, color.b * shade);
       finishes.push(tint === tone.steel || tint === tone.silver ? 1 : tint === tone.navy || tint === tone.white || tint === tone.orange ? .26 : 0);
+      wear.push(asphalt?.[i] ?? 0, asphalt?.[i + 4] ?? 0, asphalt ? brake : 0, distance + (i > 1 ? spacing : 0));
     }
     uv.push(0, distance, a.distanceTo(b), distance, 0, distance + spacing, c.distanceTo(d), distance + spacing);
     if (reverse) indices.push(at, at + 2, at + 1, at + 2, at + 3, at + 1);
@@ -154,7 +171,10 @@ function track(parent: THREE.Group, course: Course, source: THREE.MeshStandardMa
   }
   function ribbon(a: CourseFrame, b: CourseFrame, lowA: number, highA: number, lowB: number, highB: number,
     lift: number, tint: number, reverse = false, edgeShade = 0) {
-    quad(point(a, lowA, lift), point(a, highA, lift), point(b, lowB, lift), point(b, highB, lift), tint, reverse, edgeShade);
+    const offsets = [lowA, highA, lowB, highB];
+    const asphalt = lift === 0 ? offsets.concat(offsets.map((offset, i) => offset < 0
+      ? course.pitRoadHalfAt(distance + (i > 1 ? spacing : 0)) : course.roadHalfAt(distance + (i > 1 ? spacing : 0)))) : undefined;
+    quad(point(a, lowA, lift), point(a, highA, lift), point(b, lowB, lift), point(b, highB, lift), tint, reverse, edgeShade, asphalt);
   }
   function flush() {
     const geometry = new THREE.BufferGeometry();
@@ -162,16 +182,19 @@ function track(parent: THREE.Group, course: Course, source: THREE.MeshStandardMa
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geometry.setAttribute('finish', new THREE.Float32BufferAttribute(finishes, 1));
+    geometry.setAttribute('roadWear', new THREE.Float32BufferAttribute(wear, 4));
     geometry.setIndex(indices); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
     const road = new THREE.Mesh(geometry, material); road.name = 'Cinta 3D, escapatorias y guías magnéticas';
     road.castShadow = positions.some((value, i) => i % 3 === 1 && value > 1.4);
     road.receiveShadow = true; parent.add(road);
-    positions = []; colors = []; indices = []; uv = []; finishes = [];
+    positions = []; colors = []; indices = []; uv = []; finishes = []; wear = [];
   }
   for (let i = 0; i < count; i++) {
     const s = i * spacing, t = (i + 1) * spacing;
     distance = s;
     const a = course.frameAt!(s), b = course.frameAt!(t);
+    const ahead = course.frameAt!(s + 9);
+    brake = THREE.MathUtils.smoothstep(1 - (a.tx * ahead.tx + a.ty * ahead.ty + a.tz * ahead.tz), .027, .22);
     const leftA = course.roadHalfAt(s), rightA = course.pitRoadHalfAt(s);
     const leftB = course.roadHalfAt(t), rightB = course.pitRoadHalfAt(t);
     const asphalt = i % 7 ? 0x3b454c : 0x3d474e;
@@ -335,11 +358,11 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   track(fixed, course, roadway);
   // Concrete service aprons and expansion joints make the diorama read as a
   // working launch facility instead of isolated models on an empty ground plane.
-  for (const [x, z, width, depth] of [[25, -160, 110, 110], [-32, -76, 55, 47], [-94, -162, 40, 34],
-    [130, -106, 37, 35], [-76, -273, 24, 24]] as const) {
+  for (const [x, z, width, depth, slab = 12] of [[25, -160, 110, 110], [-32, -76, 55, 47], [-94, -162, 40, 34],
+    [130, -106, 37, 35], [-76, -273, 24, 24], [-98, -70, 47, 69, 7.5], [-159, -78, 41, 59, 8]] as const) {
     d.box(x, -.066, z, width, .024, depth, 0xaaa99b);
-    for (let dx = -width / 2 + 12; dx < width / 2; dx += 12) d.box(x + dx, -.052, z, .036, .003, depth, 0x777e78);
-    for (let dz = -depth / 2 + 12; dz < depth / 2; dz += 12) d.box(x, -.052, z + dz, width, .003, .036, 0x777e78);
+    for (let dx = -width / 2 + slab; dx < width / 2; dx += slab) d.box(x + dx, -.052, z, .052, .003, depth, 0x777e78);
+    for (let dz = -depth / 2 + slab; dz < depth / 2; dz += slab) d.box(x, -.052, z + dz, width, .003, .052, 0x777e78);
   }
   const clear = (x: number, z: number, height: number) => !course.samples.some((q, i) => i % 7 === 0
     && q.y < height - 1 && Math.hypot(q.x - x, q.z - z) < course.wallHalfAt(q.s, 1) + .65);
@@ -539,6 +562,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   let night = false, detail = true;
   return {
     backWall,
+    reflectors: campus.reflectors,
     launchState: launch.state,
     setNight(value: boolean) {
       night = value; lampMaterial.emissiveIntensity = value ? 3.1 : 1.2;
