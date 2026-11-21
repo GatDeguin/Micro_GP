@@ -23,7 +23,10 @@ export function buildSpaceportIllumination(parent: THREE.Group, course: Course) 
     for (let i = 0; i < values.length; i += 3) tint.toArray(values, i);
     piece.setAttribute('color', new THREE.BufferAttribute(values, 3)); pieces.push(piece);
   }
-  for (let s = 4; s < course.length; s += 44) {
+  const roadLamps = Array.from({ length: Math.ceil((course.length - 4) / 44) }, (_, i) => 4 + i * 44);
+  // The short interval at the pad is lit by the existing shoulder beacons.
+  roadLamps.push(510);
+  for (const s of roadLamps) {
     // Follow the actual curved deck; a single tangent quad would float above
     // the vertical loops and cut through the banking at its ends.
     const side = Math.floor(s / 22) % 2 ? 1 : -1, positions: number[] = [], uv: number[] = [], indices: number[] = [];
@@ -40,10 +43,11 @@ export function buildSpaceportIllumination(parent: THREE.Group, course: Course) 
     const patch = new THREE.BufferGeometry(); patch.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     patch.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); patch.setIndex(indices); patch.computeVertexNormals(); colored(patch, 0xb8dbea);
   }
-  for (const [x, y, z, w, d] of [[-94, .04, -152.4, 13, 8], [-164, .075, -111, 10, 8],
-    [-99, .025, -68, 15, 6], [-53, .025, -108, 12, 5]] as const) {
+  for (const [x, y, z, w, d, color = 0xffc980] of [[-94, .04, -152.4, 13, 8], [-164, .075, -111, 10, 8],
+    [-99, .025, -68, 15, 6], [-53, .025, -108, 12, 5],
+    [3, -.039, -201, 45, 30, 0xb18142], [52, -.039, -167, 42, 32, 0x7697ae]] as const) {
     placements.push({ position: new THREE.Vector3(x, y, z), rotation: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2),
-      scale: new THREE.Vector3(w, d, 1), color: 0xffc980 });
+      scale: new THREE.Vector3(w, d, 1), color });
   }
   for (const s of course.pit.stalls) {
     const f = course.frameAt!(s, course.pit.stationOffset);
@@ -83,7 +87,7 @@ export function buildSpaceportIllumination(parent: THREE.Group, course: Course) 
       lenses.setMatrixAt(i * 6 + j, matrix.compose(position, rotation, scale.set(.59, .43, .05)));
     }
     const flood = new THREE.SpotLight(i % 2 ? 0xc8e7ff : 0xffd7a1, i < 2 ? 100 : 0, i < 2 ? 105 : 28, .71, .76, 2);
-    if (i >= 2) flood.layers.set(sceneryLights);
+    flood.layers.set(sceneryLights);
     flood.position.set(x, y, z); flood.target.position.set(tx, ty, tz); flood.name = 'Reflector de plataforma · sin sombra adicional';
     group.add(flood, flood.target); floods.push(flood);
   }

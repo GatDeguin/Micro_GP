@@ -25,6 +25,7 @@ import { buildReplayShot } from './replay-shot';
 import { buildRaceResults } from './results';
 import { buildSafetyBarriers } from './safety-barriers';
 import { buildSceneLighting } from './scene-lighting';
+import { loadSectorReflection, type SectorReflection } from './sector-reflections';
 import { readAudioSettings, readQuality } from './settings';
 import { buildPlacard, buildRaceSigns, overviewPlacardLimit, placardLayout } from './signs';
 import { startSolo } from './solo';
@@ -51,6 +52,7 @@ type CourseStage = {
   setDetail?(detail: boolean): void;
   captureReflections?(renderer: THREE.WebGLRenderer, scene: THREE.Scene): void;
   reflectors?: readonly LocalReflector[];
+  sectorReflection?: SectorReflection;
 };
 const noLocalReflectors: readonly LocalReflector[] = [];
 
@@ -250,13 +252,14 @@ async function bootstrap() {
   let changingCourse = false;
   async function loadCourse(id: CourseId): Promise<CourseStage> {
     const course = id === 'spaceport' ? SPACEPORT : DIQUE;
+    const reflection = lowQuality ? undefined : loadSectorReflection(course);
     const build = id === 'spaceport' ? (await import('./spaceport-scene')).buildSpaceportScene
       : (await import('./dique-scene')).buildDiqueScene;
     await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
     const root = new THREE.Group();
     const diorama = await build(root, course, wood, !pages);
     return {
-      ...diorama, root, course,
+      ...diorama, root, course, sectorReflection: await reflection,
       barriers: buildSafetyBarriers(root, course), tyreMarks: buildTyreMarks(root, course),
       signs: buildRaceSigns(root, course),
     };
@@ -312,6 +315,7 @@ async function bootstrap() {
         if (desiredCourse !== course || lostContext) return;
         renderer.render(scene, camera);
         next.captureReflections?.(renderer, scene);
+        if (next.sectorReflection) renderer.initTexture(next.sectorReflection.texture);
         await warmCloseView(next);
         if (desiredCourse !== course || lostContext) return;
         if (!pages) {
@@ -433,7 +437,10 @@ async function bootstrap() {
   canvas.addEventListener('webglcontextrestored', () => {
     lastShadow = -Infinity;
     restoreReflections();
-    if (!lowQuality) stage.captureReflections?.(renderer, scene);
+    if (!lowQuality) {
+      stage.captureReflections?.(renderer, scene);
+      if (stage.sectorReflection) renderer.initTexture(stage.sectorReflection.texture);
+    }
     disposeCollectorBackdrop(renderer);
     displayWindow = buildCollectorBackdrop(renderer);
     resize();
@@ -461,6 +468,7 @@ async function bootstrap() {
     if (adaptive && budget.sample(now, elapsed)) resizeBuffer();
     solo?.advance(dt, now);
     const course = stage.course;
+    const sectorProbe = stage.sectorReflection;
     stage.update(now);
     const mode = cameraTour(now, current.phase, controls.mode, controls.selection, course.id);
     controls.showMode(mode);
@@ -565,8 +573,10 @@ async function bootstrap() {
       cars[i].setDetail(!lowQuality && (closeView
         || (subject !== undefined && Math.hypot(car.x - subject.x, car.z - subject.z) < 7.0)));
       const reflectors = !lowQuality && closeView && car.active !== false ? stage.reflectors : undefined;
+      const probeWeight = reflectors && sectorProbe?.night === night
+        ? .68 * (1 - THREE.MathUtils.smoothstep(Math.abs(road.s - sectorProbe.distance), 5, 31)) : 0;
       cars[i].setReflections(reflectors ?? noLocalReflectors, view,
-        reflectors ? approachingCover(road.s, 6, course) : 0);
+        reflectors ? approachingCover(road.s, 6, course) : 0, probeWeight > 0 ? sectorProbe?.texture : undefined, probeWeight);
       cars[i].update(view, dt, slope, now, approachingCover(road.s, 4, course) > 0.24, bankRoll, course);
       if (moment?.slot === i) focus = view;
       if (partnerSlot === i) partner = view;

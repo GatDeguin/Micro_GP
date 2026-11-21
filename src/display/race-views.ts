@@ -99,7 +99,7 @@ function followCamera(slot: number, course: Course) {
       : mode === 'general' ? 44 : mode === 'chase' ? (loop ? 60 : 48) : 42;
     const fov = lens
       + THREE.MathUtils.clamp((1.25 - aspect) * 22, 0, 22) + (qrSize ? 4 : 0);
-    const far = compact ? (mode === 'general' ? 46 : 34) : course.id === 'spaceport' ? 430 : 160;
+    const far = compact ? (mode === 'general' ? 46 : course.id === 'spaceport' ? 44 : 34) : course.id === 'spaceport' ? 430 : 160;
     if (camera.view?.enabled || camera.aspect !== aspect || camera.fov !== fov || camera.far !== far) {
       camera.aspect = aspect;
       camera.fov = fov;

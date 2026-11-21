@@ -41,25 +41,34 @@ test('liftoff reuses bounded buffers, follows altitude, clears and rearms at bot
   assert.equal(rocket.position.x, 26); assert.equal(rocket.rotation.z, 0); assert.equal(lights[0].intensity, 0);
 });
 
-test('competition lighting keeps the extra campus floods out of compact views and pools aligned to the 3D road', () => {
+test('competition lighting uses baked launch pools in compact views and follows the 3D road', () => {
   const root = new THREE.Group(), lighting = buildSpaceportIllumination(root, SPACEPORT);
   const lights: THREE.SpotLight[] = [];
   root.traverse(object => { if (object instanceof THREE.SpotLight) lights.push(object); });
   assert.equal(lights.length, 4); assert.ok(lights.every(light => !light.castShadow));
   const compact = new THREE.PerspectiveCamera(); cameraLights(compact, true, 0);
-  const launch = lights.filter(light => light.layers.test(compact.layers));
-  const campus = lights.filter(light => !light.layers.test(compact.layers));
-  assert.equal(launch.length, 2); assert.equal(campus.length, 2);
+  const close = new THREE.PerspectiveCamera(); cameraLights(close, false);
+  assert.ok(lights.every(light => !light.layers.test(compact.layers) && light.layers.test(close.layers)));
   lighting.setNight(true);
-  assert.ok(launch.every(light => light.intensity >= 2000));
-  assert.ok(campus.every(light => light.intensity > 100 && light.intensity < 200));
-  lighting.setNight(false); assert.ok(lights.every(light => light.intensity < 200));
-  assert.ok(campus.every(light => light.intensity === 0));
+  const launch = lights.filter(light => light.intensity >= 2000);
+  const campus = lights.filter(light => light.intensity > 100 && light.intensity < 200);
+  assert.equal(launch.length, 2); assert.equal(campus.length, 2);
   const pools = root.getObjectByName('Manchas de luz sobre pista, boxes y edificios') as THREE.Mesh;
+  assert.ok(pools.layers.test(compact.layers));
+  const poolMaterial = pools.material as THREE.MeshBasicMaterial;
+  const nightOpacity = poolMaterial.opacity;
+  lighting.setNight(false);
+  assert.ok(lights.every(light => light.intensity < 200) && campus.every(light => light.intensity === 0));
+  assert.ok(nightOpacity > poolMaterial.opacity * 4);
   const vertices = pools.geometry.getAttribute('position'), point = new THREE.Vector3();
   assert.ok(pools.geometry.index!.count < 4000);
+  const launchSlabs = Array.from({ length: vertices.count }, (_, i) => vertices.getY(i)).filter(y => Math.abs(y + .039) < .0001);
+  assert.equal(launchSlabs.length, 8, 'both launch pools are on the platform surface');
   let index = 0;
-  for (let s = 4; s < SPACEPORT.length; s += 44) {
+  const stations: number[] = [];
+  for (let s = 4; s < SPACEPORT.length; s += 44) stations.push(s);
+  stations.push(510);
+  for (const s of stations) {
     for (let j = 0; j <= 12; j++) {
       const along = s - 4.6 + j * 9.2 / 12, f = SPACEPORT.frameAt!(along);
       for (let edge = 0; edge < 2; edge++) {

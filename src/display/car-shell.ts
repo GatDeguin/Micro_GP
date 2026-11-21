@@ -124,12 +124,52 @@ export function shellGeometry(sections: readonly Section[], wheelbase?: number) 
       }
     }
   });
-  const front = (rings.length - 1) * ringSize;
-  for (let i = 1; i < ringSize - 1; i++) triangles.push(0, i + 1, i, front, front + i, front + i + 1);
+  // Roll the cast shell into its end plates. The thin bevel ring isolates
+  // the smooth panels from the large triangles that close each plate.
+  for (const [ring, front] of [[0, false], [rings.length - 1, true]] as const) {
+    const start = ring * ringSize;
+    const cap = positions.length / 3;
+    const dir = front ? 1 : -1;
+    const row = rings[ring];
+    const next = rings[ring - dir];
+    const roll = wheelbase === undefined ? 0 : Math.min(.024, Math.abs(row[0] - next[0]) * .78);
+    const mid = (row[2] + row[3]) / 2;
+    for (let index = 0; index < ringSize; index++) {
+      const i = (start + index) * 3;
+      const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+      const inset = roll * .63;
+      positions.push(x * (1 - inset / row[1]), y + (mid - y) * inset / (row[3] - row[2]), z);
+      positions[i + 2] -= roll * dir;
+      if (roll > 0) {
+        const a = start + index, b = start + (index + 1) % ringSize;
+        const c = cap + index, d = cap + (index + 1) % ringSize;
+        if (front) triangles.push(a, b, c, b, d, c);
+        else triangles.push(c, d, a, d, b, a);
+      }
+    }
+    uv.push(...uv.slice(start * 2, (start + ringSize) * 2));
+    for (let i = 1; i < ringSize - 1; i++) {
+      if (front) triangles.push(cap, cap + i, cap + i + 1);
+      else triangles.push(cap, cap + i + 1, cap + i);
+    }
+  }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geometry.setIndex(triangles);
   geometry.computeVertexNormals();
+  const normal = geometry.getAttribute('normal');
+  const n = new THREE.Vector3();
+  // Preserve a gentle transition on un-bevelled trim and glazing.
+  if (wheelbase !== undefined) return geometry;
+  for (const [ring, direction] of [[0, -1], [rings.length - 1, 1]] as const) {
+    for (let index = 0; index < ringSize; index++) {
+      const vertex = ring * ringSize + index;
+      n.fromBufferAttribute(normal, vertex);
+      n.z += direction * 0.21;
+      n.normalize();
+      normal.setXYZ(vertex, n.x, n.y, n.z);
+    }
+  }
   return geometry;
 }

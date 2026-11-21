@@ -221,8 +221,8 @@ export function buildSceneLighting(scene: THREE.Scene, renderer: THREE.WebGLRend
       renderer.toneMappingExposure = night ? 1.13 : 1.03;
       scene.environmentRotation.y = 0;
       scene.background = night ? harborNight : harborSky;
-      distanceHaze.color.setHex(night ? 0x28384a : 0xc2c6b7);
-      distanceHaze.density = night ? .0038 : .0028;
+      distanceHaze.color.setHex(night ? 0x28384a : 0xb1c0c2);
+      distanceHaze.density = night ? .0038 : .0024;
     }
     scene.backgroundIntensity = dayBackgroundIntensity * (night ? 0.64 : 1);
     if (!lowQuality) {

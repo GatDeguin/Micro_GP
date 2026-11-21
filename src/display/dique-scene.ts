@@ -63,7 +63,7 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
 
   const movingProps = new Set<THREE.Object3D>([equipment.crane, workstations.animated]);
   if (treatment) movingProps.add(treatment.animated);
-  if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, ...movingProps]));
+  if (compactEnabled) buildCompactScenery(parent, [dock, infrastructure, props], new Set([harbor.backWall, ...movingProps]), 22);
   mergeStatic(dock, new Set([harbor.backWall]), 45);
   mergeStatic(infrastructure, undefined, 48);
   mergeStatic(props, movingProps, 33);
@@ -73,7 +73,9 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
   if (craneActivity) equipment.placeholder.removeFromParent();
   else instanceStatic(equipment.placeholder);
   const ship = await shipLoading;
-  applyExteriorOcclusion(parent);
+  const compactShadows = applyExteriorOcclusion(parent);
+  let detailed = true;
+  let lastYardUpdate = -Infinity;
 
   return {
     backWall: harbor.backWall,
@@ -96,6 +98,9 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       workstations.setNight(night);
     },
     setDetail(detail: boolean) {
+      if (detailed !== detail) lastYardUpdate = -Infinity;
+      detailed = detail;
+      compactShadows(!detail);
       craneActivity?.setDetail?.(detail);
       ship.setDetail(detail);
       workers.setDetail(detail);
@@ -108,6 +113,11 @@ export async function buildDiqueScene(parent: THREE.Group, course: Course, wood:
       harbor.update(now);
       roadworks.update(now);
       treatment?.update(now);
+      // In the smaller panes the port's ambient motion needs fewer buffer
+      // updates. Water, track effects and cars still advance every frame.
+      const elapsed = now - lastYardUpdate;
+      if (!detailed && elapsed >= 0 && elapsed < 1000 / 30 - 1) return;
+      lastYardUpdate = now;
       yard.update(now);
       craneActivity?.update(now);
       terminal.update(now);

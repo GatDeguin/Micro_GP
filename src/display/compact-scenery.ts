@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { compactScenery, originalScenery } from './render-layers';
 
-const groupSize = 14;
-
 // Solid-painted pieces can share a draw in split screen. Textured surfaces and luminous parts keep their materials.
-export function buildCompactScenery(scene: THREE.Object3D, roots: readonly THREE.Group[], excluded: ReadonlySet<THREE.Object3D>) {
+export function buildCompactScenery(scene: THREE.Object3D, roots: readonly THREE.Group[], excluded: ReadonlySet<THREE.Object3D>,
+  groupSize = 14) {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.68, metalness: 0.10 });
   const groups = new Map<string, { pieces: THREE.BufferGeometry[]; cast: boolean; receive: boolean }>();
+  const indices = new WeakMap<THREE.BufferGeometry, THREE.BufferAttribute>();
   const local = new THREE.Matrix4();
   const matrix = new THREE.Matrix4();
   const point = new THREE.Vector3();
@@ -46,7 +46,12 @@ export function buildCompactScenery(scene: THREE.Object3D, roots: readonly THREE
       const positions = geometry.getAttribute('position').clone();
       piece.setAttribute('position', positions);
       piece.setAttribute('normal', geometry.getAttribute('normal').clone());
-      piece.setIndex(geometry.index);
+      if (!geometry.index && !indices.has(geometry)) {
+        const index = positions.count > 65535 ? new Uint32Array(positions.count) : new Uint16Array(positions.count);
+        for (let j = 0; j < index.length; j++) index[j] = j;
+        indices.set(geometry, new THREE.BufferAttribute(index, 1));
+      }
+      piece.setIndex(geometry.index ?? indices.get(geometry)!);
       const channels = new Float32Array(positions.count * 3);
       for (let j = 0; j < channels.length; j += 3) {
         channels[j] = color.r;
@@ -56,7 +61,7 @@ export function buildCompactScenery(scene: THREE.Object3D, roots: readonly THREE
       piece.setAttribute('color', new THREE.BufferAttribute(channels, 3));
       piece.applyMatrix4(matrix);
       geometry.boundingBox!.getCenter(point).applyMatrix4(matrix);
-      const key = `${Math.floor(point.x / groupSize)},${Math.floor(point.z / groupSize)},${object.castShadow},${object.receiveShadow},${!!geometry.index}`;
+      const key = `${Math.floor(point.x / groupSize)},${Math.floor(point.z / groupSize)},${object.castShadow},${object.receiveShadow}`;
       const group = groups.get(key);
       if (group) group.pieces.push(piece);
       else groups.set(key, { pieces: [piece], cast: object.castShadow, receive: object.receiveShadow });

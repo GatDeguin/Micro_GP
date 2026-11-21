@@ -158,7 +158,7 @@ function waterMaterial() {
         vec2 second = vec2(-1.92, 0.62);
         vec2 third = vec2(0.36, 3.42);
         float drift = sin(dot(p, vec2(0.23, 0.31)) - t * 0.63);
-        return first * mix(0.058, 0.102, current) * cos(dot(p, first) - (1.55 + current) * t + drift)
+        return first * mix(0.058, 0.070, current) * cos(dot(p, first) - (1.55 + current) * t + drift)
           + second * 0.045 * cos(dot(p, second) + 1.6 * t + 0.62 * drift)
           + third * 0.024 * cos(dot(p, third) - (2.1 + 3.7 * current) * t)
           + vec2(0.038, -0.032) * sin(dot(p, vec2(4.31, -5.4)) + t * 2.21);
@@ -167,6 +167,7 @@ function waterMaterial() {
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         vec2 dockSlope = dockWave(diqueWorld.xz);
         normal = normalize(normal + mat3(viewMatrix) * vec3(dockSlope.x, 0.0, dockSlope.y));
+        roughnessFactor *= mix(.88, 1.20, smoothstep(.035, .19, length(dockSlope)));
       `)
       .replace('#include <clearcoat_normal_fragment_maps>', 'clearcoatNormal = normal;')
       .replace('#include <opaque_fragment>', `
@@ -185,10 +186,12 @@ function waterMaterial() {
         float distortedX = q.x + split * (0.87 * bands + 0.69 * breakup + 0.35 * crossing);
         float reflections = 0.0;
         float darkPiling = 0.0;
-        for (int i = 0; i < 8; i++) {
-          float alignment = abs(quayPilings[i] - distortedX);
-          reflections += 1.0 - smoothstep(0.13, 2.16, alignment);
-          darkPiling += 1.0 - smoothstep(0.08, 0.66, abs(quayPilings[i] - q.x - 0.33 * bands));
+        if (quay > .001) {
+          for (int i = 0; i < 8; i++) {
+            float alignment = abs(quayPilings[i] - distortedX);
+            reflections += 1.0 - smoothstep(0.13, 2.16, alignment);
+            darkPiling += 1.0 - smoothstep(0.08, 0.66, abs(quayPilings[i] - q.x - 0.33 * bands));
+          }
         }
         float gold = reflections * quay * (0.032 + 0.58 * sparkle * detail) * (0.27 + 1.05 * harborNight);
         float shadow = darkPiling * (1.0 - smoothstep(16.0, 19.73, q.y)) * smoothstep(15.5, 16.2, q.y);

@@ -35,7 +35,7 @@ function campusSky(parent: THREE.Group) {
     vertexShader: `varying vec3 direction; void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader: `varying vec3 direction;uniform float night;
       void main(){vec3 d=normalize(direction);float h=smoothstep(-.06,.80,d.y);
-        vec3 day=mix(vec3(.72,.68,.56),vec3(.16,.34,.49),h);
+        vec3 day=mix(vec3(.53,.63,.69),vec3(.13,.29,.46),h);
         vec3 dark=mix(vec3(.055,.105,.15),vec3(.009,.022,.055),h);
         vec2 q=d.xz/(.22+max(0.,d.y));
         float cloud=sin(q.x*4.3+q.y*2.7)+.51*sin(q.x*8.1-q.y*3.1)+.25*sin(q.x*14.3+q.y*7.1);

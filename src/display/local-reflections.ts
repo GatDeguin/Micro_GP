@@ -21,7 +21,8 @@ const plumbing = /* glsl */`
   uniform vec4 reflectionOrigin[3];
   uniform vec4 reflectionBounds[3];
   uniform vec4 reflectionColor[3];
-  uniform vec2 reflectionMood;
+  uniform vec3 reflectionMood;
+  uniform sampler2D sectorReflection;
 
   // Trace the reflection against three nearby, finite volumes. The nearest
   // hit wins, so a painted container can occlude the next one behind it.
@@ -62,37 +63,52 @@ export function buildLocalReflections() {
   const origin = { value: Array.from({ length: 3 }, () => new THREE.Vector4()) };
   const bounds = { value: Array.from({ length: 3 }, () => new THREE.Vector4(1, 1, 1, 0)) };
   const color = { value: Array.from({ length: 3 }, () => new THREE.Vector4()) };
-  const mood = { value: new THREE.Vector2() };
+  const mood = { value: new THREE.Vector3() };
+  const sector = { value: null as THREE.Texture | null };
   const nearest = new Float64Array(3);
   const selected = new Int32Array(3);
   return {
-    attach(material: THREE.MeshPhysicalMaterial) {
-      material.customProgramCacheKey = () => 'micro-gp-reflected-facades-v1';
+    attach(material: THREE.MeshPhysicalMaterial, glazing = false) {
+      material.customProgramCacheKey = () => glazing ? 'micro-gp-reflected-glazing-v2' : 'micro-gp-reflected-facades-v2';
       material.onBeforeCompile = shader => {
         shader.uniforms.reflectionOrigin = origin;
         shader.uniforms.reflectionBounds = bounds;
         shader.uniforms.reflectionColor = color;
         shader.uniforms.reflectionMood = mood;
+        shader.uniforms.sectorReflection = sector;
         shader.vertexShader = 'varying vec3 reflectedPosition;\n' + shader.vertexShader
           .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nreflectedPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;');
         shader.fragmentShader = plumbing + shader.fragmentShader.replace('#include <lights_fragment_maps>', `
           #include <lights_fragment_maps>
+          ${glazing ? 'diffuseColor.a *= mix(.66, 1.52, pow(1.0 - clamp(abs(dot(geometryViewDir, geometryNormal)), 0.0, 1.0), 3.0));' : ''}
           #if defined(USE_ENVMAP) && defined(RE_IndirectSpecular)
             if (reflectionMood.y > .001) {
               vec3 ray = inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix);
+              #ifdef ENVMAP_TYPE_CUBE_UV
+                if (reflectionMood.z > .001) {
+                  radiance = mix(radiance, textureCubeUV(sectorReflection, ray, material.roughness).rgb, reflectionMood.z);
+                  #ifdef USE_CLEARCOAT
+                    vec3 coatRay = inverseTransformDirection(reflect(-geometryViewDir, clearcoatNormal), viewMatrix);
+                    clearcoatRadiance = mix(clearcoatRadiance,
+                      textureCubeUV(sectorReflection, coatRay, material.clearcoatRoughness).rgb, reflectionMood.z);
+                  #endif
+                }
+              #endif
               vec4 facade = reflectedFacade(ray, material.roughness);
               float overhead = smoothstep(-.12, .65, ray.y);
               float roof = mix(1.0, mix(.67, .13, overhead), reflectionMood.x);
-              radiance = mix(radiance, facade.rgb, facade.a * .91) * roof;
+              float panelBlend = mix(1.0, .52, reflectionMood.z);
+              radiance = mix(radiance, facade.rgb, facade.a * .91 * panelBlend) * roof;
               #ifdef USE_CLEARCOAT
-                clearcoatRadiance = mix(clearcoatRadiance, facade.rgb, facade.a) * roof;
+                clearcoatRadiance = mix(clearcoatRadiance, facade.rgb, facade.a * panelBlend) * roof;
               #endif
             }
           #endif
         `);
       };
     },
-    update(boxes: readonly LocalReflector[], x: number, y: number, z: number, shelter: number, night: boolean) {
+    update(boxes: readonly LocalReflector[], x: number, y: number, z: number, shelter: number, night: boolean,
+      probe?: THREE.Texture, probeWeight = 0) {
       nearest.fill(28 ** 2); selected.fill(-1);
       for (let i = 0; i < boxes.length; i++) {
         const distance = reflectorDistanceSquared(boxes[i], x, y, z);
@@ -105,7 +121,9 @@ export function buildLocalReflections() {
           break;
         }
       }
-      mood.value.set(shelter, Number(selected[0] >= 0 || shelter > .001));
+      const probeBlend = probe ? probeWeight * (1 - shelter) : 0;
+      mood.value.set(shelter, Number(selected[0] >= 0 || shelter > .001 || probeBlend > .001), probeBlend);
+      sector.value = probe ?? null;
       for (let i = 0; i < selected.length; i++) {
         const facade = boxes[selected[i]];
         if (!facade) { color.value[i].w = 0; continue; }

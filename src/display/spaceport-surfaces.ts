@@ -36,9 +36,9 @@ function maps(kind: Surface) {
     }
     if (kind === 'asphalt') {
       const chip = smoothChip(noise(u, v, 102));
-      c = 219 + (grain - .5) * 34 + broad * 12 - pore * 21 + chip * 38;
-      h = .5 + (grain - .5) * .14 - pore * .13 + chip * .18;
-      r = .86 + grain * .13 - chip * .23;
+      c = 220 + (grain - .5) * 32 + broad * 12 - pore * 17 + chip * 26;
+      h = .5 + (grain - .5) * .15 - pore * .11 + chip * .13;
+      r = .87 + grain * .12 - chip * .19;
     }
     colour.set([c, c - warm * .25, c - warm, 255], i);
     height.set([h * 255, h * 255, h * 255, 255], i);
@@ -49,7 +49,7 @@ function maps(kind: Surface) {
     map.colorSpace = colorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping;
     map.magFilter = THREE.LinearFilter; map.minFilter = THREE.LinearMipmapLinearFilter;
     map.generateMipmaps = true; map.anisotropy = 8; map.needsUpdate = true;
-    map.repeat.setScalar(kind === 'asphalt' ? .52 : kind === 'wood' ? .50 : kind === 'concrete' ? .48 : .8);
+    map.repeat.setScalar(kind === 'asphalt' ? .79 : kind === 'wood' ? .50 : kind === 'concrete' ? .48 : .8);
     return map;
   };
   return { map: make(colour, THREE.SRGBColorSpace), bumpMap: make(height, THREE.NoColorSpace),

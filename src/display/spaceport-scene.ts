@@ -12,6 +12,7 @@ import { applyExteriorOcclusion } from './scene-occlusion';
 import { buildSpaceportWorkplaces } from './spaceport-workplaces';
 import { buildSpaceportLaunch } from './spaceport-launch';
 import { buildSpaceportIllumination } from './spaceport-illumination';
+import { bakeGroundContacts, type GroundContact } from './ground-contacts';
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
@@ -129,7 +130,7 @@ function track(parent: THREE.Group, course: Course, source: THREE.MeshStandardMa
   // The deck, painted barriers, and steel rims share a draw but respond to
   // light differently. The per-vertex selector is constant across each face.
   material.metalness = .58;
-  material.customProgramCacheKey = () => 'spaceport-track-finishes-v1';
+  material.customProgramCacheKey = () => 'spaceport-track-finishes-v2';
   material.onBeforeCompile = shader => {
     shader.vertexShader = 'attribute float finish; attribute vec4 roadWear; varying float vFinish; varying vec4 vRoadWear;\n' + shader.vertexShader
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinish = finish; vRoadWear = roadWear;');
@@ -141,12 +142,15 @@ function track(parent: THREE.Group, course: Course, source: THREE.MeshStandardMa
         float outwash = .54 + .29 * sin(vRoadWear.w * .44) + .16 * sin(vRoadWear.w * .13);
         float dryEdge = smoothstep(.68, .98, span) * outwash;
         float burnish = rubber * (.24 + .68 * vRoadWear.z) * step(.1, vRoadWear.y);
+        float seal = smoothstep(497.0, 498.1, vRoadWear.w) * (1.0 - smoothstep(514.0, 515.8, vRoadWear.w))
+          * smoothstep(-2.30, -1.90, vRoadWear.x) * (1.0 - smoothstep(.95, 1.39, vRoadWear.x)) * step(.1, vRoadWear.y);
         diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - .29 * burnish),
           diffuseColor.rgb * vec3(1.37, 1.22, 1.07), dryEdge * step(.1, vRoadWear.y));
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(.79, .82, .84), seal);
       `)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, .35, vFinish);
-        roughnessFactor = clamp(roughnessFactor - .28 * burnish + .12 * dryEdge, .25, 1.0);
+        roughnessFactor = clamp(roughnessFactor - .28 * burnish + .12 * dryEdge - .13 * seal, .25, 1.0);
       `)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor *= vFinish;');
   };
@@ -344,8 +348,10 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
     parts(parent, material, name, cell, concrete, surfaces.routes);
   const groundGrain = concrete.bumpMap?.clone();
   groundGrain?.repeat.set(105, 99);
+  const terrainMap = surfaceTexture('ground');
+  terrainMap?.repeat.set(6, 7);
   const groundMaterial = new THREE.MeshStandardMaterial({ color: tone.sand, roughness: .98,
-    map: surfaceTexture('ground') ?? null, bumpMap: groundGrain ?? null, bumpScale: .026 });
+    map: terrainMap ?? null, bumpMap: groundGrain ?? null, bumpScale: .026 });
   const lampMaterial = new THREE.MeshStandardMaterial({ color: 0x9edbe3, emissive: 0x4bb9d1, emissiveIntensity: 1.8, roughness: .4 });
   const warningMaterial = new THREE.MeshStandardMaterial({ color: 0xf27b49, emissive: 0xe44a22, emissiveIntensity: 1.5 });
   const fixed = new THREE.Group(); fixed.name = 'Instalaciones del centro espacial'; parent.add(fixed);
@@ -358,14 +364,18 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   track(fixed, course, roadway);
   // Concrete service aprons and expansion joints make the diorama read as a
   // working launch facility instead of isolated models on an empty ground plane.
-  for (const [x, z, width, depth, slab = 12] of [[25, -160, 110, 110], [-32, -76, 55, 47], [-94, -162, 40, 34],
-    [130, -106, 37, 35], [-76, -273, 24, 24], [-98, -70, 47, 69, 7.5], [-159, -78, 41, 59, 8]] as const) {
+  const aprons = [[25, -160, 110, 110], [-32, -76, 55, 47], [-94, -162, 40, 34], [104, -218, 31, 39, 7.5],
+    [130, -106, 37, 35], [-76, -273, 24, 24], [-98, -70, 47, 69, 7.5], [-159, -78, 41, 59, 8]] as const;
+  for (const [x, z, width, depth, slab = 12] of aprons) {
     d.box(x, -.066, z, width, .024, depth, 0xaaa99b);
     for (let dx = -width / 2 + slab; dx < width / 2; dx += slab) d.box(x + dx, -.052, z, .052, .003, depth, 0x777e78);
     for (let dz = -depth / 2 + slab; dz < depth / 2; dz += slab) d.box(x, -.052, z + dz, width, .003, .052, 0x777e78);
   }
   const clear = (x: number, z: number, height: number) => !course.samples.some((q, i) => i % 7 === 0
     && q.y < height - 1 && Math.hypot(q.x - x, q.z - z) < course.wallHalfAt(q.s, 1) + .65);
+  const contacts: GroundContact[] = [];
+  const apronHeight = (x: number, z: number) => aprons.some(([cx, cz, w, d]) =>
+    Math.abs(x - cx) < w / 2 && Math.abs(z - cz) < d / 2) ? -.054 : -.08;
   for (let s = 0; s < course.length; s += 12) {
     const f = course.frameAt!(s), wall = course.wallHalfAt(s, 1);
     if (f.y < 1.8 || f.ny < .75 || course.loops?.some(loop => s > loop.from - 4 && s < loop.to + 4)) continue;
@@ -375,15 +385,35 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       if (!clear(top.x, top.z, top.y)) continue;
       d.box(top.x, -.04, top.z, 2.3, .48, 2.3, tone.concrete);
       d.box(top.x, .225, top.z, 1.35, .07, 1.35, tone.dark);
+      contacts.push([top.x, apronHeight(top.x, top.z) + .004, top.z, 3.36, 3.36]);
       for (const dx of [-.49, .49]) for (const dz of [-.49, .49]) {
         d.cylinder(top.x + dx, .285, top.z + dz, .105, .065, tone.silver);
         d.cylinder(top.x + dx, .31, top.z + dz, .058, .105, tone.steel);
       }
       d.box(top.x, top.y / 2 - .02, top.z, .68, top.y, .68, tone.steel);
+      if (Math.hypot(top.x - 84, top.z + 211) < 39) {
+        d.box(top.x, .71, top.z, .79, .075, .79, tone.silver);
+        for (const side of [-1, 1]) {
+          d.pipe(p(top.x + side * .54, .27, top.z), p(top.x + side * .34, .71, top.z), .093, tone.steel);
+        }
+      }
       d.pipe(p(top.x, .4, top.z), point(f, side * (wall - .25), -1.2), .17, tone.navy);
       d.pipe(top, point(f, side * (wall - .4), -.32), .20, tone.steel);
     }
   }
+  // Small bolted service covers reveal the scale of the deck by the pad.
+  for (let s = 492; s <= 531; s += 9) {
+    const frame = course.frameAt!(s);
+    const rim = point(frame, course.wallHalfAt(s, 1) + 2.0);
+    if (!clear(rim.x, rim.z, 2.5)) continue;
+    const y = apronHeight(rim.x, rim.z) + .026;
+    d.box(rim.x, y, rim.z, .98, .066, .69, tone.dark);
+    d.box(rim.x, y + .039, rim.z, .83, .019, .57, tone.steel);
+    for (const x of [-.31, .31]) for (const z of [-.20, .20]) {
+      d.cylinder(rim.x + x, y + .055, rim.z + z, .045, .028, tone.silver);
+    }
+  }
+  bakeGroundContacts(fixed, contacts);
   const beaconPoints: THREE.Vector3[] = [];
   const lampPoints: THREE.Vector3[] = [];
   for (let s = 4; s < course.length; s += 22) {
@@ -558,7 +588,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
   for (const side of [-1, 1]) arm.pipe(p(side * .14, 1.5, 1.8), p(side * .10, 1.25, 1.8), .033, tone.silver);
   arm.finish();
   const backWall = new THREE.Group(); backWall.name = 'Límite de la plataforma espacial'; parent.add(backWall);
-  applyExteriorOcclusion(parent);
+  const compactShadows = applyExteriorOcclusion(parent);
   let night = false, detail = true;
   return {
     backWall,
@@ -573,6 +603,7 @@ export async function buildSpaceportScene(parent: THREE.Group, course: Course, _
       launch.setNight(value); illumination.setNight(value);
     },
     setDetail(value: boolean) {
+      compactShadows(!value);
       detail = value; campus.setDetail(value); people.setDetail(value); vehicles.setDetail(value);
       activity.setDetail(value);
       workplaces.setDetail(value);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bakeGroundContacts } from './ground-contacts';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { diquePlanPoint, diqueRoadDistance, type Course } from '../shared/courses';
 import { box, canvas2d, horizontalShadow, noiseField, random, standard, texture } from './materials';
@@ -62,9 +63,9 @@ function floodlightPool() {
       const reflect = THREE.MathUtils.smoothstep(stone, 0.61, 0.97) * footprint;
       const i = (y * width + x) * 4;
       pattern.data[i] = 255;
-      pattern.data[i + 1] = 154 + 54 * reflect;
-      pattern.data[i + 2] = 73 + 71 * reflect;
-      pattern.data[i + 3] = 223 * footprint * (0.49 + 0.32 * wear(u, v) + 0.41 * reflect);
+      pattern.data[i + 1] = 163 + 25 * reflect;
+      pattern.data[i + 2] = 90 + 31 * reflect;
+      pattern.data[i + 3] = 223 * footprint * (0.55 + 0.14 * wear(u, v) + 0.12 * reflect);
     }
   }
   context.putImageData(pattern, 0, 0);
@@ -399,6 +400,8 @@ function containers(parent: THREE.Group, course: Course) {
     const load = point(-4.97, -1.51);
     if (diqueRoadClear(course, load.x, load.z, 0.88)) pallet(parent, load.x, DIQUE_GROUND, load.z);
   }
+  bakeGroundContacts(parent, reflectors.filter(box => box.y < DIQUE_GROUND + cargoHeight)
+    .map(box => [box.x, DIQUE_GROUND + .012, box.z, box.width + .91, box.depth + .68, box.yaw]));
   return reflectors;
 }
 

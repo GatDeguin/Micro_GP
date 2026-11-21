@@ -54,7 +54,7 @@ const effects = /* glsl */`
   void main() {
     float depth = eyeDepth(vFilmUv);
     vec3 center = texture2D(sceneColor, vFilmUv).rgb;
-    vec2 stepPixel = pixel * 4.4;
+    vec2 stepPixel = pixel * mix(3.0, 5.1, smoothstep(16.0, 69.0, depth));
     vec3 glow = highlight(center) * .28;
     vec3 lensColor = center * .28;
     gather(stepPixel * vec2(1.0, 0.0), .125, center, depth, glow, lensColor);
@@ -143,7 +143,7 @@ const composite = /* glsl */`
   void main() {
     vec3 color = softenEdge(texture2D(sceneColor, vFilmUv).rgb);
     float depth = eyeDepth(vFilmUv);
-    float blur = .84 * softLens * smoothstep(focusDepth + 9.0, focusDepth + 49.0, depth);
+    float blur = .80 * softLens * smoothstep(focusDepth + 10.0, focusDepth + 54.0, depth);
     if (blur > .025) {
       vec4 distant = texture2D(lensImage, vFilmUv);
       color = mix(color, distant.rgb, blur * smoothstep(.83, .975, distant.a / depth));

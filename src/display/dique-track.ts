@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bakeGroundContacts, type GroundContact } from './ground-contacts';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { diqueRoadDistance, type Course } from '../shared/courses';
@@ -149,13 +150,13 @@ function asphalt() {
       const fines = dust(u, v);
       const facets = THREE.MathUtils.smoothstep(grit, 0.55, 0.91);
       const i = (y * size + x) * 4;
-      const shade = 182 + (wear - 0.5) * 26 + (fines - 0.5) * 32 + 24 * facets;
+      const shade = 181 + (wear - 0.5) * 23 + (fines - 0.5) * 34 + 15 * facets;
       pigment.data[i] = shade + 5 * facets;
       pigment.data[i + 1] = shade + 1;
       pigment.data[i + 2] = shade - 4 * facets;
       pigment.data[i + 3] = 255;
-      response.data[i] = 104 + 82 * grit + 32 * fines;
-      response.data[i + 1] = 231 + 17 * fines - 42 * facets;
+      response.data[i] = 112 + 67 * grit + 50 * fines;
+      response.data[i + 1] = 232 + 18 * fines - 31 * facets;
       response.data[i + 3] = 255;
     }
   }
@@ -166,7 +167,7 @@ function asphalt() {
   map.wrapS = map.wrapT = aggregate.wrapS = aggregate.wrapT = THREE.RepeatWrapping;
   // Texture data is linear. Red carries surface relief, green controls the gloss of the exposed aggregate.
   aggregate.anisotropy = map.anisotropy;
-  const material = new THREE.MeshStandardMaterial({ color: TINT.asphalt, map, bumpMap: aggregate, bumpScale: 0.021,
+  const material = new THREE.MeshStandardMaterial({ color: TINT.asphalt, map, bumpMap: aggregate, bumpScale: 0.012,
     name: 'Asfalto de árido expuesto', vertexColors: true, roughnessMap: aggregate, roughness: 0.95 });
   material.customProgramCacheKey = () => 'dique-damp-asphalt-v1';
   material.onBeforeCompile = shader => {
@@ -195,11 +196,14 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
   const uv = [];
   const damp = [];
   const indices = [];
-  const repeats = Math.round(course.length * 0.24) / course.length;
+  const repeats = Math.round(course.length * 0.37) / course.length;
   for (const [i, p] of samples.entries()) {
     const half = course.roadHalfAt(p.s);
     const port = insideDetour(course.detour, p.s, 6);
     const plant = insideDetour(course.treatmentDetour, p.s, 6);
+    const repair = course.detour
+      ? THREE.MathUtils.smoothstep(p.s - course.detour.from, 37, 39)
+        * (1 - THREE.MathUtils.smoothstep(p.s - course.detour.from, 49, 51)) : 0;
     const drainage = course.treatmentDetour
       ? 1 - THREE.MathUtils.smoothstep(Math.abs(p.s - course.treatmentDetour.from - 46), 7, 26) : 0;
     for (const [line, fraction] of bands.entries()) {
@@ -207,15 +211,18 @@ function asphaltDeck(course: Course, samples: readonly TrackPoint[]) {
       const q = diqueEdge(course, p, offset);
       const streak = 0.94 + 0.040 * Math.cos(p.s * 0.092) + 0.025 * Math.sin(p.s * 0.29 + fraction * 1.6);
       const wheelLine = 1 - Math.min(1, Math.abs(Math.abs(fraction) - 0.43 + 0.05 * Math.sin(p.s * 0.23)) * 6.8);
-      const wear = streak * (1 - 0.16 * wheelLine - 0.17 * Math.abs(fraction) ** 5);
+      const shoulder = Math.abs(fraction) ** 5;
+      const seal = repair * THREE.MathUtils.smoothstep(fraction, -.76, -.44) * (1 - THREE.MathUtils.smoothstep(fraction, .47, .77));
+      const wear = streak * (1 - 0.18 * wheelLine - 0.09 * shoulder - 0.12 * seal);
       const wet = course.wetAt(p.s, offset);
       const surfaceMoisture = Math.max(wet, drainage * THREE.MathUtils.smoothstep(Math.abs(fraction), .54, .96) * .87);
       positions.push(q.x, q.y, q.z);
-      uv.push(p.s * repeats, offset * 0.24);
+      uv.push(p.s * repeats, offset * 0.37);
       damp.push(surfaceMoisture);
-      colors.push(wear * (1 - 0.49 * wet + 0.21 * port + 0.06 * plant),
-        wear * (1 - 0.43 * wet + 0.28 * port + 0.13 * plant),
-        wear * (1 - 0.37 * wet + 0.30 * port + 0.17 * plant));
+      const dust = shoulder * (1 - surfaceMoisture) * (.06 + .07 * Math.cos(p.s * .22));
+      colors.push(wear * (1 - 0.49 * wet + 0.21 * port + 0.06 * plant + dust),
+        wear * (1 - 0.43 * wet + 0.28 * port + 0.13 * plant + dust * .62),
+        wear * (1 - 0.37 * wet + 0.30 * port + 0.17 * plant + dust * .35));
       if (line === bands.length - 1 || i === samples.length - 1) continue;
       const k = i * bands.length + line;
       indices.push(k, k + 1, k + bands.length, k + bands.length, k + 1, k + bands.length + 1);
@@ -419,6 +426,7 @@ function rails(parent: THREE.Group, course: Course) {
   const base = standard(0x66615a, 0.72, 0.30);
   const bevel = new RoundedBoxGeometry(1, 1, 1, 1, .11);
   const hex = new THREE.CylinderGeometry(.020, .024, .021, 6);
+  const contacts: GroundContact[] = [];
   const repairRail = [standard(0xc77b38, 0.75, 0.17), standard(0xe0cba0, 0.83)];
   const count = Math.round(course.length / 2.30);
   const spacing = course.length / count;
@@ -442,6 +450,9 @@ function rails(parent: THREE.Group, course: Course) {
         const upright = box(parent, post, foot.x, foot.y + .391, foot.z, .077, .795, .091, false);
         shoe.rotation.y = upright.rotation.y = yaw;
         if (closeHardware) {
+          if (Math.abs(course.bankAt(s)) < .035 && Math.abs(q.y - p.y) < .10) {
+            contacts.push([foot.x, foot.y + .010, foot.z, .31, .42, yaw]);
+          }
           shoe.geometry = upright.geometry = bevel;
           const join = box(parent, post, foot.x, foot.y + .432, foot.z, .094, .096, .116, false);
           join.geometry = bevel; join.rotation.y = yaw;
@@ -468,6 +479,7 @@ function rails(parent: THREE.Group, course: Course) {
       }
     }
   }
+  bakeGroundContacts(parent, contacts);
 }
 
 function retainingGlow() {

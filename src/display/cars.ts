@@ -6,7 +6,7 @@ import { CAR_SPECS, type CarView } from '../shared/protocol';
 import { TALLER, type Course } from '../shared/courses';
 import { mergeStatic } from './batches';
 import { ARCH_RADIUS, archFloor, crownHeight, sectionAt, shellGeometry, shellSections, sidePoint, type Section } from './car-shell';
-import { box, canvas2d, horizontalShadow, random, standard, texture } from './materials';
+import { box, canvas2d, random, standard, texture } from './materials';
 import { headlightLayer } from './render-layers';
 import { buildLocalReflections, type LocalReflector } from './local-reflections';
 
@@ -376,14 +376,17 @@ function windowBorders(parent: THREE.Object3D, model: Model, trim: THREE.Materia
   ];
   for (const [from, to] of panes) {
     const rows = [from, ...shellSections(model.glass).map(([z]) => z).filter(z => z > from + 0.02 && z < to - 0.02), to];
-    const at = (z: number, side: number) => {
+    const at = (z: number, side: number, edge: number, lift: number) => {
       const section = sectionAt(model.glass, z);
-      const x = side * section[1] * 0.708;
-      return new THREE.Vector3(x, crownHeight(section, x, false) + 0.0065, z);
+      const x = side * section[1] * edge;
+      return new THREE.Vector3(x, crownHeight(section, x, false) + lift, z);
     };
-    const shape = [...rows.map(z => at(z, 1)), ...rows.reverse().map(z => at(z, -1))];
-    seam(parent, shape, trim, 0.009, true);
-    seam(parent, shape.map(p => p.clone().add(new THREE.Vector3(0, 0.005, 0))), rubberSeal, 0.007, true);
+    const border = (edge: number, lift: number, inset: number) => {
+      const samples = rows.map(z => THREE.MathUtils.clamp(z, from + inset, to - inset));
+      return [...samples.map(z => at(z, 1, edge, lift)), ...samples.reverse().map(z => at(z, -1, edge, lift))];
+    };
+    seam(parent, border(.736, .005, 0), trim, .0057, true);
+    seam(parent, border(.699, .0067, .006), rubberSeal, .0081, true);
   }
 }
 
@@ -393,6 +396,10 @@ function cockpit(parent: THREE.Object3D, model: Model) {
   const parcelZ = THREE.MathUtils.lerp(model.glass[0][0], rear, 0.71);
   const parcel = sectionAt(model.glass, parcelZ);
   box(parent, splitter, 0, parcel[2] + 0.057, parcelZ, parcel[1] * 1.35, 0.027, 0.105, false);
+  const shelf = new THREE.Mesh(topDecal(model.body, 0, parcel[1] * 1.46, model.glass[0][0] + .021,
+    THREE.MathUtils.lerp(rear, front, .19), model.wheelbase), rubberSeal);
+  shelf.name = 'Bandeja interior bajo la luneta';
+  parent.add(shelf);
   for (const side of [-1, 1]) {
     const x = side * width * 0.48;
     box(parent, rubberSeal, x, 0.472, seatZ + 0.04, 0.181, 0.043, 0.217, false);
@@ -539,7 +546,7 @@ function topDecal(sections: readonly Section[], offset: number, width: number, f
 
 function stripe(parent: THREE.Object3D, sections: readonly Section[], offset: number, width: number, first: number,
   material: THREE.Material, wheelbase?: number) {
-  const last = sections[sections.length - 1][0];
+  const last = sections[sections.length - 1][0] - (wheelbase === undefined ? 0 : .025);
   const mesh = new THREE.Mesh(topDecal(sections, offset, width, first, last, wheelbase), material);
   mesh.receiveShadow = true;
   parent.add(mesh);
@@ -586,17 +593,33 @@ function wheel(parent: THREE.Object3D, side: number, z: number, tyre: THREE.Mate
   return { pivot, spin };
 }
 
+function carShadowMaterial() {
+  const { canvas, context } = canvas2d(128, 64);
+  for (const [x, stops] of [[32, [.53, .34, 0]], [96, [.92, .78, 0]]] as const) {
+    const falloff = context.createRadialGradient(x, 32, 3, x, 32, 28);
+    stops.forEach((alpha, i) => falloff.addColorStop([0, .40, 1][i], `rgba(8, 12, 16, ${alpha})`));
+    context.fillStyle = falloff;
+    context.fillRect(x - 32, 0, 64, 64);
+  }
+  return new THREE.MeshBasicMaterial({ map: texture(canvas), vertexColors: true, transparent: true, depthWrite: false });
+}
+
 function contactShadow(dimensions: CarDimensions, material: THREE.Material) {
-  const patches = [new THREE.PlaneGeometry(dimensions.halfWidth * 2.68, (dimensions.front + dimensions.rear) * 1.20).rotateX(-Math.PI / 2)];
+  const patches = [new THREE.PlaneGeometry(dimensions.halfWidth * 2.73, (dimensions.front + dimensions.rear) * 1.22).rotateX(-Math.PI / 2)];
   for (const side of [-1, 1]) for (const end of [-1, 1]) {
-    patches.push(new THREE.PlaneGeometry(0.41, 0.51).rotateX(-Math.PI / 2)
+    patches.push(new THREE.PlaneGeometry(0.32, 0.39).rotateX(-Math.PI / 2)
       .translate(WHEEL_SIDE * dimensions.renderScale[0] * side, 0.002, dimensions.axle * end));
   }
   patches.push(new THREE.PlaneGeometry(dimensions.halfWidth * 2.93, (dimensions.front + dimensions.rear) * 1.26)
     .rotateX(-Math.PI / 2).translate(0, .003, 0));
+  patches.forEach((patch, i) => {
+    const uv = patch.getAttribute('uv');
+    const offset = i > 0 && i < 5 ? .5 : 0;
+    for (let vertex = 0; vertex < uv.count; vertex++) uv.setX(vertex, uv.getX(vertex) * .5 + offset);
+  });
   const geometry = mergeGeometries(patches);
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(
-    patches.flatMap((_, i) => Array.from({ length: 4 }, () => [1, 1, 1, i === 0 ? 0.60 : i === 5 ? 0 : 1]).flat()), 4));
+    patches.flatMap((_, i) => Array.from({ length: 4 }, () => [1, 1, 1, i === 0 ? 0.69 : i === 5 ? 0 : 0.94]).flat()), 4));
   const shadow = new THREE.Mesh(geometry, material);
   patches.forEach(patch => patch.dispose());
   shadow.position.y = 0.009;
@@ -708,8 +731,7 @@ function headlightPattern() {
 }
 
 export function buildCars(parent: THREE.Object3D) {
-  const shadowMaterial = horizontalShadow();
-  shadowMaterial.vertexColors = true;
+  const shadowMaterial = carShadowMaterial();
   const chrome = metalFinish(true);
   const satin = metalFinish(false);
   const wheelChrome = chrome.clone();
@@ -724,7 +746,7 @@ export function buildCars(parent: THREE.Object3D) {
     const model = models[i];
     const dimensions = CAR_DIMENSIONS[i];
     const [scaleX, scaleY, scaleZ] = dimensions.renderScale;
-    const trim = i === 0 ? chrome : satin;
+    const trim = (i === 0 ? chrome : satin).clone();
     const root = new THREE.Group();
     const chassis = new THREE.Group();
     const axles = new THREE.Group();
@@ -750,7 +772,8 @@ export function buildCars(parent: THREE.Object3D) {
     const localReflection = buildLocalReflections();
     const reflectiveGlass = closeGlass.clone();
     localReflection.attach(paint);
-    localReflection.attach(reflectiveGlass);
+    localReflection.attach(reflectiveGlass, true);
+    localReflection.attach(trim);
     loft(chassis, model.body, paint, model.wheelbase);
     box(chassis, splitter, 0, 0.148, 0, 0.56, 0.065, model.wheelbase * 2 + 0.44);
     const glazing = loft(chassis, model.glass, glass);
@@ -780,8 +803,8 @@ export function buildCars(parent: THREE.Object3D) {
     roundedPart(chassis, bumper, 0, 0.218, tail - 0.016, i === 3 ? 0.85 : 0.69, 0.066, 0.067);
     frontFascia(chassis, detail, model, i, nose, trim, paint);
     paintWear(detail, model, 114 + i * 317);
-    const rearLamps = new THREE.MeshStandardMaterial({ color: 0xaf3022, map: tailGlow, emissive: 0xff281a, emissiveMap: tailGlow,
-      emissiveIntensity: 0.24, roughness: 0.31 });
+    const rearLamps = new THREE.MeshPhysicalMaterial({ color: 0xaf3022, map: tailGlow, emissive: 0xff281a, emissiveMap: tailGlow,
+      emissiveIntensity: 0.24, roughness: 0.41, clearcoat: .78, clearcoatRoughness: .14 });
     rearFascia(chassis, detail, model, i, tail, trim, rearLamps, number);
     const headlamp = lens.clone();
     headlamp.emissive.setHex(0xffebc7);
@@ -851,8 +874,8 @@ export function buildCars(parent: THREE.Object3D) {
     let projectedOpacity = 0;
     return {
       setNight(enabled: boolean) { night = enabled; },
-      setReflections(reflectors: readonly LocalReflector[], view: CarView, cover: number) {
-        localReflection.update(reflectors, view.x, view.y + .45, view.z, cover, night);
+      setReflections(reflectors: readonly LocalReflector[], view: CarView, cover: number, probe?: THREE.Texture, weight?: number) {
+        localReflection.update(reflectors, view.x, view.y + .45, view.z, cover, night, probe, weight);
       },
       setProjectedShadow(enabled: boolean) { for (const caster of casters) caster.castShadow = enabled; },
       setDetail(close: boolean) {
