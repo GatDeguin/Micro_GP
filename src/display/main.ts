@@ -5,6 +5,7 @@ import type { TrackPoint } from '../shared/track';
 import { raceAudio } from './audio';
 import { instanceStatic, mergeStatic } from './batches';
 import { buildCars } from './cars';
+import { buildChaseFilm } from './chase-film';
 import { lobbyCameraTour } from './camera-tour';
 import { buildCircuit } from './circuit';
 import { buildCollectorBackdrop, disposeCollectorBackdrop } from './collector-backdrop';
@@ -188,10 +189,11 @@ async function bootstrap() {
   const controls = buildViewControls({ multiplayer: !pages, graphics, audio: audioSettings, onAudioChange: audio.setLevels });
   let displayWindow = buildCollectorBackdrop(renderer);
   let stage = taller;
+  const chaseFilm = lowQuality ? undefined : buildChaseFilm(renderer);
   let preview = exhibition(TALLER);
   let fit = cameraFit(camera, TALLER);
   const viewsFor = (next: CourseStage) => buildRaceViews(renderer, camera, placard,
-    camera => cameraFit(camera, next.course), { wall: next.backWall, build: () => displayWindow }, next.course);
+    camera => cameraFit(camera, next.course), { wall: next.backWall, build: () => displayWindow }, next.course, chaseFilm);
   let renderViews = viewsFor(taller);
   const replay = new ReplayHistory(false);
   const cameraTour = lobbyCameraTour();
@@ -339,7 +341,12 @@ async function bootstrap() {
     if (expected.course.id !== 'spaceport') scene.background = displayWindow;
     try {
       await renderer.compileAsync(scene, closeCamera);
-      if (stage === expected && !lostContext) renderer.render(scene, closeCamera);
+      if (stage !== expected || lostContext) return;
+      renderer.render(scene, closeCamera);
+      if (chaseFilm && expected.course.id !== 'taller') {
+        await chaseFilm.prepare(scene, closeCamera);
+        if (stage === expected && !lostContext) chaseFilm.render(scene, closeCamera, 6, night, true);
+      }
     } finally {
       if (stage === expected) {
         scene.background = background;
@@ -588,7 +595,7 @@ async function bootstrap() {
         replayShot?.stop();
         placard.resize(camera, width, height, undefined, overviewPlacardLimit(stage.course));
       }
-      listener = renderViews(scene, mode, interpolated, slots, width, height, dt);
+      listener = renderViews(scene, mode, interpolated, slots, width, height, dt, night, !reduceMotion.matches && budget.scale >= 0.86);
     }
     if (splash.dataset.stage === 'loading') splash.dataset.stage = 'ready';
     audio.update({

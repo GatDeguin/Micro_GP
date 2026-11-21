@@ -39,3 +39,41 @@ test('loop chase keeps the whole toy car in frame through inversion and lateral 
     assert.ok(worst < .98, location);
   } finally { await server.close(); }
 });
+
+test('solo chase composites the QR after the film and split views draw directly', async () => {
+  const server = await createServer({ configFile: false, logLevel: 'silent', server: { middlewareMode: true } });
+  try {
+    const { buildRaceViews } = await server.ssrLoadModule('/src/display/race-views.ts');
+    const { SPACEPORT } = await server.ssrLoadModule('/src/shared/courses.ts');
+    const scene = new THREE.Scene(), code = new THREE.Group();
+    scene.add(code);
+    const passes: string[] = [];
+    const renderer = {
+      autoClear: true, shadowMap: { autoUpdate: false },
+      setViewport() {}, setScissor() {}, setScissorTest() {}, setClearColor() {}, clear() {}, clearDepth() {},
+      render(world: THREE.Scene) { passes.push(world === scene ? 'world' : 'plaquard'); },
+    };
+    const placard = { object: code, resize() {}, setGrounded() {} };
+    const film = {
+      render(world: THREE.Scene, _camera: THREE.Camera, focus: number, night: boolean, blur: boolean) {
+        assert.equal(world, scene);
+        assert.ok(focus > 2 && focus < 10);
+        assert.equal(night, true);
+        assert.equal(blur, false);
+        assert.notEqual(code.parent, scene);
+        passes.push('film');
+      },
+    };
+    const render = buildRaceViews(renderer, new THREE.PerspectiveCamera(), placard, () => () => {},
+      { wall: new THREE.Group() }, SPACEPORT, film);
+    const cars = [24, 31].map(s => {
+      const frame = SPACEPORT.frameAt(s);
+      return { x: frame.x, y: frame.y, z: frame.z, yaw: Math.atan2(frame.tx, frame.tz), distance: s, speed: 8 };
+    });
+    render(scene, 'chase', cars, [0], 1920, 1080, 1 / 60, true, false);
+    assert.deepEqual(passes.splice(0), ['film', 'plaquard']);
+    render(scene, 'chase', cars, [0, 1], 1920, 1080, 1 / 60, true, false);
+    assert.deepEqual(passes, ['world', 'world', 'plaquard']);
+    assert.equal(code.parent, scene);
+  } finally { await server.close(); }
+});

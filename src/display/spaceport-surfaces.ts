@@ -34,7 +34,12 @@ function maps(kind: Surface) {
       const ring = Math.sin(u * Math.PI * 22 + Math.sin(v * Math.PI * 2) * .70 + Math.sin(v * Math.PI * 6) * .16);
       c = 222 + ring * 13 + (grain - .5) * 8; h = .5 + ring * .1; r = .67 + grain * .16; warm = 7;
     }
-    if (kind === 'asphalt') { c = 232 + (grain - .5) * 29 + broad * 6 - pore * 21; h = .5 + (grain - .5) * .23 - pore * .16; r = .82 + grain * .17; }
+    if (kind === 'asphalt') {
+      const chip = smoothChip(noise(u, v, 102));
+      c = 219 + (grain - .5) * 34 + broad * 12 - pore * 21 + chip * 38;
+      h = .5 + (grain - .5) * .14 - pore * .13 + chip * .18;
+      r = .86 + grain * .13 - chip * .23;
+    }
     colour.set([c, c - warm * .25, c - warm, 255], i);
     height.set([h * 255, h * 255, h * 255, 255], i);
     roughness.set([255, r * 255, 255, 255], i);
@@ -44,11 +49,15 @@ function maps(kind: Surface) {
     map.colorSpace = colorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping;
     map.magFilter = THREE.LinearFilter; map.minFilter = THREE.LinearMipmapLinearFilter;
     map.generateMipmaps = true; map.anisotropy = 8; map.needsUpdate = true;
-    map.repeat.setScalar(kind === 'asphalt' ? 2.2 : kind === 'wood' ? .50 : kind === 'concrete' ? .48 : .8);
+    map.repeat.setScalar(kind === 'asphalt' ? .52 : kind === 'wood' ? .50 : kind === 'concrete' ? .48 : .8);
     return map;
   };
   return { map: make(colour, THREE.SRGBColorSpace), bumpMap: make(height, THREE.NoColorSpace),
     roughnessMap: make(roughness, THREE.NoColorSpace) };
+}
+
+function smoothChip(value: number) {
+  return THREE.MathUtils.smoothstep(value, .63, .91);
 }
 
 export function createSpaceportSurfaces() {

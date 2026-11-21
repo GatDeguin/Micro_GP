@@ -6,6 +6,7 @@ import { overviewPlacardLimit, type buildPlacard } from './signs';
 import { approachingCover, coverClearance } from './track-cover';
 import { cinematicStation } from './cinematic-cameras';
 import { cameraLights } from './render-layers';
+import type { buildChaseFilm } from './chase-film';
 
 export type ViewMode = 'general' | 'chase' | 'trackside' | 'broadcast';
 
@@ -123,6 +124,7 @@ export function buildRaceViews(
   placard: ReturnType<typeof buildPlacard>, cameraFit: (camera: THREE.PerspectiveCamera) => (width: number, height: number) => void,
   backdrop: { wall: THREE.Object3D; build(): THREE.Texture },
   course: Course = TALLER,
+  film?: ReturnType<typeof buildChaseFilm>,
 ) {
   const followers = Array.from({ length: 4 }, (_, slot) => followCamera(slot, course));
   const shared = new THREE.PerspectiveCamera(overhead.fov, 1, overhead.near, overhead.far);
@@ -132,12 +134,13 @@ export function buildRaceViews(
   plateKey.position.set(-3, 5, 5);
   plateScene.add(plateKey, new THREE.HemisphereLight(0xffead2, 0x3f3636, 1.5));
   const divider = new THREE.Color(0x171310);
+  const subject = new THREE.Vector3();
   let sharedWidth = 0;
   let sharedHeight = 0;
   let wasSplit = false;
 
   return (scene: THREE.Scene, mode: ViewMode, cars: readonly CarView[], slots: readonly number[],
-    width: number, height: number, dt: number) => {
+    width: number, height: number, dt: number, night = false, lensBlur = true) => {
     const split = slots.length > 1;
     if (wasSplit && !split) placard.resize(overhead, width, height, undefined, overviewPlacardLimit(course));
     wasSplit = split;
@@ -151,13 +154,17 @@ export function buildRaceViews(
     const roomBlur = scene.backgroundBlurriness;
     const roomIntensity = scene.backgroundIntensity;
     const collector = mode === 'general' || course.id === 'spaceport' ? undefined : backdrop.build();
-    const draw = (camera: THREE.PerspectiveCamera, following: boolean) => {
+    const draw = (camera: THREE.PerspectiveCamera, following: boolean, featured?: CarView) => {
       const background = following ? collector : undefined;
       scene.background = background ?? room;
       scene.backgroundBlurriness = background ? 0.05 : roomBlur;
       scene.backgroundIntensity = background && course.id === 'dique' ? roomIntensity * 0.74 : roomIntensity;
       backdrop.wall.visible = background === undefined;
-      renderer.render(scene, camera);
+      if (film && featured && mode === 'chase' && course.id !== 'taller') {
+        camera.updateMatrixWorld();
+        const focus = -subject.set(featured.x, featured.y + .42, featured.z).applyMatrix4(camera.matrixWorldInverse).z;
+        film.render(scene, camera, Math.max(2, focus), night, lensBlur);
+      } else renderer.render(scene, camera);
     };
 
     placard.setGrounded(false);
@@ -209,7 +216,7 @@ export function buildRaceViews(
     } else {
       const slot = slots[0];
       listener = followers[slot](mode, cars[slot], width, height, dt);
-      draw(listener, true);
+      draw(listener, true, cars[slot]);
     }
     scene.background = room;
     scene.backgroundBlurriness = roomBlur;

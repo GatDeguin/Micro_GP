@@ -226,9 +226,9 @@ function wetShoulder(parent: THREE.Group, course: Course) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   diquePart(parent, geometry, new THREE.MeshPhysicalMaterial({
-    color: 0x353c41, roughness: 0.24, vertexColors: true,
-    bumpMap: mineralMap(2957, [192, 195, 199]), bumpScale: 0.014,
-    clearcoat: 0.94, clearcoatRoughness: 0.14, envMapIntensity: 0.83, transparent: true, depthWrite: false,
+    color: 0x303941, roughness: 0.21, vertexColors: true,
+    bumpMap: mineralMap(2957, [192, 195, 199]), bumpScale: 0.008,
+    clearcoat: 1.0, clearcoatRoughness: 0.105, envMapIntensity: 1.18, transparent: true, depthWrite: false,
   }), false, 'Huella húmeda de la grúa');
 }
 

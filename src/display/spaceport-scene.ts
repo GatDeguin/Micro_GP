@@ -124,9 +124,21 @@ function parts(parent: THREE.Object3D, material: THREE.MeshStandardMaterial, nam
 }
 type Parts = ReturnType<typeof parts>;
 
-function track(parent: THREE.Group, course: Course, material: THREE.MeshStandardMaterial) {
+function track(parent: THREE.Group, course: Course, source: THREE.MeshStandardMaterial) {
+  const material = source.clone();
+  // The deck, painted barriers, and steel rims share a draw but respond to
+  // light differently. The per-vertex selector is constant across each face.
+  material.metalness = .58;
+  material.customProgramCacheKey = () => 'spaceport-track-finishes-v1';
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = 'attribute float finish; varying float vFinish;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFinish = finish;');
+    shader.fragmentShader = 'varying float vFinish;\n' + shader.fragmentShader
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, .35, vFinish);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor *= vFinish;');
+  };
   const count = Math.ceil(course.length / .78), spacing = course.length / count;
-  let positions: number[] = [], colors: number[] = [], indices: number[] = [], uv: number[] = [];
+  let positions: number[] = [], colors: number[] = [], indices: number[] = [], uv: number[] = [], finishes: number[] = [];
   let distance = 0;
   const color = new THREE.Color();
   function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, tint: number, reverse = false, edgeShade = 0) {
@@ -134,6 +146,7 @@ function track(parent: THREE.Group, course: Course, material: THREE.MeshStandard
     for (const [i, v] of [a, b, c, d].entries()) {
       const shade = edgeShade && i % 2 === (edgeShade > 0 ? 1 : 0) ? .76 : 1;
       positions.push(v.x, v.y, v.z); colors.push(color.r * shade, color.g * shade, color.b * shade);
+      finishes.push(tint === tone.steel || tint === tone.silver ? 1 : tint === tone.navy || tint === tone.white || tint === tone.orange ? .26 : 0);
     }
     uv.push(0, distance, a.distanceTo(b), distance, 0, distance + spacing, c.distanceTo(d), distance + spacing);
     if (reverse) indices.push(at, at + 2, at + 1, at + 2, at + 3, at + 1);
@@ -148,11 +161,12 @@ function track(parent: THREE.Group, course: Course, material: THREE.MeshStandard
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geometry.setAttribute('finish', new THREE.Float32BufferAttribute(finishes, 1));
     geometry.setIndex(indices); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
     const road = new THREE.Mesh(geometry, material); road.name = 'Cinta 3D, escapatorias y guías magnéticas';
     road.castShadow = positions.some((value, i) => i % 3 === 1 && value > 1.4);
     road.receiveShadow = true; parent.add(road);
-    positions = []; colors = []; indices = []; uv = [];
+    positions = []; colors = []; indices = []; uv = []; finishes = [];
   }
   for (let i = 0; i < count; i++) {
     const s = i * spacing, t = (i + 1) * spacing;
